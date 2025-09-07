@@ -39,7 +39,9 @@ This system provides a testing ground for warehouse optimization algorithms by s
 
 - **Modern Dashboard** with dark mode support
 - **Real-time Inventory Tracking** with pagination and filtering
-- **Medication Detail Views** with comprehensive analytics
+- **Medication Detail Views** with comprehensive analytics and interactive charts
+- **Consumption History Charts** using Plotly.js for data visualization
+- **Forecasting Visualizations** with 28-day demand predictions
 - **Responsive Design** for desktop and mobile access
 
 ## Quick Start
@@ -184,6 +186,7 @@ The system simulates realistic warehouse disorganization:
 GET /api/inventory          # Paginated inventory with filters
 GET /api/medication/{id}    # Detailed medication information
 GET /api/filters           # Available filter options (categories, suppliers, etc.)
+GET /api/medication/{id}/consumption-history  # Historical consumption data and forecasts
 ```
 
 ### Query Parameters
@@ -193,6 +196,7 @@ GET /api/filters           # Available filter options (categories, suppliers, et
 - `category`: Filter by medication category
 - `supplier`: Filter by supplier
 - `stock_level`: Filter by stock status (Low, Medium, High, Out of Stock)
+- `days`: Number of days for consumption history data (30-730 days)
 
 ### Example Response
 
@@ -225,11 +229,14 @@ GET /api/filters           # Available filter options (categories, suppliers, et
 - **Advanced Filtering**: Multi-criteria search and filtering
 - **Pagination**: Efficient handling of large datasets
 - **Real-time Updates**: Live inventory status and metrics
+- **Interactive Charts**: Plotly.js powered consumption and forecasting visualizations
 
 ### User Interface Components
 
 - **Inventory Table**: Sortable columns with stock level indicators
-- **Medication Details**: Comprehensive view with consumption history
+- **Medication Details**: Comprehensive view with consumption history and interactive charts
+- **Consumption Charts**: Visual representation of historical demand patterns
+- **Forecasting Dashboard**: 28-day demand predictions with confidence intervals
 - **Supplier Dashboard**: Lead times and delivery performance
 - **Zone Management**: Storage location optimization view
 
@@ -333,6 +340,10 @@ docker-compose -f docker-compose.prod.yml up -d
 ```bash
 # Check application health
 curl http://localhost:8000/api/filters
+
+# Test medication details with charts
+curl http://localhost:8000/api/medication/1
+curl http://localhost:8000/api/medication/1/consumption-history
 
 # Monitor container stats
 docker stats warehouse-management

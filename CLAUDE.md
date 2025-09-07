@@ -60,6 +60,9 @@ make lint
 ```bash
 # Test application health
 curl http://localhost:8000/api/filters
+
+# Test chart data endpoint  
+curl http://localhost:8000/api/medication/1/consumption-history
 ```
 
 ## Architecture Overview
@@ -74,8 +77,10 @@ curl http://localhost:8000/api/filters
 ### Frontend
 
 - **Static Web App**: HTML/CSS/JavaScript files in `src/static/`
-- **Features**: Dark mode, responsive tables, inventory management UI
-- **API Integration**: Consumes FastAPI endpoints for data visualization
+- **Features**: Dark mode, responsive tables, inventory management UI, interactive charts
+- **Chart Visualization**: Plotly.js integration for consumption history and forecasting charts
+- **Medication Detail Pages**: Dedicated pages with comprehensive analytics and chart views
+- **API Integration**: Consumes FastAPI endpoints for data visualization and real-time charting
 
 ### Data Architecture
 
@@ -122,6 +127,8 @@ The data generator creates realistic warehouse chaos:
 - Query parameter validation using FastAPI Query types
 - Comprehensive error handling with HTTPException
 - JSON responses with cleaned NaN values
+- **Chart Data Endpoints**: Specialized routes for consumption history and forecasting data
+- **Medication Detail API**: Rich data endpoints for individual medication analytics
 
 ### Docker Optimization
 
@@ -138,11 +145,18 @@ src/
 ├── data_loader.py       # CSV data loading and caching
 ├── api/
 │   ├── __init__.py
-│   └── routes.py        # API endpoints
+│   └── routes.py        # API endpoints with chart data routes
 ├── utils/
 │   └── synthetic_data_generator.py  # Large data generation script
 ├── static/              # Frontend assets (HTML/CSS/JS)
+│   ├── css/
+│   │   ├── chart-styles.css     # Chart-specific styling
+│   │   └── ...
+│   └── js/
+│       ├── consumption-chart.js # Chart rendering logic
+│       └── ...
 └── templates/           # HTML templates
+    └── medication-detail.html   # Medication detail page with charts
 
 data/                    # Generated CSV files
 docker-compose*.yml      # Docker configurations  

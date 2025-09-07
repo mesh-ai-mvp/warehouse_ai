@@ -65,8 +65,10 @@ async def get_filter_options():
 
 @router.get("/medication/{med_id}/consumption-history")
 async def get_medication_consumption_history(
-    med_id: int, 
-    days: int = Query(365, ge=30, le=730, description="Number of days of historical data")
+    med_id: int,
+    days: int = Query(
+        365, ge=30, le=730, description="Number of days of historical data"
+    ),
 ):
     """Get historical consumption data and forecast for a specific medication"""
     try:
