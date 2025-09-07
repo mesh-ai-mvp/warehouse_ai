@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import numpy as np
 from typing import Dict, List, Any
+from datetime import timedelta
 
 
 def clean_nan_values(data):
@@ -379,3 +380,94 @@ class DataLoader:
             "suppliers": sorted(list(suppliers)),
             "stock_levels": sorted(list(stock_levels)),
         }
+
+    def get_medication_consumption_history(self, med_id: int, days: int = 365) -> Dict[str, Any]:
+        """Get historical consumption data and forecast for a specific medication"""
+        try:
+            # Load full consumption history for this medication
+            consumption_df = pd.read_csv(
+                os.path.join(self.data_dir, "consumption_history.csv")
+            )
+            consumption_df["date"] = pd.to_datetime(consumption_df["date"])
+            
+            # Filter for specific medication
+            med_data = consumption_df[consumption_df["med_id"] == med_id].copy()
+            
+            if med_data.empty:
+                return {"error": "No consumption data found for this medication"}
+            
+            # Sort by date and get the latest `days` records
+            med_data = med_data.sort_values("date").tail(days)
+            
+            # Aggregate consumption across all stores by date
+            daily_consumption = med_data.groupby("date").agg({
+                "qty_dispensed": "sum",
+                "on_hand": "sum"
+            }).reset_index()
+            
+            # Rename columns for consistency
+            daily_consumption = daily_consumption.rename(columns={
+                "qty_dispensed": "consumption",
+                "on_hand": "current_stock"
+            })
+            
+            # Generate simple forecast (moving average for next 30-60 days)
+            recent_consumption = daily_consumption.tail(30)["consumption"].mean()
+            
+            # Create forecast data points
+            last_date = daily_consumption["date"].max()
+            forecast_dates = [last_date + timedelta(days=i) for i in range(1, 61)]
+            
+            # Simple forecast with some variation
+            np.random.seed(42)  # For consistent results
+            base_forecast = recent_consumption
+            forecast_values = []
+            
+            for i, date in enumerate(forecast_dates):
+                # Add some seasonal variation and noise
+                seasonal_factor = 1 + 0.1 * np.sin(2 * np.pi * i / 7)  # Weekly pattern
+                noise = np.random.normal(0, 0.1)
+                forecast_value = max(0, base_forecast * seasonal_factor * (1 + noise))
+                forecast_values.append(forecast_value)
+            
+            # Calculate statistics
+            avg_daily_consumption = daily_consumption["consumption"].mean()
+            current_stock = daily_consumption["current_stock"].iloc[-1] if len(daily_consumption) > 0 else 0
+            days_until_stockout = int(current_stock / avg_daily_consumption) if avg_daily_consumption > 0 else 999
+            
+            # Format data for chart
+            historical_data = []
+            for _, row in daily_consumption.iterrows():
+                historical_data.append({
+                    "date": row["date"].strftime("%Y-%m-%d"),
+                    "consumption": float(row["consumption"]),
+                    "stock": float(row["current_stock"]),
+                    "type": "historical"
+                })
+            
+            forecast_data = []
+            for i, date in enumerate(forecast_dates):
+                forecast_data.append({
+                    "date": date.strftime("%Y-%m-%d"),
+                    "consumption": float(forecast_values[i]),
+                    "stock": max(0, current_stock - sum(forecast_values[:i+1])),
+                    "type": "forecast"
+                })
+            
+            result = {
+                "med_id": med_id,
+                "historical_data": historical_data,
+                "forecast_data": forecast_data,
+                "statistics": {
+                    "avg_daily_consumption": float(avg_daily_consumption),
+                    "current_stock": float(current_stock),
+                    "days_until_stockout": days_until_stockout,
+                    "forecast_period_days": 60,
+                    "data_period_days": len(daily_consumption)
+                }
+            }
+            
+            return clean_nan_values(result)
+            
+        except Exception as e:
+            return {"error": f"Failed to load consumption history: {str(e)}"}

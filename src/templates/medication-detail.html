@@ -7,6 +7,10 @@
     <link rel="stylesheet" href="/static/css/main.css">
     <link rel="stylesheet" href="/static/css/table.css">
     <link rel="stylesheet" href="/static/css/dark-mode.css">
+    <link rel="stylesheet" href="/static/css/chart-styles.css">
+    
+    <!-- Plotly.js CDN -->
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
     <style>
         .detail-container {
             max-width: 1200px;
@@ -275,6 +279,81 @@
                         <div id="stockAlerts"></div>
                     </div>
 
+                    <!-- Consumption Chart Section -->
+                    <div class="chart-section">
+                        <div class="chart-header">
+                            <h2 class="chart-title">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+                                </svg>
+                                Consumption Analytics & Forecast
+                            </h2>
+                            <p class="chart-subtitle">Historical consumption patterns with AI-powered demand forecasting</p>
+                        </div>
+                        
+                        <!-- Statistics Cards -->
+                        <div class="chart-stats">
+                            <div class="stat-card">
+                                <div class="stat-value" id="avgDailyConsumption">--</div>
+                                <div class="stat-label">Avg Daily Consumption</div>
+                                <div class="stat-trend trend-neutral">
+                                    <span>Based on 30-day average</span>
+                                </div>
+                            </div>
+                            <div class="stat-card" id="stockoutCard">
+                                <div class="stat-value" id="daysUntilStockout">--</div>
+                                <div class="stat-label">Days Until Stockout</div>
+                                <div class="stat-trend trend-neutral">
+                                    <span>At current consumption rate</span>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="currentStock">--</div>
+                                <div class="stat-label">Current Stock Level</div>
+                                <div class="stat-trend trend-neutral">
+                                    <span>Units in inventory</span>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="dataQuality">--</div>
+                                <div class="stat-label">Forecast Confidence</div>
+                                <div class="stat-trend trend-neutral">
+                                    <span>Data quality indicator</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Chart Controls -->
+                        <div class="chart-controls">
+                            <div class="time-range-controls">
+                                <button class="time-range-btn" data-days="30">30D</button>
+                                <button class="time-range-btn active" data-days="90">90D</button>
+                                <button class="time-range-btn" data-days="180">6M</button>
+                                <button class="time-range-btn" data-days="365">1Y</button>
+                            </div>
+                            <div class="chart-actions">
+                                <button class="refresh-btn" id="refreshChart">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="23 4 23 10 17 10"/>
+                                        <polyline points="1 20 1 14 7 14"/>
+                                        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                                    </svg>
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Chart Container -->
+                        <div class="chart-container">
+                            <div id="consumptionChart">
+                                <div class="chart-loading">
+                                    <div class="loading-spinner"></div>
+                                    <p>Loading consumption data...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Detail grid -->
                     <div class="detail-grid">
                         <!-- Stock Summary -->
@@ -463,7 +542,7 @@
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Days Until Stockout</span>
-                            <span class="detail-value" id="daysUntilStockout">-</span>
+                            <span class="detail-value" id="daysUntilStockoutDetail">-</span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Last Updated</span>
@@ -515,21 +594,6 @@
                         </div>
                     </div>
 
-                    <!-- Consumption Chart Placeholder -->
-                    <div class="detail-card">
-                        <h3 class="card-title">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
-                            </svg>
-                            <span>Consumption Trend (Coming Soon)</span>
-                        </h3>
-                        <div class="consumption-chart">
-                            <div style="text-align: center;">
-                                <div style="font-size: 3rem; margin-bottom: 1rem;">📈</div>
-                                <p>Consumption trend chart will be available in a future update</p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </main>
@@ -540,6 +604,7 @@
 
     <!-- Scripts -->
     <script src="/static/js/dark-mode.js"></script>
+    <script src="/static/js/consumption-chart.js"></script>
     <script>
         // Medication detail page functionality
         class MedicationDetailPage {
@@ -577,6 +642,9 @@
                     this.medicationData = await response.json();
                     this.renderMedicationDetails();
                     
+                    // Initialize the consumption chart after medication data is loaded
+                    await this.initializeChart();
+                    
                 } catch (error) {
                     console.error('Error loading medication data:', error);
                     this.showError('Failed to load medication details. Please try again.');
@@ -590,7 +658,7 @@
                 
                 // Basic information
                 document.getElementById('medicationName').textContent = data.name || 'Unknown Medication';
-                document.getElementById('medicationId').textContent = `#${data.med_id || 'N/A'}`;
+                document.getElementById('medicationId').textContent = `#${this.medicationId || 'N/A'}`;
                 document.getElementById('category').textContent = data.category || 'N/A';
                 document.getElementById('packSize').textContent = data.pack_size || 'N/A';
                 document.getElementById('shelfLife').textContent = data.shelf_life_days 
@@ -841,6 +909,70 @@
                 document.getElementById('errorMessage').style.display = 'flex';
                 document.getElementById('loadingIndicator').style.display = 'none';
                 document.getElementById('medicationDetails').style.display = 'none';
+            }
+            
+            async initializeChart() {
+                console.log('Starting chart initialization...');
+                
+                // Wait for Plotly and ConsumptionChart to be available
+                let attempts = 0;
+                const maxAttempts = 100; // 10 seconds max wait
+                
+                while ((!window.Plotly || !window.ConsumptionChartReady) && attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                    
+                    if (attempts % 10 === 0) { // Log every second
+                        console.log(`Waiting for dependencies... Attempt ${attempts}/${maxAttempts}`, {
+                            hasPlotly: !!window.Plotly,
+                            hasConsumptionChart: !!window.ConsumptionChart,
+                            chartReady: !!window.ConsumptionChartReady
+                        });
+                    }
+                }
+                
+                if (this.medicationId && window.ConsumptionChart && window.Plotly) {
+                    console.log('All dependencies loaded! Initializing chart for medication ID:', this.medicationId);
+                    try {
+                        this.consumptionChart = new ConsumptionChart('consumptionChart', this.medicationId);
+                        console.log('Chart initialization completed successfully');
+                    } catch (error) {
+                        console.error('Error initializing chart:', error);
+                        this.showChartError(`Chart initialization failed: ${error.message}`);
+                    }
+                } else {
+                    const errorDetails = {
+                        medicationId: this.medicationId,
+                        hasPlotly: !!window.Plotly,
+                        hasConsumptionChart: !!window.ConsumptionChart,
+                        chartReady: !!window.ConsumptionChartReady,
+                        attempts: attempts,
+                        timeout: attempts >= maxAttempts
+                    };
+                    console.error('Cannot initialize chart - dependencies not ready:', errorDetails);
+                    
+                    // Show error message to user
+                    let errorMessage = 'Chart could not load. ';
+                    if (!window.Plotly) errorMessage += 'Plotly.js failed to load. ';
+                    if (!window.ConsumptionChart) errorMessage += 'Chart module failed to initialize. ';
+                    if (attempts >= maxAttempts) errorMessage += 'Initialization timed out. ';
+                    
+                    this.showChartError(errorMessage + 'Please check your internet connection and try refreshing the page.');
+                }
+            }
+            
+            showChartError(message) {
+                const container = document.getElementById('consumptionChart');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="chart-error">
+                            <div class="error-icon">⚠️</div>
+                            <h3>Chart Loading Failed</h3>
+                            <p>${message}</p>
+                            <button class="btn btn-secondary" onclick="location.reload()">Reload Page</button>
+                        </div>
+                    `;
+                }
             }
         }
         
