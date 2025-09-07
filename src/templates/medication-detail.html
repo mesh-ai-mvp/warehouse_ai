@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medication Details - Inventory Management</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/table.css">
+    <link rel="stylesheet" href="/static/css/dark-mode.css">
+    <style>
+        .detail-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .detail-header {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            margin-bottom: var(--spacing-xl);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .medication-title {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .medication-name {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .medication-id {
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--spacing-xl);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .detail-card {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-md);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+        
+        .card-title svg {
+            flex-shrink: 0;
+            opacity: 0.8;
+        }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-sm) 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .detail-value {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .stock-summary {
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-dark) 100%);
+            color: white;
+            border: none;
+        }
+
+        .stock-summary .card-title,
+        .stock-summary .detail-label,
+        .stock-summary .detail-value {
+            color: white;
+        }
+
+        .stock-summary .detail-item {
+            border-bottom-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .stock-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin: var(--spacing-md) 0;
+        }
+
+        .consumption-chart {
+            min-height: 300px;
+            background-color: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            margin-top: var(--spacing-md);
+        }
+
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .alert {
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .alert.warning {
+            background-color: #fef3c7;
+            border: 1px solid #f59e0b;
+            color: #92400e;
+        }
+
+        .alert.danger {
+            background-color: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+        }
+
+        .alert.success {
+            background-color: #dcfce7;
+            border: 1px solid #10b981;
+            color: #166534;
+        }
+
+        .store-breakdown {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--spacing-md);
+        }
+
+        .store-card {
+            background-color: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            border: 1px solid var(--border-light);
+        }
+
+        .store-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .store-stock {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        @media (max-width: 768px) {
+            .medication-title {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .medication-name {
+                font-size: 1.5rem;
+            }
+
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: var(--spacing-xs);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <h1 class="logo">Inventory Management</h1>
+        </div>
+        <div class="header-right">
+            <div class="theme-toggle">
+                <label class="switch">
+                    <input type="checkbox" id="themeToggle">
+                    <span class="slider">
+                        <span class="slider-icon sun">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <circle cx="12" cy="12" r="4"/>
+                                <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                            </svg>
+                        </span>
+                        <span class="slider-icon moon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+                            </svg>
+                        </span>
+                    </span>
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-container" style="margin-left: 0;">
+        <main class="main-content" style="margin-left: 0;">
+            <div class="detail-container">
+                <!-- Back button -->
+                <a href="/" class="btn btn-secondary back-button">
+                    ← Back to Inventory
+                </a>
+
+                <!-- Loading indicator -->
+                <div class="loading" id="loadingIndicator">
+                    <div class="loading-spinner"></div>
+                    <span>Loading medication details...</span>
+                </div>
+
+                <!-- Error message -->
+                <div class="alert danger" id="errorMessage" style="display: none;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                    </svg>
+                    <span id="errorText">Failed to load medication details.</span>
+                </div>
+
+                <!-- Medication details content -->
+                <div id="medicationDetails" style="display: none;">
+                    <!-- Header -->
+                    <div class="detail-header">
+                        <div class="medication-title">
+                            <h1 class="medication-name" id="medicationName">Loading...</h1>
+                            <span class="medication-id" id="medicationId">#000</span>
+                        </div>
+                        
+                        <!-- Alerts for stock issues -->
+                        <div id="stockAlerts"></div>
+                    </div>
+
+                    <!-- Detail grid -->
+                    <div class="detail-grid">
+                        <!-- Stock Summary -->
+                        <div class="detail-card stock-summary">
+                            <h3 class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                    <polyline points="3.27,6.96 12,12.01 20.73,6.96"/>
+                                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                                </svg>
+                                <span>Current Stock</span>
+                            </h3>
+                            <div class="stock-number" id="totalStock">0</div>
+                            <div class="detail-item">
+                                <span class="detail-label">Stock Status</span>
+                                <span class="detail-value" id="stockStatus">Unknown</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Days Supply</span>
+                                <span class="detail-value" id="daysSupply">N/A</span>
+                            </div>
+                        </div>
+
+                        <!-- Basic Information -->
+                        <div class="detail-card">
+                            <h3 class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="12" y1="16" x2="12" y2="12"/>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                                </svg>
+                                <span>Basic Information</span>
+                            </h3>
+                            <div class="detail-item">
+                                <span class="detail-label">Category</span>
+                                <span class="detail-value" id="category">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Pack Size</span>
+                                <span class="detail-value" id="packSize">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Shelf Life</span>
+                                <span class="detail-value" id="shelfLife">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Avg Daily Pick</span>
+                                <span class="detail-value" id="avgDailyPick">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Supplier Information -->
+                        <div class="detail-card">
+                            <h3 class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 21h18"/>
+                                    <path d="M5 21V7l8-4v18"/>
+                                    <path d="M19 21V11l-6-4"/>
+                                </svg>
+                                <span>Supplier Information</span>
+                            </h3>
+                            <div class="detail-item">
+                                <span class="detail-label">Supplier</span>
+                                <span class="detail-value" id="supplierName">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Status</span>
+                                <span class="detail-value" id="supplierStatus">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Avg Lead Time</span>
+                                <span class="detail-value" id="avgLeadTime">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Last Delivery</span>
+                                <span class="detail-value" id="lastDelivery">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Storage Information -->
+                        <div class="detail-card">
+                            <h3 class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                                    <line x1="8" y1="21" x2="16" y2="21"/>
+                                    <line x1="12" y1="17" x2="12" y2="21"/>
+                                </svg>
+                                <span>Storage Information</span>
+                            </h3>
+                            <div class="detail-item">
+                                <span class="detail-label">Location</span>
+                                <span class="detail-value" id="storageLocation">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Zone Type</span>
+                                <span class="detail-value" id="zoneType">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Case Volume</span>
+                                <span class="detail-value" id="caseVolume">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Case Weight</span>
+                                <span class="detail-value" id="caseWeight">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Pricing Information -->
+                        <div class="detail-card">
+                            <h3 class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="1" x2="12" y2="23"/>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                </svg>
+                                <span>Pricing Information</span>
+                            </h3>
+                            <div class="detail-item">
+                                <span class="detail-label">Current Price</span>
+                                <span class="detail-value" id="currentPrice">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Total Value</span>
+                                <span class="detail-value" id="totalValue">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Price Valid From</span>
+                                <span class="detail-value" id="priceValidFrom">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Special Attributes -->
+                        <div class="detail-card">
+                            <h3 class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m17-4a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM7 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                                </svg>
+                                <span>Special Attributes</span>
+                            </h3>
+                            <div class="detail-item">
+                                <span class="detail-label">Cold Chain Required</span>
+                                <span class="detail-value" id="coldChain">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Controlled Substance</span>
+                                <span class="detail-value" id="controlled">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Store Breakdown -->
+                    <div class="detail-card">
+                        <h3 class="card-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 21h18"/>
+                                <path d="M5 21V7l8-4v18"/>
+                                <path d="M19 21V11l-6-4"/>
+                            </svg>
+                            <span>Stock by Store</span>
+                        </h3>
+                        <div class="store-breakdown" id="storeBreakdown">
+                            <!-- Store cards will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Enhanced Inventory Status -->
+                    <div class="detail-card">
+                        <h3 class="card-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 11H5a2 2 0 0 0-2 2v3c0 1.1.9 2 2 2h4m-4-6l4-4m0 0l4 4m-4-4v12"/>
+                                <path d="M20 12V6a2 2 0 0 0-2-2H10a2 2 0 0 0-2 2v6"/>
+                            </svg>
+                            <span>Inventory Status</span>
+                        </h3>
+                        <div class="detail-item">
+                            <span class="detail-label">Reorder Point</span>
+                            <span class="detail-value" id="reorderPoint">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Safety Stock</span>
+                            <span class="detail-value" id="safetyStock">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Max Stock</span>
+                            <span class="detail-value" id="maxStock">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Days Until Stockout</span>
+                            <span class="detail-value" id="daysUntilStockout">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Last Updated</span>
+                            <span class="detail-value" id="lastUpdated">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Batch Information -->
+                    <div class="detail-card">
+                        <h3 class="card-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14,2 14,8 20,8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                                <polyline points="10,9 9,9 8,9"/>
+                            </svg>
+                            <span>Batch Information</span>
+                        </h3>
+                        <div id="batchInfo">
+                            <!-- Batch data will be populated by JavaScript -->
+                            <div class="batch-placeholder">
+                                <div style="text-align: center; color: var(--text-light);">
+                                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📋</div>
+                                    <p>Loading batch information...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Purchase Order History -->
+                    <div class="detail-card">
+                        <h3 class="card-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="9" cy="21" r="1"/>
+                                <circle cx="20" cy="21" r="1"/>
+                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                            </svg>
+                            <span>Recent Purchase Orders</span>
+                        </h3>
+                        <div id="purchaseOrders">
+                            <!-- PO data will be populated by JavaScript -->
+                            <div class="po-placeholder">
+                                <div style="text-align: center; color: var(--text-light);">
+                                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📋</div>
+                                    <p>Loading purchase order history...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Consumption Chart Placeholder -->
+                    <div class="detail-card">
+                        <h3 class="card-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+                            </svg>
+                            <span>Consumption Trend (Coming Soon)</span>
+                        </h3>
+                        <div class="consumption-chart">
+                            <div style="text-align: center;">
+                                <div style="font-size: 3rem; margin-bottom: 1rem;">📈</div>
+                                <p>Consumption trend chart will be available in a future update</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="/static/js/dark-mode.js"></script>
+    <script>
+        // Medication detail page functionality
+        class MedicationDetailPage {
+            constructor() {
+                this.medicationId = null;
+                this.medicationData = null;
+                this.init();
+            }
+            
+            async init() {
+                this.medicationId = this.getMedicationIdFromUrl();
+                if (!this.medicationId) {
+                    this.showError('Invalid medication ID');
+                    return;
+                }
+                
+                await this.loadMedicationData();
+            }
+            
+            getMedicationIdFromUrl() {
+                const path = window.location.pathname;
+                const matches = path.match(/\/medication\/(\d+)/);
+                return matches ? parseInt(matches[1]) : null;
+            }
+            
+            async loadMedicationData() {
+                this.showLoading(true);
+                
+                try {
+                    const response = await fetch(`/api/medication/${this.medicationId}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch medication data');
+                    }
+                    
+                    this.medicationData = await response.json();
+                    this.renderMedicationDetails();
+                    
+                } catch (error) {
+                    console.error('Error loading medication data:', error);
+                    this.showError('Failed to load medication details. Please try again.');
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+            
+            renderMedicationDetails() {
+                const data = this.medicationData;
+                
+                // Basic information
+                document.getElementById('medicationName').textContent = data.name || 'Unknown Medication';
+                document.getElementById('medicationId').textContent = `#${data.med_id || 'N/A'}`;
+                document.getElementById('category').textContent = data.category || 'N/A';
+                document.getElementById('packSize').textContent = data.pack_size || 'N/A';
+                document.getElementById('shelfLife').textContent = data.shelf_life_days 
+                    ? `${data.shelf_life_days} days` : 'N/A';
+                
+                // Stock information
+                const totalStock = data.total_stock || 0;
+                document.getElementById('totalStock').textContent = totalStock.toLocaleString();
+                
+                // SKU metadata
+                if (data.sku_meta) {
+                    document.getElementById('avgDailyPick').textContent = 
+                        data.sku_meta.avg_daily_pick ? `${data.sku_meta.avg_daily_pick.toFixed(1)}/day` : 'N/A';
+                    document.getElementById('caseVolume').textContent = 
+                        data.sku_meta.case_volume_m3 ? `${data.sku_meta.case_volume_m3.toFixed(4)} m³` : 'N/A';
+                    document.getElementById('caseWeight').textContent = 
+                        data.sku_meta.case_weight_kg ? `${data.sku_meta.case_weight_kg.toFixed(2)} kg` : 'N/A';
+                    document.getElementById('coldChain').textContent = 
+                        data.sku_meta.is_cold_chain ? 'Yes' : 'No';
+                    document.getElementById('controlled').textContent = 
+                        data.sku_meta.is_controlled ? 'Yes' : 'No';
+                        
+                    // Calculate stock status and days supply
+                    const avgDaily = data.sku_meta.avg_daily_pick || 0;
+                    if (avgDaily > 0) {
+                        const daysSupply = Math.floor(totalStock / avgDaily);
+                        document.getElementById('daysSupply').textContent = `${daysSupply} days`;
+                        
+                        let stockStatus = 'Unknown';
+                        if (totalStock === 0) stockStatus = 'Out of Stock';
+                        else if (daysSupply < 7) stockStatus = 'Low';
+                        else if (daysSupply < 21) stockStatus = 'Medium';
+                        else stockStatus = 'High';
+                        
+                        document.getElementById('stockStatus').textContent = stockStatus;
+                        this.showStockAlerts(stockStatus, daysSupply);
+                    } else {
+                        document.getElementById('daysSupply').textContent = 'N/A';
+                        document.getElementById('stockStatus').textContent = 'Unknown';
+                    }
+                }
+                
+                // Supplier information
+                if (data.supplier) {
+                    document.getElementById('supplierName').textContent = data.supplier.name || 'N/A';
+                    document.getElementById('supplierStatus').textContent = data.supplier.status || 'N/A';
+                    document.getElementById('avgLeadTime').textContent = 
+                        data.supplier.avg_lead_time ? `${data.supplier.avg_lead_time.toFixed(1)} days` : 'N/A';
+                    document.getElementById('lastDelivery').textContent = data.supplier.last_delivery_date || 'N/A';
+                }
+                
+                // Storage information
+                if (data.storage) {
+                    document.getElementById('storageLocation').textContent = 
+                        data.storage.location_id ? `Location #${data.storage.location_id}` : 'Unassigned';
+                    document.getElementById('zoneType').textContent = 
+                        data.storage.zone_type ? data.storage.zone_type.charAt(0).toUpperCase() + data.storage.zone_type.slice(1) : 'N/A';
+                }
+                
+                // Pricing information
+                if (data.price) {
+                    const price = data.price.price_per_unit || 0;
+                    document.getElementById('currentPrice').textContent = `$${price.toFixed(2)}`;
+                    document.getElementById('totalValue').textContent = `$${(price * totalStock).toFixed(2)}`;
+                    document.getElementById('priceValidFrom').textContent = data.price.valid_from || 'N/A';
+                }
+                
+                // Enhanced inventory status
+                this.populateInventoryStatus(data.inventory_status || {});
+                
+                // Batch information
+                this.renderBatchInfo(data.batch_info || []);
+                
+                // Purchase order history
+                this.renderPurchaseOrders(data.purchase_orders || []);
+                
+                // Store breakdown
+                this.renderStoreBreakdown(data.consumption_by_store || []);
+                
+                // Show the details
+                document.getElementById('medicationDetails').style.display = 'block';
+            }
+            
+            showStockAlerts(stockStatus, daysSupply) {
+                const alertContainer = document.getElementById('stockAlerts');
+                alertContainer.innerHTML = '';
+                
+                if (stockStatus === 'Out of Stock') {
+                    alertContainer.innerHTML = `
+                        <div class="alert danger">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                    </svg>
+                            <span>This medication is out of stock! Immediate restocking required.</span>
+                        </div>
+                    `;
+                } else if (stockStatus === 'Low') {
+                    alertContainer.innerHTML = `
+                        <div class="alert warning">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                    </svg>
+                            <span>Low stock alert: Only ${daysSupply} days of supply remaining.</span>
+                        </div>
+                    `;
+                } else if (stockStatus === 'High') {
+                    alertContainer.innerHTML = `
+                        <div class="alert success">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                            <span>Stock levels are healthy with ${daysSupply} days of supply.</span>
+                        </div>
+                    `;
+                }
+            }
+            
+            renderStoreBreakdown(storeData) {
+                const container = document.getElementById('storeBreakdown');
+                
+                if (storeData.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No store data available</p>';
+                    return;
+                }
+                
+                container.innerHTML = storeData.map(store => `
+                    <div class="store-card">
+                        <div class="store-name">Store #${store.store_id}</div>
+                        <div class="store-stock">${store.on_hand.toLocaleString()}</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                            Last dispensed: ${store.qty_dispensed || 0}
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            populateInventoryStatus(inventoryData) {
+                document.getElementById('reorderPoint').textContent = 
+                    inventoryData.reorder_point ? inventoryData.reorder_point.toLocaleString() : 'N/A';
+                document.getElementById('safetyStock').textContent = 
+                    inventoryData.safety_stock ? inventoryData.safety_stock.toLocaleString() : 'N/A';
+                document.getElementById('maxStock').textContent = 
+                    inventoryData.max_stock ? inventoryData.max_stock.toLocaleString() : 'N/A';
+                
+                // Days until stockout with warning styling
+                const daysUntilStockout = inventoryData.days_until_stockout || 0;
+                const stockoutElement = document.getElementById('daysUntilStockout');
+                if (daysUntilStockout > 0) {
+                    let className = '';
+                    if (daysUntilStockout <= 7) className = 'critical';
+                    else if (daysUntilStockout <= 14) className = 'warning';
+                    
+                    stockoutElement.innerHTML = `<span class="stockout-warning ${className}">${daysUntilStockout} days</span>`;
+                } else {
+                    stockoutElement.textContent = 'N/A';
+                }
+
+                document.getElementById('lastUpdated').textContent = 
+                    inventoryData.last_updated ? new Date(inventoryData.last_updated).toLocaleDateString() : 'N/A';
+            }
+
+            renderBatchInfo(batchData) {
+                const container = document.getElementById('batchInfo');
+                
+                if (!batchData || batchData.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No batch information available</p>';
+                    return;
+                }
+
+                container.innerHTML = batchData.slice(0, 5).map(batch => {
+                    const expiryDate = new Date(batch.expiry_date);
+                    const daysToExpiry = Math.ceil((expiryDate - new Date()) / (1000 * 60 * 60 * 24));
+                    let expiryClass = '';
+                    if (daysToExpiry <= 30) expiryClass = 'critical';
+                    else if (daysToExpiry <= 90) expiryClass = 'warning';
+
+                    return `
+                        <div class="batch-card" style="border: 1px solid var(--border-light); padding: 12px; margin-bottom: 8px; border-radius: 6px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <strong>Lot: ${batch.lot_number}</strong>
+                                <span style="background: #e0f7fa; color: #006064; padding: 2px 8px; border-radius: 12px; font-size: 0.75em;">${batch.status}</span>
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <div>Quantity: ${batch.remaining_quantity.toLocaleString()} units</div>
+                                <div class="stockout-warning ${expiryClass}">
+                                    Expires: ${expiryDate.toLocaleDateString()} (${daysToExpiry} days)
+                                </div>
+                                <div style="color: var(--text-light); font-size: 0.85em;">
+                                    Received: ${new Date(batch.received_date).toLocaleDateString()}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            renderPurchaseOrders(poData) {
+                const container = document.getElementById('purchaseOrders');
+                
+                if (!poData || poData.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No purchase order history available</p>';
+                    return;
+                }
+
+                // Sort by order date (most recent first) and take top 5
+                const recentPOs = poData.sort((a, b) => new Date(b.order_date) - new Date(a.order_date)).slice(0, 5);
+
+                container.innerHTML = recentPOs.map(po => {
+                    const orderDate = new Date(po.order_date);
+                    const expectedDelivery = new Date(po.expected_delivery);
+                    const actualDelivery = po.actual_delivery ? new Date(po.actual_delivery) : null;
+                    
+                    let statusStyle = '';
+                    switch (po.status) {
+                        case 'completed': statusStyle = 'background: #d4edda; color: #155724;'; break;
+                        case 'pending': statusStyle = 'background: #fff3cd; color: #856404;'; break;
+                        case 'cancelled': statusStyle = 'background: #f8d7da; color: #721c24;'; break;
+                        default: statusStyle = 'background: #d1ecf1; color: #0c5460;';
+                    }
+
+                    return `
+                        <div class="po-card" style="border: 1px solid var(--border-light); padding: 12px; margin-bottom: 8px; border-radius: 6px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <strong>${po.po_number}</strong>
+                                <span style="${statusStyle} padding: 2px 8px; border-radius: 12px; font-size: 0.75em;">${po.status}</span>
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <div>Quantity: ${po.quantity_ordered.toLocaleString()} units</div>
+                                <div>Total: $${po.total_amount.toFixed(2)}</div>
+                                <div>Expected: ${expectedDelivery.toLocaleDateString()}</div>
+                                ${actualDelivery ? `<div>Delivered: ${actualDelivery.toLocaleDateString()}</div>` : ''}
+                                <div style="color: var(--text-light); font-size: 0.85em;">
+                                    Terms: ${po.payment_terms}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            showLoading(show) {
+                document.getElementById('loadingIndicator').style.display = show ? 'flex' : 'none';
+                document.getElementById('medicationDetails').style.display = show ? 'none' : 'block';
+            }
+            
+            showError(message) {
+                document.getElementById('errorText').textContent = message;
+                document.getElementById('errorMessage').style.display = 'flex';
+                document.getElementById('loadingIndicator').style.display = 'none';
+                document.getElementById('medicationDetails').style.display = 'none';
+            }
+        }
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', () => {
+            new MedicationDetailPage();
+        });
+    </script>
+</body>
+</html>

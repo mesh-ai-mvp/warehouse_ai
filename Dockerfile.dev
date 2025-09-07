@@ -1,0 +1,52 @@
+# Development Dockerfile using uv for fast iteration
+FROM python:3.12-slim
+
+# Set build arguments
+ARG DEBIAN_FRONTEND=noninteractive
+ARG UV_NO_CACHE=1
+
+# Install uv - the fast Python package installer
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Install system dependencies for development
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Set working directory
+WORKDIR /app
+
+# Copy uv configuration files
+COPY pyproject.toml uv.lock ./
+
+# Create virtual environment and install all dependencies (including dev)
+RUN uv venv /opt/venv --python 3.12
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install all dependencies including development ones
+RUN uv sync --dev
+
+# Set environment variables for development
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=8000 \
+    HOST=0.0.0.0 \
+    WORKERS=1
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+# Copy application code (this layer changes frequently in dev)
+COPY --chown=appuser:appuser . .
+
+# Expose port
+EXPOSE 8000
+
+# Development command with auto-reload
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "src"]

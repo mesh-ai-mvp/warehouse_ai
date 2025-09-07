@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  warehouse-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DEBIAN_FRONTEND: noninteractive
+        UV_NO_CACHE: 1
+    container_name: warehouse-management
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - WORKERS=1
+    volumes:
+      # Mount data directory (optional, if you want to update data without rebuilding)
+      - ./data:/app/data:ro
+      # Mount logs directory for log persistence
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/filters', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - warehouse-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+networks:
+  warehouse-network:
+    driver: bridge
+
+volumes:
+  logs:
+    driver: local

@@ -260,17 +260,17 @@ Command: `python main.py --skus 50 --stores 3 --days 365`
 | File | Description |
 |------|-------------|
 | `poc_supplychain.db` | SQLite database with all tables |
-| `static/suppliers.csv` | Supplier master data |
-| `static/medications.csv` | Medication catalog |
-| `static/stores.csv` | Store locations |
-| `static/consumption_history.csv` | Full consumption records |
-| `static/drug_prices.csv` | Price history |
-| `static/forecasts.csv` | Pre-computed forecasts |
-| `static/sku_meta.csv` | SKU warehouse metadata |
-| `static/storage_loc_simple.csv` | Storage locations |
-| `static/slot_assignments.csv` | Current assignments |
-| `static/receipts_sim.csv` | Simulated purchase orders |
-| `static/validation_report.json` | Data quality metrics |
+| `data/suppliers.csv` | Supplier master data |
+| `data/medications.csv` | Medication catalog |
+| `data/stores.csv` | Store locations |
+| `data/consumption_history.csv` | Full consumption records |
+| `data/drug_prices.csv` | Price history |
+| `data/forecasts.csv` | Pre-computed forecasts |
+| `data/sku_meta.csv` | SKU warehouse metadata |
+| `data/storage_loc_simple.csv` | Storage locations |
+| `data/slot_assignments.csv` | Current assignments |
+| `data/receipts_sim.csv` | Simulated purchase orders |
+| `data/validation_report.json` | Data quality metrics |
 
 ---
 
