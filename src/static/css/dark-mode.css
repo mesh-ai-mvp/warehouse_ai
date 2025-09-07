@@ -8,23 +8,23 @@
   --text-primary: #ffffff;
   --text-secondary: #b8bcc8;
   --text-muted: #6b7280;
-  
+
   --border-light: #2a2a2a;
   --border-medium: #3a3a3a;
-  
+
   --accent-orange: #ff6b35;
   --accent-orange-light: #2a1610;
   --accent-orange-dark: #ff8c69;
-  
+
   --accent-blue: #00d4ff;
   --accent-blue-light: #0a2938;
   --accent-blue-dark: #33ddff;
-  
+
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
   --info: #00d4ff;
-  
+
   /* Dark theme specific shadows */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
@@ -45,7 +45,7 @@
   background-color: var(--bg-primary);
 }
 
-[data-theme="dark"] input:checked + .slider {
+[data-theme="dark"] input:checked+.slider {
   background-color: var(--accent-orange);
   border-color: var(--accent-orange);
 }
@@ -220,9 +220,9 @@
 
 /* Dark mode transition animation */
 * {
-  transition: background-color var(--transition-normal), 
-              color var(--transition-normal), 
-              border-color var(--transition-normal);
+  transition: background-color var(--transition-normal),
+    color var(--transition-normal),
+    border-color var(--transition-normal);
 }
 
 /* Auto dark mode support - only applies when no explicit data-theme is set */

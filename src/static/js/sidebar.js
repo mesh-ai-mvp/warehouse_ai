@@ -5,39 +5,39 @@ class SidebarManager {
         this.sidebarToggle = null;
         this.mainContent = null;
         this.isCollapsed = false;
-        
+
         this.init();
     }
-    
+
     init() {
         this.sidebar = document.getElementById('sidebar');
         this.sidebarToggle = document.getElementById('sidebarToggle');
         this.mainContent = document.querySelector('.main-content');
-        
+
         // Load saved state from localStorage
         this.loadSidebarState();
-        
+
         this.setupEventListeners();
         this.setupMediaQuery();
     }
-    
+
     setupEventListeners() {
         if (this.sidebarToggle) {
             this.sidebarToggle.addEventListener('click', () => {
                 this.toggleSidebar();
             });
         }
-        
+
         // Close sidebar when clicking outside on mobile
         document.addEventListener('click', (e) => {
-            if (window.innerWidth <= 768 && 
-                !this.sidebar.contains(e.target) && 
-                !this.sidebarToggle.contains(e.target) && 
+            if (window.innerWidth <= 768 &&
+                !this.sidebar.contains(e.target) &&
+                !this.sidebarToggle.contains(e.target) &&
                 !this.isCollapsed) {
                 this.collapseSidebar();
             }
         });
-        
+
         // Handle navigation clicks
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
@@ -45,14 +45,14 @@ class SidebarManager {
             });
         });
     }
-    
+
     setupMediaQuery() {
         // Handle responsive behavior
         const mediaQuery = window.matchMedia('(max-width: 768px)');
         this.handleMediaQuery(mediaQuery);
         mediaQuery.addListener(this.handleMediaQuery.bind(this));
     }
-    
+
     handleMediaQuery(mediaQuery) {
         if (mediaQuery.matches) {
             // Mobile: Sidebar should be collapsed by default
@@ -62,7 +62,7 @@ class SidebarManager {
             this.loadSidebarState();
         }
     }
-    
+
     toggleSidebar() {
         if (this.isCollapsed) {
             this.expandSidebar();
@@ -70,19 +70,19 @@ class SidebarManager {
             this.collapseSidebar();
         }
     }
-    
+
     expandSidebar() {
         this.isCollapsed = false;
         this.updateSidebarState();
         this.saveSidebarState();
     }
-    
+
     collapseSidebar() {
         this.isCollapsed = true;
         this.updateSidebarState();
         this.saveSidebarState();
     }
-    
+
     updateSidebarState() {
         if (this.isCollapsed) {
             this.sidebar.classList.add('collapsed');
@@ -93,18 +93,18 @@ class SidebarManager {
             this.mainContent.classList.remove('sidebar-collapsed');
             this.sidebarToggle.classList.remove('active');
         }
-        
+
         // Dispatch resize event to help other components adjust
         window.dispatchEvent(new Event('resize'));
     }
-    
+
     saveSidebarState() {
         // Don't save state on mobile - always collapsed
         if (window.innerWidth <= 768) return;
-        
+
         localStorage.setItem('sidebarCollapsed', this.isCollapsed.toString());
     }
-    
+
     loadSidebarState() {
         // Don't load state on mobile - always collapsed
         if (window.innerWidth <= 768) {
@@ -112,29 +112,29 @@ class SidebarManager {
             this.updateSidebarState();
             return;
         }
-        
+
         const saved = localStorage.getItem('sidebarCollapsed');
         if (saved !== null) {
             this.isCollapsed = saved === 'true';
             this.updateSidebarState();
         }
     }
-    
+
     handleNavigation(e) {
         // Remove active class from all nav items
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
         });
-        
+
         // Add active class to clicked item
         const navItem = e.target.closest('.nav-item');
         if (navItem) {
             navItem.classList.add('active');
         }
-        
+
         // Handle different navigation items
         const linkText = e.target.textContent.trim();
-        
+
         if (linkText.includes('Current Stock')) {
             // Already on current stock page - just prevent default
             e.preventDefault();
@@ -154,13 +154,13 @@ class SidebarManager {
             e.preventDefault();
             this.showComingSoon('Settings Panel');
         }
-        
+
         // Close sidebar on mobile after navigation
         if (window.innerWidth <= 768) {
             this.collapseSidebar();
         }
     }
-    
+
     showComingSoon(featureName) {
         // Show a toast notification for features not yet implemented
         if (window.app && typeof window.app.showToast === 'function') {
@@ -169,21 +169,21 @@ class SidebarManager {
             alert(`${featureName} - Coming Soon!`);
         }
     }
-    
+
     // Highlight active section based on current page/view
     setActiveSection(sectionName) {
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
         });
-        
+
         const targetItem = document.querySelector(`[data-section=\"${sectionName}\"]`) ||
-                          document.querySelector(`.nav-item:has(.nav-link:contains(\"${sectionName}\"))`);
-        
+            document.querySelector(`.nav-item:has(.nav-link:contains(\"${sectionName}\"))`);
+
         if (targetItem) {
             targetItem.classList.add('active');
         }
     }
-    
+
     // Add notification badges to nav items
     addNotificationBadge(sectionName, count) {
         const navLink = document.querySelector(`[data-section=\"${sectionName}\"] .nav-link`);
@@ -193,7 +193,7 @@ class SidebarManager {
             if (existingBadge) {
                 existingBadge.remove();
             }
-            
+
             // Add new badge if count > 0
             if (count > 0) {
                 const badge = document.createElement('span');
@@ -203,7 +203,7 @@ class SidebarManager {
             }
         }
     }
-    
+
     // Update sidebar based on user permissions or data
     updateSidebarVisibility(userPermissions = {}) {
         const navItems = {
@@ -213,7 +213,7 @@ class SidebarManager {
             'storageLocations': document.querySelector('.nav-item:has(.nav-link:contains(\"Storage Locations\"))'),
             'settings': document.querySelector('.nav-item:has(.nav-link:contains(\"Settings\"))')
         };
-        
+
         Object.entries(navItems).forEach(([key, element]) => {
             if (element) {
                 if (userPermissions[key] === false) {
@@ -224,7 +224,7 @@ class SidebarManager {
             }
         });
     }
-    
+
     // Add custom CSS for sidebar states
     addCustomStyles() {
         const style = document.createElement('style');
