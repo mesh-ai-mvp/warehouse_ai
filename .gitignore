@@ -10,3 +10,5 @@ data/
 # AI agent cache
 .swarm/
 .claude-flow/
+.claude/
+docs/

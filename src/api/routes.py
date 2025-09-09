@@ -3,11 +3,15 @@ API routes for inventory management
 """
 
 from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import sys
 import os
 from datetime import datetime
 from uuid import uuid4
+import smtplib
+import ssl
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 # Add parent directory to path to import data_loader
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -94,6 +98,13 @@ async def get_medication_consumption_history(
 async def list_suppliers():
     try:
         suppliers = data_loader.get_suppliers()
+        # Ensure contact fields are present if available in DB
+        for s in suppliers:
+            supplier_id = s.get("supplier_id")
+            src = data_loader.suppliers.get(supplier_id, {})
+            for key in ("email", "contact_name", "phone", "address"):
+                if key in src and key not in s:
+                    s[key] = src.get(key)
         return {"suppliers": suppliers}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -226,6 +237,189 @@ async def get_med_supplier_prices(med_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ Email Utilities ============
+
+
+def _slugify(name: str) -> str:
+    return "".join(ch.lower() if ch.isalnum() else "" for ch in name) or "supplier"
+
+
+def _render_supplier_email_html(
+    supplier_name: str, po_lines: List[Dict[str, Any]], meta: Dict[str, Any]
+) -> str:
+    total = sum(line["unit_price"] * line["quantity"] for line in po_lines)
+    requested = meta.get("requested_delivery_date") or "-"
+    buyer = meta.get("buyer") or "-"
+    notes = meta.get("notes") or "-"
+
+    rows = "".join(
+        f"""
+        <tr>
+            <td class='cell'>{line["med_name"]}</td>
+            <td class='cell right'>{line["quantity"]}</td>
+            <td class='cell right'>${line["unit_price"]:.2f}</td>
+            <td class='cell right'>${line["total_price"]:.2f}</td>
+        </tr>
+        """
+        for line in po_lines
+    )
+
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+<title>Purchase Order Request</title>
+<style>
+  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif; background:#f6f7f9; color:#111827; margin:0; padding:24px; }}
+  .card {{ max-width:720px; margin:0 auto; background:#ffffff; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.08); overflow:hidden; }}
+  .header {{ padding:20px 24px; background:linear-gradient(180deg,#f9fafb,#ffffff); border-bottom:1px solid #e5e7eb; }}
+  .title {{ margin:0; font-size:18px; font-weight:700; }}
+  .subtitle {{ margin:6px 0 0 0; font-size:13px; color:#6b7280; }}
+  .content {{ padding:24px; }}
+  .meta-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }}
+  .meta {{ background:#f9fafb; border:1px solid #eef0f2; border-radius:8px; padding:12px; }}
+  .meta .label {{ font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; }}
+  .meta .value {{ font-size:14px; font-weight:600; margin-top:4px; }}
+  table {{ width:100%; border-collapse:separate; border-spacing:0; margin-top:8px; }}
+  thead th {{ background:#f3f4f6; color:#374151; font-size:12px; text-transform:uppercase; letter-spacing:.5px; padding:10px 12px; border-top:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; text-align:left; }}
+  .cell {{ padding:10px 12px; border-bottom:1px solid #eef0f2; font-size:14px; }}
+  .right {{ text-align:right; }}
+  tfoot td {{ padding:12px; font-weight:800; }}
+  .footer {{ padding:16px 24px; background:#fafafa; border-top:1px solid #e5e7eb; color:#6b7280; font-size:12px; }}
+</style>
+</head>
+<body>
+  <div class='card'>
+    <div class='header'>
+      <h1 class='title'>Purchase Order Request</h1>
+      <p class='subtitle'>Supplier: {supplier_name}</p>
+    </div>
+    <div class='content'>
+      <div class='meta-grid'>
+        <div class='meta'>
+          <div class='label'>Requested Delivery Date</div>
+          <div class='value'>{requested}</div>
+        </div>
+        <div class='meta'>
+          <div class='label'>Buyer</div>
+          <div class='value'>{buyer}</div>
+        </div>
+      </div>
+      <table role='presentation'>
+        <thead>
+          <tr><th>Medication</th><th class='right'>Quantity</th><th class='right'>Unit Price</th><th class='right'>Amount</th></tr>
+        </thead>
+        <tbody>
+          {rows}
+        </tbody>
+        <tfoot>
+          <tr><td colspan='3' class='right'>Total</td><td class='right'>${total:.2f}</td></tr>
+        </tfoot>
+      </table>
+      <div style='margin-top:12px; font-size:13px;'>
+        <div class='label'>Notes</div>
+        <div>{notes}</div>
+      </div>
+    </div>
+    <div class='footer'>
+      This is an automated request from the Inventory Management system. Please reply with confirmation and estimated delivery date.
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+def _send_email_via_gmail(
+    subject: str, html_body: str, to_email: str, bcc: Optional[str] = None
+):
+    user = os.getenv("GMAIL_USER")
+    app_password = os.getenv("GMAIL_APP_PASSWORD")
+    from_name = os.getenv("EMAIL_FROM_NAME", "Inventory Management")
+    if not user or not app_password:
+        raise HTTPException(
+            status_code=500,
+            detail="Email is not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD in .env",
+        )
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"{from_name} <{user}>"
+    msg["To"] = to_email
+    if bcc:
+        msg["Bcc"] = bcc
+
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+        server.login(user, app_password)
+        server.send_message(msg)
+
+
+@router.post("/purchase-orders/send-emails")
+async def send_po_emails(payload: Dict[str, Any]):
+    """Draft and send HTML PO request emails to all involved suppliers before PO submission."""
+    try:
+        items = payload.get("items", [])
+        meta = payload.get("meta", {})
+
+        # Group allocations by supplier similar to PO creation
+        supplier_to_lines: Dict[int, List[Dict[str, Any]]] = {}
+        for item in items:
+            med_id = int(item.get("med_id"))
+            med_info = data_loader.medications.get(med_id, {})
+            med_name = med_info.get("name", f"Medication {med_id}")
+            for alloc in item.get("allocations", []):
+                supplier_id = int(alloc.get("supplier_id"))
+                quantity = int(alloc.get("quantity", 0))
+                unit_price = float(alloc.get("unit_price", 0))
+                if quantity <= 0:
+                    continue
+                supplier_to_lines.setdefault(supplier_id, []).append(
+                    {
+                        "med_id": med_id,
+                        "med_name": med_name,
+                        "quantity": quantity,
+                        "unit_price": unit_price,
+                        "total_price": quantity * unit_price,
+                    }
+                )
+
+        if not supplier_to_lines:
+            return {"sent": 0}
+
+        fallback_to = os.getenv("SUPPLIER_FALLBACK_EMAIL")
+        bcc = os.getenv("EMAIL_BCC")
+
+        sent_count = 0
+        for supplier_id, lines in supplier_to_lines.items():
+            supplier = data_loader.suppliers.get(supplier_id, {})
+            supplier_name = supplier.get("name", f"Supplier {supplier_id}")
+            # Determine recipient email
+            to_email = supplier.get("email")
+            if not to_email:
+                if fallback_to:
+                    to_email = fallback_to
+                else:
+                    # Derive a plausible test email if none configured
+                    to_email = f"{_slugify(supplier_name)}@example.com"
+
+            subject = f"Purchase Order Request - {supplier_name}"
+            html_body = _render_supplier_email_html(supplier_name, lines, meta)
+            _send_email_via_gmail(subject, html_body, to_email, bcc=bcc)
+            sent_count += 1
+
+        return {"sent": sent_count}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # AI PO Generation Endpoints
 
 
@@ -286,6 +480,34 @@ async def create_po_from_ai_result(payload: Dict[str, Any]):
         now_iso = datetime.utcnow().isoformat() + "Z"
         year = datetime.utcnow().year
         po_counter = len(data_loader.list_purchase_orders()) + 1
+
+        # Before saving, send emails to suppliers represented in po_list
+        fallback_to = os.getenv("SUPPLIER_FALLBACK_EMAIL")
+        bcc = os.getenv("EMAIL_BCC")
+        for po_data in po_list:
+            supplier_id = po_data["supplier_id"]
+            supplier_name = po_data["supplier_name"]
+            # Build lines format compatible with renderer
+            lines = [
+                {
+                    "med_id": it["med_id"],
+                    "med_name": it["med_name"],
+                    "quantity": it["quantity"],
+                    "unit_price": it["unit_price"],
+                    "total_price": it["subtotal"],
+                }
+                for it in po_data["items"]
+            ]
+            html_body = _render_supplier_email_html(supplier_name, lines, meta)
+            to_email = data_loader.suppliers.get(supplier_id, {}).get("email")
+            if not to_email:
+                to_email = fallback_to or f"{_slugify(supplier_name)}@example.com"
+            _send_email_via_gmail(
+                f"Purchase Order Request - {supplier_name}",
+                html_body,
+                to_email,
+                bcc=bcc,
+            )
 
         for po_data in po_list:
             po_id = f"PO-{datetime.utcnow().strftime('%Y%m%d')}-{str(uuid4())[:8].upper()}-AI"

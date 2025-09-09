@@ -73,7 +73,11 @@ def create_tables(conn):
       name TEXT NOT NULL,
       status TEXT,
       avg_lead_time REAL,
-      last_delivery_date DATE
+      last_delivery_date DATE,
+      email TEXT,
+      contact_name TEXT,
+      phone TEXT,
+      address TEXT
     );
 
     CREATE TABLE IF NOT EXISTS medications (
@@ -228,18 +232,36 @@ def create_tables(conn):
         FOREIGN KEY (session_id) REFERENCES ai_po_sessions(session_id)
     );
     """)
-    
+
     # Create indexes for better query performance
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_med_supplier_prices_med_id ON med_supplier_prices(med_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_med_supplier_prices_supplier_id ON med_supplier_prices(supplier_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier_id ON purchase_orders(supplier_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_purchase_order_items_po_id ON purchase_order_items(po_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_purchase_order_items_med_id ON purchase_order_items(med_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_po_sessions_status ON ai_po_sessions(status)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_po_metadata_po_id ON ai_po_metadata(po_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_po_metadata_session_id ON ai_po_metadata(session_id)")
-    
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_med_supplier_prices_med_id ON med_supplier_prices(med_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_med_supplier_prices_supplier_id ON med_supplier_prices(supplier_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier_id ON purchase_orders(supplier_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_purchase_order_items_po_id ON purchase_order_items(po_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_purchase_order_items_med_id ON purchase_order_items(med_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ai_po_sessions_status ON ai_po_sessions(status)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ai_po_metadata_po_id ON ai_po_metadata(po_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ai_po_metadata_session_id ON ai_po_metadata(session_id)"
+    )
+
     conn.commit()
 
 
@@ -290,6 +312,14 @@ def generate_suppliers(n_suppliers, seed=DEFAULT_SEED):
         last_delivery = (
             datetime.now(timezone.utc) - timedelta(days=int(np.random.randint(1, 30)))
         ).date()
+        contact_name = fake.name()
+        # Derive a simple domain and email
+        domain = name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        domain = f"{domain[:18]}.com"
+        email_local = contact_name.lower().replace(" ", ".").replace("'", "")
+        email = f"{email_local}@{domain}"
+        phone = fake.phone_number()
+        address = fake.address().replace("\n", ", ")
         suppliers.append(
             {
                 "supplier_id": i + 1,
@@ -297,6 +327,10 @@ def generate_suppliers(n_suppliers, seed=DEFAULT_SEED):
                 "status": status,
                 "avg_lead_time": avg_lead_time,
                 "last_delivery_date": str(last_delivery),
+                "email": email,
+                "contact_name": contact_name,
+                "phone": phone,
+                "address": address,
             }
         )
     return suppliers
@@ -1602,7 +1636,7 @@ def generate_all(
 
     cur = conn.cursor()
     cur.executemany(
-        "INSERT INTO suppliers (supplier_id, name, status, avg_lead_time, last_delivery_date) VALUES (:supplier_id, :name, :status, :avg_lead_time, :last_delivery_date);",
+        "INSERT INTO suppliers (supplier_id, name, status, avg_lead_time, last_delivery_date, email, contact_name, phone, address) VALUES (:supplier_id, :name, :status, :avg_lead_time, :last_delivery_date, :email, :contact_name, :phone, :address);",
         suppliers,
     )
     cur.executemany(
@@ -1639,7 +1673,7 @@ def generate_all(
     supplier_price_rows = generate_supplier_prices_for_meds(
         meds, suppliers, all_price_rows, seed=seed + 44
     )
-    
+
     # Insert supplier prices into database
     print("Writing supplier prices to DB …")
     cur.executemany(
@@ -1647,7 +1681,7 @@ def generate_all(
         supplier_price_rows,
     )
     conn.commit()
-    
+
     pd.DataFrame(supplier_price_rows).to_csv(
         os.path.join(output_dir, "med_supplier_prices.csv"), index=False
     )

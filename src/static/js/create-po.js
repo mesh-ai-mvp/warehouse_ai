@@ -323,6 +323,40 @@ class CreatePOApp {
             items: this.itemsState,
             meta
         };
+
+        // Show sending overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'emailOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;';
+        overlay.innerHTML = `
+            <div style="background:#111827;color:#e5e7eb;padding:20px 24px;border-radius:10px;min-width:280px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.35);">
+                <div style="font-weight:700;margin-bottom:6px;">Preparing Supplier Emails</div>
+                <div style="font-size:13px;color:#9ca3af;">Drafting and sending purchase request…</div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        try {
+            // Pre-send supplier emails (non-blocking for UX, but awaited here)
+            const emailRes = await fetch('/api/purchase-orders/send-emails', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const emailData = await emailRes.json().catch(() => ({}));
+            if (!emailRes.ok) {
+                // Log but proceed with submission
+                console.warn('Email send failed:', emailData);
+            }
+        } catch (e) {
+            console.warn('Email step error:', e);
+        } finally {
+            // Hide overlay
+            const el = document.getElementById('emailOverlay');
+            if (el) el.remove();
+        }
+
+        // Now submit the PO(s)
         try {
             const res = await fetch('/api/purchase-orders', {
                 method: 'POST',
