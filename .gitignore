@@ -1,3 +1,12 @@
 data/
 *.db
-*__pycache/
+*__pycache__
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# AI agent cache
+.swarm/
+.claude-flow/

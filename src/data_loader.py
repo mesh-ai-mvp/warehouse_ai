@@ -1,11 +1,13 @@
 """
-Data loader utilities for CSV files
+Data loader module for inventory management system
+Now uses SQLite database instead of CSV files
 """
 
 import pandas as pd
 import os
 import numpy as np
-from typing import Dict, List, Any
+import sqlite3
+from typing import Dict, List, Any, Optional
 from datetime import timedelta
 
 
@@ -17,11 +19,11 @@ def clean_nan_values(data):
         return [clean_nan_values(item) for item in data]
     elif data is None:
         return None
-    elif isinstance(data, float):
+    elif isinstance(data, (float, np.floating)):
         if pd.isna(data) or np.isnan(data) or np.isinf(data):
             return None
         else:
-            return data
+            return float(data)  # Convert numpy float types to Python float
     elif isinstance(data, (int, np.integer)):
         if pd.isna(data):
             return None
@@ -34,14 +36,17 @@ def clean_nan_values(data):
 
 
 class DataLoader:
-    def __init__(self, data_dir: str = None):
-        # Get the directory where this script is located and find data directory
-        if data_dir is None:
+    def __init__(self, db_path: str = None):
+        # Get the database path
+        if db_path is None:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             project_root = os.path.dirname(script_dir)  # Go up one level from src/
-            self.data_dir = os.path.join(project_root, "data")
+            self.db_path = os.path.join(project_root, "poc_supplychain.db")
+            self.data_dir = os.path.join(project_root, "data")  # Keep for CSV fallback
         else:
-            self.data_dir = data_dir
+            self.db_path = db_path
+            self.data_dir = os.path.dirname(db_path)
+        # Initialize data containers
         self.medications = {}
         self.suppliers = {}
         self.consumption_history = {}
@@ -49,30 +54,41 @@ class DataLoader:
         self.storage_locations = {}
         self.slot_assignments = {}
         self.drug_prices = {}
+        self.med_supplier_prices = {}
         # New data structures for enhanced data
         self.current_inventory = {}
         self.batch_info = {}
         self.warehouse_zones = {}
         self.purchase_orders = {}
 
+        # Database connection (will be created on demand)
+        self._conn = None
+
+    def get_connection(self):
+        """Get or create database connection"""
+        if self._conn is None:
+            self._conn = sqlite3.connect(self.db_path)
+            self._conn.row_factory = sqlite3.Row  # Enable column access by name
+        return self._conn
+
     def load_all_data(self):
-        """Load all CSV data into memory"""
+        """Load all data from SQLite database"""
         try:
-            # Verify data directory exists
-            if not os.path.exists(self.data_dir):
-                raise FileNotFoundError(f"Data directory not found: {self.data_dir}")
+            conn = self.get_connection()
 
             # Load medications
-            meds_df = pd.read_csv(os.path.join(self.data_dir, "medications.csv"))
+            meds_df = pd.read_sql_query("SELECT * FROM medications", conn)
             self.medications = meds_df.set_index("med_id").to_dict("index")
 
             # Load suppliers
-            suppliers_df = pd.read_csv(os.path.join(self.data_dir, "suppliers.csv"))
+            suppliers_df = pd.read_sql_query("SELECT * FROM suppliers", conn)
             self.suppliers = suppliers_df.set_index("supplier_id").to_dict("index")
 
             # Load consumption history (get latest stock levels)
-            consumption_df = pd.read_csv(
-                os.path.join(self.data_dir, "consumption_history.csv")
+            consumption_df = pd.read_sql_query(
+                """SELECT * FROM consumption_history 
+                   ORDER BY date DESC, store_id, med_id""",
+                conn,
             )
             consumption_df["date"] = pd.to_datetime(consumption_df["date"])
 
@@ -85,28 +101,35 @@ class DataLoader:
             ).to_dict("index")
 
             # Load SKU metadata
-            sku_df = pd.read_csv(os.path.join(self.data_dir, "sku_meta.csv"))
+            sku_df = pd.read_sql_query("SELECT * FROM sku_meta", conn)
             self.sku_meta = sku_df.set_index("med_id").to_dict("index")
 
             # Load storage locations
-            storage_df = pd.read_csv(
-                os.path.join(self.data_dir, "storage_loc_simple.csv")
-            )
+            storage_df = pd.read_sql_query("SELECT * FROM storage_loc_simple", conn)
             self.storage_locations = storage_df.to_dict("records")
 
             # Load slot assignments
-            slots_df = pd.read_csv(os.path.join(self.data_dir, "slot_assignments.csv"))
+            slots_df = pd.read_sql_query(
+                """SELECT sa.*, sl.zone_type, sl.distance_score 
+                   FROM slot_assignment_simple sa
+                   LEFT JOIN storage_loc_simple sl ON sa.location_id = sl.location_id""",
+                conn,
+            )
             # Handle duplicate med_id entries by keeping the first occurrence
             slots_df = slots_df.drop_duplicates(subset=["med_id"], keep="first")
             self.slot_assignments = slots_df.set_index("med_id").to_dict("index")
 
-            # Load drug prices (get latest prices)
-            prices_df = pd.read_csv(os.path.join(self.data_dir, "drug_prices.csv"))
-            prices_df["valid_from"] = pd.to_datetime(prices_df["valid_from"])
-            latest_prices = prices_df.loc[
-                prices_df.groupby("med_id")["valid_from"].idxmax()
-            ]
-            self.drug_prices = latest_prices.set_index("med_id").to_dict("index")
+            # Load drug prices (latest price for each medication)
+            prices_df = pd.read_sql_query(
+                """SELECT dp1.* FROM drug_prices dp1
+                   INNER JOIN (
+                       SELECT med_id, MAX(valid_from) as max_date
+                       FROM drug_prices
+                       GROUP BY med_id
+                   ) dp2 ON dp1.med_id = dp2.med_id AND dp1.valid_from = dp2.max_date""",
+                conn,
+            )
+            self.drug_prices = prices_df.set_index("med_id").to_dict("index")
 
             # Load new enhanced data files (with error handling for missing files)
             try:
@@ -156,6 +179,18 @@ class DataLoader:
             except FileNotFoundError:
                 print("Warning: purchase_orders.csv not found, using fallback data")
                 self.purchase_orders = {}
+
+            # Load supplier-specific prices from database
+            supplier_prices_df = pd.read_sql_query(
+                """SELECT * FROM med_supplier_prices 
+                   ORDER BY med_id, supplier_id""",
+                conn,
+            )
+
+            # Group by medication
+            self.med_supplier_prices = {}
+            for med_id, group in supplier_prices_df.groupby("med_id"):
+                self.med_supplier_prices[int(med_id)] = group.to_dict("records")
 
         except Exception as e:
             print(f"Error loading data: {e}")
@@ -485,3 +520,196 @@ class DataLoader:
 
         except Exception as e:
             return {"error": f"Failed to load consumption history: {str(e)}"}
+
+    def get_suppliers(self) -> List[Dict[str, Any]]:
+        """Get all suppliers with their details"""
+        suppliers_list = []
+        for supplier_id, supplier_data in self.suppliers.items():
+            supplier_dict = {"supplier_id": supplier_id, **supplier_data}
+            suppliers_list.append(supplier_dict)
+
+        # Sort by supplier_id for consistent ordering
+        suppliers_list.sort(key=lambda x: x["supplier_id"])
+        return clean_nan_values(suppliers_list)
+
+    def get_medication_supplier_prices(self, med_id: int) -> Dict[str, Any]:
+        """Get all supplier prices for a medication with supplier details"""
+        prices = []
+
+        # Get medication details
+        med = self.medications.get(med_id)
+        if not med:
+            return {"prices": []}
+
+        # Get supplier-specific prices from database
+        conn = self.get_connection()
+        query = """
+            SELECT msp.*, s.name as supplier_name, s.avg_lead_time, s.status as supplier_status
+            FROM med_supplier_prices msp
+            JOIN suppliers s ON msp.supplier_id = s.supplier_id
+            WHERE msp.med_id = ?
+            ORDER BY msp.supplier_id
+        """
+
+        df = pd.read_sql_query(query, conn, params=(med_id,))
+
+        if not df.empty:
+            for _, row in df.iterrows():
+                prices.append(
+                    {
+                        "supplier_id": row["supplier_id"],
+                        "supplier_name": row["supplier_name"],
+                        "price_per_unit": row["price_per_unit"],
+                        "avg_lead_time": row["avg_lead_time"],
+                        "supplier_status": row["supplier_status"],
+                        "valid_from": row["valid_from"],
+                    }
+                )
+        else:
+            # Fallback to base price for primary supplier if no specific prices
+            base_price = self.drug_prices.get(med_id, {}).get("price_per_unit", 0)
+            primary_supplier = self.suppliers.get(med["supplier_id"], {})
+            if primary_supplier:
+                prices.append(
+                    {
+                        "supplier_id": med["supplier_id"],
+                        "supplier_name": primary_supplier.get("name", "Unknown"),
+                        "price_per_unit": base_price,
+                        "avg_lead_time": primary_supplier.get("avg_lead_time", 7),
+                        "supplier_status": primary_supplier.get("status", "Unknown"),
+                        "valid_from": None,
+                    }
+                )
+
+        return clean_nan_values({"prices": prices})
+
+    def save_purchase_order(self, po_data: Dict[str, Any]) -> str:
+        """Save a purchase order to the database"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Begin transaction
+            conn.execute("BEGIN TRANSACTION")
+
+            # Insert main PO record
+            cursor.execute(
+                """
+                INSERT INTO purchase_orders (
+                    po_id, po_number, supplier_id, supplier_name, status,
+                    total_amount, created_at, updated_at, requested_delivery_date,
+                    notes, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    po_data["po_id"],
+                    po_data["po_number"],
+                    po_data["supplier_id"],
+                    po_data["supplier_name"],
+                    po_data["status"],
+                    po_data["total_amount"],
+                    po_data["created_at"],
+                    po_data["updated_at"],
+                    po_data.get("requested_delivery_date"),
+                    po_data.get("notes"),
+                    po_data.get("created_by", "system"),
+                ),
+            )
+
+            # Insert PO items
+            for item in po_data["items"]:
+                cursor.execute(
+                    """
+                    INSERT INTO purchase_order_items (
+                        po_id, med_id, med_name, quantity, 
+                        unit_price, total_price, pack_size
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        po_data["po_id"],
+                        item["med_id"],
+                        item["med_name"],
+                        item["quantity"],
+                        item["unit_price"],
+                        item["total_price"],
+                        item.get("pack_size", 0),
+                    ),
+                )
+
+            conn.commit()
+
+            # Add to in-memory cache
+            self.purchase_orders[po_data["po_id"]] = po_data
+
+            return po_data["po_id"]
+
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def get_purchase_order(self, po_id: str) -> Optional[Dict[str, Any]]:
+        """Get a purchase order by ID"""
+        conn = self.get_connection()
+
+        # Query PO with items
+        po_query = """
+            SELECT * FROM purchase_orders WHERE po_id = ?
+        """
+        po_df = pd.read_sql_query(po_query, conn, params=(po_id,))
+
+        if po_df.empty:
+            return None
+
+        po = po_df.iloc[0].to_dict()
+
+        # Query items
+        items_query = """
+            SELECT * FROM purchase_order_items WHERE po_id = ?
+        """
+        items_df = pd.read_sql_query(items_query, conn, params=(po_id,))
+
+        po["items"] = items_df.to_dict("records") if not items_df.empty else []
+
+        return clean_nan_values(po)
+
+    def list_purchase_orders(
+        self, status: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List all purchase orders, optionally filtered by status"""
+        conn = self.get_connection()
+
+        # Build query
+        if status:
+            query = """
+                SELECT po.*, COUNT(poi.item_id) as item_count,
+                       SUM(poi.quantity) as total_quantity
+                FROM purchase_orders po
+                LEFT JOIN purchase_order_items poi ON po.po_id = poi.po_id
+                WHERE po.status = ?
+                GROUP BY po.po_id
+                ORDER BY po.created_at DESC
+            """
+            params = (status,)
+        else:
+            query = """
+                SELECT po.*, COUNT(poi.item_id) as item_count,
+                       SUM(poi.quantity) as total_quantity
+                FROM purchase_orders po
+                LEFT JOIN purchase_order_items poi ON po.po_id = poi.po_id
+                GROUP BY po.po_id
+                ORDER BY po.created_at DESC
+            """
+            params = ()
+
+        df = pd.read_sql_query(query, conn, params=params)
+
+        if df.empty:
+            return []
+
+        pos = df.to_dict("records")
+        return clean_nan_values(pos)
+
+    def __del__(self):
+        """Close database connection when object is destroyed"""
+        if hasattr(self, "_conn") and self._conn:
+            self._conn.close()

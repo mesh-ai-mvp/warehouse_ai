@@ -271,3 +271,21 @@ html.theme-transitioning *:after {
 [data-theme="dark"] .empty-state-icon {
   opacity: 0.3;
 }
+
+[data-theme="dark"] .form-field input,
+[data-theme="dark"] .form-field select,
+[data-theme="dark"] .form-field textarea,
+[data-theme="dark"] .allocation-row .supplier-select,
+[data-theme="dark"] .allocation-row .alloc-qty,
+[data-theme="dark"] .allocation-row .alloc-price {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .form-field input::placeholder,
+[data-theme="dark"] .form-field textarea::placeholder,
+[data-theme="dark"] .allocation-row .alloc-qty::placeholder,
+[data-theme="dark"] .allocation-row .alloc-price::placeholder {
+  color: var(--text-muted);
+}

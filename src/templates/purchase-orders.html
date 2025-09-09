@@ -3,15 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Inventory Management - POC</title>
+    <title>Purchase Orders - Inventory Management</title>
     <link rel="stylesheet" href="/static/css/main.css" />
     <link rel="stylesheet" href="/static/css/table.css" />
     <link rel="stylesheet" href="/static/css/dark-mode.css" />
-    <link rel="stylesheet" href="/static/css/ai-components.css" />
+    <link rel="stylesheet" href="/static/css/po.css" />
   </head>
 
   <body>
-    <!-- Header -->
     <header class="header">
       <div class="header-left">
         <button class="sidebar-toggle" id="sidebarToggle">
@@ -56,13 +55,12 @@
     </header>
 
     <div class="app-container">
-      <!-- Sidebar -->
       <aside class="sidebar" id="sidebar">
         <nav class="sidebar-nav">
           <div class="nav-section">
             <h3 class="nav-section-title">Inventory</h3>
             <ul class="nav-list">
-              <li class="nav-item active">
+              <li class="nav-item">
                 <a href="/" class="nav-link">
                   <svg
                     width="16"
@@ -81,22 +79,7 @@
                   <span>Current Stock</span>
                 </a>
               </li>
-              <li class="nav-item">
-                <a href="#" class="nav-link">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" />
-                  </svg>
-                  <span>Analytics</span>
-                </a>
-              </li>
-              <li class="nav-item">
+              <li class="nav-item active">
                 <a href="/purchase-orders" class="nav-link">
                   <svg
                     width="16"
@@ -191,86 +174,39 @@
         </nav>
       </aside>
 
-      <!-- Main Content -->
       <main class="main-content">
         <div class="content-header">
-          <h2>Current Stock Inventory</h2>
+          <h2>Purchase Orders</h2>
           <div class="actions">
-            <button class="btn btn-primary" id="generatePoBtn" disabled>
-              Generate PO
-            </button>
-            <button class="btn btn-secondary" id="createPoBtn" disabled>
-              Create PO
-            </button>
+            <a class="btn btn-primary" href="/create-po">Create PO</a>
           </div>
         </div>
 
-        <!-- Filters -->
-        <div class="filters-section">
-          <div class="filter-group">
-            <input
-              type="text"
-              class="filter-input"
-              id="searchInput"
-              placeholder="Search medications..."
-            />
-          </div>
-          <div class="filter-group">
-            <select class="filter-select" id="categoryFilter">
-              <option value="">All Categories</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <select class="filter-select" id="supplierFilter">
-              <option value="">All Suppliers</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <select class="filter-select" id="stockLevelFilter">
-              <option value="">All Stock Levels</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <button class="btn btn-secondary" id="clearFilters">
-              Clear Filters
-            </button>
-          </div>
-        </div>
-
-        <!-- Loading Indicator -->
-        <div class="loading" id="loadingIndicator">
-          <div class="loading-spinner"></div>
-          <span>Loading inventory data...</span>
-        </div>
-
-        <!-- Inventory Table -->
-        <div class="table-container" id="tableContainer">
-          <table class="inventory-table" id="inventoryTable">
+        <div class="table-container">
+          <table class="po-table po-list-table" id="poTable">
+            <colgroup>
+              <col style="width: 24%" />
+              <col style="width: 24%" />
+              <col style="width: 12%" />
+              <col style="width: 18%" />
+              <col style="width: 8%" />
+              <col style="width: 8%" />
+              <col style="width: 6%" />
+            </colgroup>
             <thead>
               <tr>
-                <th class="checkbox-column">
-                  <input type="checkbox" id="selectAll" />
-                </th>
-                <th>Medication Name</th>
-                <th>Category</th>
-                <th>Current Stock</th>
-                <th>Stock Level</th>
-                <th>Reorder Point</th>
-                <th>Days Until Stockout</th>
+                <th>PO ID</th>
                 <th>Supplier</th>
-                <th>Pack Size</th>
-                <th>Avg Daily Pick</th>
-                <th>Storage Location</th>
-                <th>Actions</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th style="text-align: right">Total Lines</th>
+                <th style="text-align: right">Total Amount</th>
+                <th style="text-align: center">Actions</th>
               </tr>
             </thead>
-            <tbody id="inventoryTableBody">
-              <!-- Table rows will be populated by JavaScript -->
-            </tbody>
+            <tbody id="poTableBody"></tbody>
           </table>
-
-          <!-- Empty State -->
-          <div class="empty-state" id="emptyState" style="display: none">
+          <div class="empty-state" id="poEmptyState" style="display: none">
             <div class="empty-state-icon">
               <svg
                 width="64"
@@ -288,91 +224,17 @@
                 <line x1="12" y1="22.08" x2="12" y2="12" />
               </svg>
             </div>
-            <h3>No inventory items found</h3>
-            <p>Try adjusting your search criteria or filters.</p>
-          </div>
-        </div>
-
-        <!-- Pagination -->
-        <div class="pagination-container">
-          <div class="pagination-info">
-            <span id="paginationInfo">Showing 0 - 0 of 0 items</span>
-          </div>
-          <div class="pagination-controls">
-            <div class="page-size-selector">
-              <label for="pageSize">Items per page:</label>
-              <select id="pageSize">
-                <option value="10">10</option>
-                <option value="20" selected>20</option>
-                <option value="50">50</option>
-              </select>
-            </div>
-            <div class="pagination-buttons">
-              <button class="btn-page" id="firstPage" disabled>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <polyline points="11,17 6,12 11,7" />
-                  <polyline points="18,17 13,12 18,7" />
-                </svg>
-              </button>
-              <button class="btn-page" id="prevPage" disabled>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <polyline points="15,18 9,12 15,6" />
-                </svg>
-              </button>
-              <span class="page-numbers" id="pageNumbers"></span>
-              <button class="btn-page" id="nextPage" disabled>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <polyline points="9,18 15,12 9,6" />
-                </svg>
-              </button>
-              <button class="btn-page" id="lastPage" disabled>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <polyline points="13,17 18,12 13,7" />
-                  <polyline points="6,17 11,12 6,7" />
-                </svg>
-              </button>
-            </div>
+            <h3>No purchase orders yet</h3>
+            <p>Create your first PO by clicking "Create PO".</p>
           </div>
         </div>
       </main>
     </div>
 
-    <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <!-- Scripts -->
-    <script src="/static/js/ai-po-generator.js"></script>
-    <script src="/static/js/app.js"></script>
-    <script src="/static/js/table.js"></script>
     <script src="/static/js/sidebar.js"></script>
     <script src="/static/js/dark-mode.js"></script>
+    <script src="/static/js/purchase-orders.js"></script>
   </body>
 </html>

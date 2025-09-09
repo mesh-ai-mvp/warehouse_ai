@@ -63,6 +63,11 @@ class InventoryApp {
         // Generate PO button
         document.getElementById('generatePoBtn').addEventListener('click',
             () => this.handleGeneratePO());
+        // Create PO button
+        const createPoBtn = document.getElementById('createPoBtn');
+        if (createPoBtn) {
+            createPoBtn.addEventListener('click', () => this.handleCreatePO());
+        }
     }
 
     async loadFilterOptions() {
@@ -338,6 +343,14 @@ class InventoryApp {
         generatePoBtn.textContent = selectedCount > 0
             ? `Generate PO (${selectedCount})`
             : 'Generate PO';
+        // Update Create PO button
+        const createPoBtn = document.getElementById('createPoBtn');
+        if (createPoBtn) {
+            createPoBtn.disabled = selectedCount === 0;
+            createPoBtn.textContent = selectedCount > 0
+                ? `Create PO (${selectedCount})`
+                : 'Create PO';
+        }
     }
 
     handleSelectAll(checked) {
@@ -405,21 +418,32 @@ class InventoryApp {
             return;
         }
 
-        // Placeholder functionality - just show a toast
-        this.showToast(
-            `Generated PO for ${this.selectedItems.size} selected items (placeholder functionality)`,
-            'success'
-        );
+        // Get selected medication IDs
+        const medicationIds = Array.from(this.selectedItems);
+        
+        // Use AI PO Generator
+        if (window.aiPOGenerator) {
+            window.aiPOGenerator.generatePO(medicationIds);
+        } else {
+            // Fallback if AI generator not loaded
+            this.showToast('AI generator not available. Please refresh the page.', 'error');
+        }
+    }
 
-        // Clear selections
-        this.selectedItems.clear();
-        this.updateSelectionState();
-
-        // Update table rows
-        document.querySelectorAll('#inventoryTableBody tr').forEach(row => {
-            row.classList.remove('selected');
-            row.querySelector('input[type=\"checkbox\"]').checked = false;
-        });
+    handleCreatePO() {
+        if (this.selectedItems.size === 0) {
+            this.showToast('Please select items to create a Purchase Order', 'warning');
+            return;
+        }
+        // Persist selected medication IDs for the create-po page
+        const ids = Array.from(this.selectedItems);
+        try {
+            sessionStorage.setItem('poSelectedMedicationIds', JSON.stringify(ids));
+        } catch (e) {
+            console.warn('Failed to store selection in sessionStorage', e);
+        }
+        // Navigate to create PO flow
+        window.location.href = '/create-po';
     }
 
     showLoading(show) {

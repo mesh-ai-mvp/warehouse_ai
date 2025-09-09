@@ -62,6 +62,24 @@ async def medication_detail_page(med_id: int):
     return FileResponse(os.path.join(TEMPLATES_DIR, "medication-detail.html"))
 
 
+@app.get("/create-po")
+async def create_po_page():
+    """Serve create purchase order page"""
+    return FileResponse(os.path.join(TEMPLATES_DIR, "create-po.html"))
+
+
+@app.get("/purchase-orders")
+async def purchase_orders_page():
+    """Serve purchase orders list page"""
+    return FileResponse(os.path.join(TEMPLATES_DIR, "purchase-orders.html"))
+
+
+@app.get("/purchase-orders/{po_id}")
+async def purchase_order_detail_page(po_id: str):
+    """Serve purchase order detail page"""
+    return FileResponse(os.path.join(TEMPLATES_DIR, "po-detail.html"))
+
+
 @app.get("/favicon.ico")
 async def favicon():
     """Return a simple favicon response to prevent 404 errors"""

@@ -155,7 +155,91 @@ def create_tables(conn):
       FOREIGN KEY (med_id) REFERENCES sku_meta(med_id),
       FOREIGN KEY (location_id) REFERENCES storage_loc_simple(location_id)
     );
+
+    -- ========== PURCHASE ORDER AND AI TABLES ==========
+    -- Supplier-specific medication prices
+    CREATE TABLE IF NOT EXISTS med_supplier_prices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        med_id INTEGER NOT NULL,
+        supplier_id INTEGER NOT NULL,
+        valid_from DATE NOT NULL,
+        price_per_unit REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (med_id) REFERENCES medications(med_id),
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id),
+        UNIQUE(med_id, supplier_id, valid_from)
+    );
+
+    -- Purchase orders table
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+        po_id TEXT PRIMARY KEY,
+        po_number TEXT UNIQUE NOT NULL,
+        supplier_id INTEGER NOT NULL,
+        supplier_name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft',
+        total_amount REAL NOT NULL,
+        created_at TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP NOT NULL,
+        requested_delivery_date DATE,
+        actual_delivery_date DATE,
+        notes TEXT,
+        created_by TEXT,
+        approved_by TEXT,
+        approved_at TIMESTAMP,
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id)
+    );
+
+    -- Purchase order items table
+    CREATE TABLE IF NOT EXISTS purchase_order_items (
+        item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        po_id TEXT NOT NULL,
+        med_id INTEGER NOT NULL,
+        med_name TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        unit_price REAL NOT NULL,
+        total_price REAL NOT NULL,
+        pack_size INTEGER,
+        FOREIGN KEY (po_id) REFERENCES purchase_orders(po_id) ON DELETE CASCADE,
+        FOREIGN KEY (med_id) REFERENCES medications(med_id)
+    );
+
+    -- AI metadata tables
+    CREATE TABLE IF NOT EXISTS ai_po_sessions (
+        session_id TEXT PRIMARY KEY,
+        created_at TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP,
+        medications TEXT NOT NULL,  -- JSON array of medication IDs
+        agent_outputs TEXT,  -- JSON with all agent outputs
+        reasoning TEXT,  -- JSON reasoning traces
+        status TEXT NOT NULL DEFAULT 'pending',
+        error TEXT,
+        generation_time_ms INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_po_metadata (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        po_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        ai_generated BOOLEAN DEFAULT 1,
+        generation_time_ms INTEGER,
+        confidence_score REAL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (po_id) REFERENCES purchase_orders(po_id) ON DELETE CASCADE,
+        FOREIGN KEY (session_id) REFERENCES ai_po_sessions(session_id)
+    );
     """)
+    
+    # Create indexes for better query performance
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_med_supplier_prices_med_id ON med_supplier_prices(med_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_med_supplier_prices_supplier_id ON med_supplier_prices(supplier_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier_id ON purchase_orders(supplier_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_purchase_order_items_po_id ON purchase_order_items(po_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_purchase_order_items_med_id ON purchase_order_items(med_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_po_sessions_status ON ai_po_sessions(status)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_po_metadata_po_id ON ai_po_metadata(po_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_po_metadata_session_id ON ai_po_metadata(session_id)")
+    
     conn.commit()
 
 
@@ -1346,6 +1430,149 @@ def generate_purchase_orders(
     return po_rows
 
 
+def generate_supplier_prices_for_meds(
+    medications, suppliers, drug_prices_rows, seed=DEFAULT_SEED + 44
+):
+    """
+    Create supplier-specific current prices for each medication with realistic variation.
+    Each medication has 3-5 suppliers with different pricing strategies:
+    - Some suppliers are consistently cheaper (high volume/generic focus)
+    - Some are premium (brand/quality focus)
+    - Some have competitive identical prices
+    - Category specialization affects pricing
+    Output schema: { med_id, supplier_id, valid_from, price_per_unit }
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+
+    # Build latest base price per med
+    latest_base_price = {}
+    for row in sorted(drug_prices_rows, key=lambda r: pd.to_datetime(r["valid_from"])):
+        latest_base_price[row["med_id"]] = float(row["price_per_unit"]) or 10.0
+
+    # Create supplier profiles with pricing tendencies
+    supplier_profiles = {}
+    for s in suppliers:
+        sid = s["supplier_id"]
+        # Assign pricing strategy to each supplier
+        strategy_rand = random.random()
+        if strategy_rand < 0.25:  # 25% are discount suppliers
+            profile = {
+                "strategy": "discount",
+                "base_multiplier": np.random.uniform(0.85, 0.95),
+                "variance": 0.03,
+                "specialties": random.sample(["Chronic", "Intermittent"], 1),
+            }
+        elif strategy_rand < 0.50:  # 25% are premium suppliers
+            profile = {
+                "strategy": "premium",
+                "base_multiplier": np.random.uniform(1.05, 1.15),
+                "variance": 0.02,
+                "specialties": random.sample(["Sporadic", "Intermittent"], 1),
+            }
+        else:  # 50% are competitive/standard suppliers
+            profile = {
+                "strategy": "competitive",
+                "base_multiplier": np.random.uniform(0.97, 1.03),
+                "variance": 0.04,
+                "specialties": random.sample(
+                    ["Chronic", "Intermittent", "Sporadic"], 2
+                ),
+            }
+        supplier_profiles[sid] = profile
+
+    supplier_ids = [s["supplier_id"] for s in suppliers]
+    offers = []
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    for med in medications:
+        med_id = med["med_id"]
+        med_category = med["category"]
+        base_supplier = med["supplier_id"]
+        base_price = latest_base_price.get(med_id, round(np.random.uniform(5, 500), 2))
+
+        # Primary supplier gets a slight advantage (established relationship)
+        primary_profile = supplier_profiles[base_supplier]
+        if med_category in primary_profile["specialties"]:
+            # Better price for specialty category
+            primary_multiplier = primary_profile["base_multiplier"] * 0.95
+        else:
+            primary_multiplier = primary_profile["base_multiplier"]
+
+        primary_price = round(
+            base_price
+            * primary_multiplier
+            * np.random.uniform(
+                1 - primary_profile["variance"], 1 + primary_profile["variance"]
+            ),
+            2,
+        )
+        offers.append(
+            {
+                "med_id": med_id,
+                "supplier_id": base_supplier,
+                "valid_from": today,
+                "price_per_unit": float(primary_price),
+            }
+        )
+
+        # Select 2-4 additional suppliers (ensuring 3-5 total suppliers per medication)
+        alternates = [sid for sid in supplier_ids if sid != base_supplier]
+        num_alternates = random.randint(2, min(4, len(alternates)))
+        selected_alternates = random.sample(alternates, num_alternates)
+
+        # Track if we should create identical prices (competitive market scenario)
+        create_identical = random.random() < 0.20  # 20% chance of price matching
+        match_price = None
+
+        for i, sid in enumerate(selected_alternates):
+            profile = supplier_profiles[sid]
+
+            # Check for competitive price matching
+            if create_identical and i == 0:
+                # First alternate sets the competitive price
+                match_price = round(base_price * np.random.uniform(0.96, 1.04), 2)
+                alt_price = match_price
+            elif create_identical and match_price and random.random() < 0.6:
+                # 60% chance other suppliers match the competitive price
+                alt_price = match_price
+            else:
+                # Normal pricing based on supplier profile
+                if med_category in profile["specialties"]:
+                    multiplier = profile["base_multiplier"] * 0.93  # Specialty discount
+                else:
+                    multiplier = profile["base_multiplier"]
+
+                # Add variance based on supplier strategy
+                variance_factor = np.random.uniform(
+                    1 - profile["variance"], 1 + profile["variance"]
+                )
+
+                # Additional factors for realism
+                # Volume discount for chronic medications (higher volume)
+                if med_category == "Chronic" and profile["strategy"] == "discount":
+                    multiplier *= 0.95
+                # Premium markup for sporadic/rare medications
+                elif med_category == "Sporadic" and profile["strategy"] == "premium":
+                    multiplier *= 1.08
+
+                alt_price = round(base_price * multiplier * variance_factor, 2)
+
+            # Ensure price is reasonable (not below 50% or above 150% of base)
+            alt_price = max(base_price * 0.5, min(base_price * 1.5, alt_price))
+
+            offers.append(
+                {
+                    "med_id": med_id,
+                    "supplier_id": sid,
+                    "valid_from": today,
+                    "price_per_unit": float(alt_price),
+                }
+            )
+
+    return offers
+
+
 # -----------------------
 # Orchestrator
 # -----------------------
@@ -1406,6 +1633,23 @@ def generate_all(
     conn.commit()
     pd.DataFrame(all_price_rows).to_csv(
         os.path.join(output_dir, "drug_prices.csv"), index=False
+    )
+
+    # Supplier-specific current prices for each medication
+    supplier_price_rows = generate_supplier_prices_for_meds(
+        meds, suppliers, all_price_rows, seed=seed + 44
+    )
+    
+    # Insert supplier prices into database
+    print("Writing supplier prices to DB …")
+    cur.executemany(
+        "INSERT INTO med_supplier_prices (med_id, supplier_id, valid_from, price_per_unit) VALUES (:med_id, :supplier_id, :valid_from, :price_per_unit);",
+        supplier_price_rows,
+    )
+    conn.commit()
+    
+    pd.DataFrame(supplier_price_rows).to_csv(
+        os.path.join(output_dir, "med_supplier_prices.csv"), index=False
     )
 
     # Consumption & receipts & forecasts

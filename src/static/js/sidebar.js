@@ -136,14 +136,18 @@ class SidebarManager {
         const linkText = e.target.textContent.trim();
 
         if (linkText.includes('Current Stock')) {
-            // Already on current stock page - just prevent default
             e.preventDefault();
+            // Check if we're not already on the inventory page (home page)
+            if (window.location.pathname !== '/') {
+                window.location.href = '/';
+            }
+            // If already on home page, do nothing (inventory is already shown)
         } else if (linkText.includes('Analytics')) {
             e.preventDefault();
             this.showComingSoon('Analytics Dashboard');
         } else if (linkText.includes('Purchase Orders')) {
             e.preventDefault();
-            this.showComingSoon('Purchase Orders Management');
+            window.location.href = '/purchase-orders';
         } else if (linkText.includes('Suppliers')) {
             e.preventDefault();
             this.showComingSoon('Supplier Management');
