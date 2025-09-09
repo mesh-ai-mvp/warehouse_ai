@@ -1,0 +1,6 @@
+[
+  {
+    "type": "sqlite",
+    "path": "/home/sid/dev/hackathon-warehouse-management/poc_supplychain.db"
+  }
+]

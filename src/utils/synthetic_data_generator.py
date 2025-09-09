@@ -73,7 +73,11 @@ def create_tables(conn):
       name TEXT NOT NULL,
       status TEXT,
       avg_lead_time REAL,
-      last_delivery_date DATE
+      last_delivery_date DATE,
+      email TEXT,
+      contact_name TEXT,
+      phone TEXT,
+      address TEXT
     );
 
     CREATE TABLE IF NOT EXISTS medications (
@@ -155,7 +159,121 @@ def create_tables(conn):
       FOREIGN KEY (med_id) REFERENCES sku_meta(med_id),
       FOREIGN KEY (location_id) REFERENCES storage_loc_simple(location_id)
     );
+
+    -- ========== PURCHASE ORDER AND AI TABLES ==========
+    -- Supplier-specific medication prices
+    CREATE TABLE IF NOT EXISTS med_supplier_prices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        med_id INTEGER NOT NULL,
+        supplier_id INTEGER NOT NULL,
+        valid_from DATE NOT NULL,
+        price_per_unit REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (med_id) REFERENCES medications(med_id),
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id),
+        UNIQUE(med_id, supplier_id, valid_from)
+    );
+
+    -- Purchase orders table
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+        po_id TEXT PRIMARY KEY,
+        po_number TEXT UNIQUE NOT NULL,
+        supplier_id INTEGER NOT NULL,
+        supplier_name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft',
+        total_amount REAL NOT NULL,
+        created_at TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP NOT NULL,
+        requested_delivery_date DATE,
+        actual_delivery_date DATE,
+        notes TEXT,
+        created_by TEXT,
+        approved_by TEXT,
+        approved_at TIMESTAMP,
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id)
+    );
+
+    -- Purchase order items table
+    CREATE TABLE IF NOT EXISTS purchase_order_items (
+        item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        po_id TEXT NOT NULL,
+        med_id INTEGER NOT NULL,
+        med_name TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        unit_price REAL NOT NULL,
+        total_price REAL NOT NULL,
+        pack_size INTEGER,
+        FOREIGN KEY (po_id) REFERENCES purchase_orders(po_id) ON DELETE CASCADE,
+        FOREIGN KEY (med_id) REFERENCES medications(med_id)
+    );
+
+    -- AI metadata tables
+    CREATE TABLE IF NOT EXISTS ai_po_sessions (
+        session_id TEXT PRIMARY KEY,
+        created_at TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP,
+        medications TEXT NOT NULL,  -- JSON array of medication IDs
+        agent_outputs TEXT,  -- JSON with all agent outputs
+        reasoning TEXT,  -- JSON reasoning traces
+        status TEXT NOT NULL DEFAULT 'pending',
+        error TEXT,
+        generation_time_ms INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_po_metadata (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        po_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        ai_generated BOOLEAN DEFAULT 1,
+        generation_time_ms INTEGER,
+        confidence_score REAL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (po_id) REFERENCES purchase_orders(po_id) ON DELETE CASCADE,
+        FOREIGN KEY (session_id) REFERENCES ai_po_sessions(session_id)
+    );
     """)
+
+    # Create indexes for better query performance
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_med_supplier_prices_med_id ON med_supplier_prices(med_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_med_supplier_prices_supplier_id ON med_supplier_prices(supplier_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier_id ON purchase_orders(supplier_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_purchase_order_items_po_id ON purchase_order_items(po_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_purchase_order_items_med_id ON purchase_order_items(med_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ai_po_sessions_status ON ai_po_sessions(status)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ai_po_metadata_po_id ON ai_po_metadata(po_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ai_po_metadata_session_id ON ai_po_metadata(session_id)"
+    )
+
+    # Ensure new supplier contact columns exist on older DBs
+    cur.execute("PRAGMA table_info(suppliers)")
+    cols = {row[1] for row in cur.fetchall()}
+    for col_name, col_type in (
+        ("email", "TEXT"),
+        ("contact_name", "TEXT"),
+        ("phone", "TEXT"),
+        ("address", "TEXT"),
+    ):
+        if col_name not in cols:
+            cur.execute(f"ALTER TABLE suppliers ADD COLUMN {col_name} {col_type}")
+
     conn.commit()
 
 
@@ -206,6 +324,14 @@ def generate_suppliers(n_suppliers, seed=DEFAULT_SEED):
         last_delivery = (
             datetime.now(timezone.utc) - timedelta(days=int(np.random.randint(1, 30)))
         ).date()
+        contact_name = fake.name()
+        # Derive a simple domain and email
+        domain = name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        domain = f"{domain[:18]}.com"
+        email_local = contact_name.lower().replace(" ", ".").replace("'", "")
+        email = f"{email_local}@{domain}"
+        phone = fake.phone_number()
+        address = fake.address().replace("\n", ", ")
         suppliers.append(
             {
                 "supplier_id": i + 1,
@@ -213,6 +339,10 @@ def generate_suppliers(n_suppliers, seed=DEFAULT_SEED):
                 "status": status,
                 "avg_lead_time": avg_lead_time,
                 "last_delivery_date": str(last_delivery),
+                "email": email,
+                "contact_name": contact_name,
+                "phone": phone,
+                "address": address,
             }
         )
     return suppliers
@@ -399,30 +529,28 @@ def simulate_inventory_and_history(
 # Price history generator
 # -----------------------
 def generate_price_history_for_med(med_id, start_date, days):
-    base_price = round(np.random.uniform(5, 500), 2)
+    # Base prices adjusted to realistic pharmaceutical wholesale ranges (USD per unit)
+    # Defaults if we cannot infer from name/category
+    base_price = round(np.random.uniform(1.5, 25.0), 2)
     price_rows = []
     t = 0
 
-    # More realistic pharmaceutical pricing: changes less frequently with smaller volatility
-    annual_price_drift = np.random.normal(
-        0.0, 0.015
-    )  # 1.5% annual drift (inflation, etc.)
+    # More realistic pharmaceutical pricing: small, infrequent changes
+    annual_price_drift = np.random.normal(0.0, 0.01)  # ~1% annual drift
 
     while t < days:
         valid_from = (pd.Timestamp(start_date) + pd.Timedelta(days=t)).date()
 
-        # Calculate time-based price adjustment (gradual annual changes)
-        time_factor = t / 365.0  # Years elapsed
+        # Calculate time-based price adjustment (gradual changes)
+        time_factor = t / 365.0
         trend_adjustment = 1.0 + (annual_price_drift * time_factor)
 
-        # Occasional price updates (every 6-18 months instead of every 2-6 months)
-        if t == 0 or np.random.random() < 0.15:  # 15% chance of price adjustment
-            # Small price adjustments typical of pharmaceutical markets
-            change_factor = 1.0 + np.random.normal(
-                0.0, 0.008
-            )  # 0.8% volatility instead of 3%
+        # Less frequent price updates (every 9-18 months)
+        if t == 0 or np.random.random() < 0.08:
+            # Category-aware baseline could be applied by caller if needed; here keep small variance
+            change_factor = 1.0 + np.random.normal(0.0, 0.005)  # 0.5% volatility
             base_price = round(
-                max(0.01, base_price * change_factor * trend_adjustment), 2
+                max(0.1, base_price * change_factor * trend_adjustment), 2
             )
 
             price_rows.append(
@@ -433,10 +561,10 @@ def generate_price_history_for_med(med_id, start_date, days):
                 }
             )
 
-        # Price updates happen less frequently: every 180-540 days (6-18 months)
-        t += int(np.random.randint(180, 541))
+        # Next update in 270-540 days
+        t += int(np.random.randint(270, 541))
 
-    # Ensure we have at least one price record
+    # Ensure at least one price record
     if not price_rows:
         price_rows.append(
             {
@@ -447,6 +575,145 @@ def generate_price_history_for_med(med_id, start_date, days):
         )
 
     return price_rows
+
+
+def _estimate_base_price_for_med(name: str, category: str) -> float:
+    n = name.lower()
+    # Common low-cost generics
+    if "ibuprofen" in n or "paracetamol" in n or "amoxicillin" in n:
+        return float(round(np.random.uniform(0.05, 0.50), 2))
+    if (
+        "atorvastatin" in n
+        or "lisinopril" in n
+        or "amlodipine" in n
+        or "omeprazole" in n
+    ):
+        return float(round(np.random.uniform(0.05, 0.60), 2))
+    if "ceftriaxone" in n:
+        return float(round(np.random.uniform(0.50, 3.00), 2))
+    if "insulin" in n:
+        # Per-unit here can represent per mL or per vial component; keep realistic order-of-magnitude
+        return float(round(np.random.uniform(5.00, 25.00), 2))
+    if "salbutamol" in n:
+        return float(round(np.random.uniform(0.80, 3.00), 2))
+
+    # Category fallback ranges
+    if category == "Chronic":
+        return float(round(np.random.uniform(0.10, 2.00), 2))
+    if category == "Intermittent":
+        return float(round(np.random.uniform(0.10, 3.00), 2))
+    # Sporadic/rare
+    return float(round(np.random.uniform(0.20, 5.00), 2))
+
+
+def generate_supplier_prices_for_meds(
+    medications, suppliers, drug_prices_rows, seed=DEFAULT_SEED + 44
+):
+    """
+    Create supplier-specific current prices with realistic variation.
+    Base prices derived from medication name/category; limited variance.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+
+    # Build latest base price per med; if not present, estimate from name/category
+    latest_base_price = {}
+    by_med = {}
+    for row in sorted(drug_prices_rows, key=lambda r: pd.to_datetime(r["valid_from"])):
+        latest_base_price[row["med_id"]] = float(row["price_per_unit"]) or 1.0
+        by_med.setdefault(row["med_id"], []).append(row)
+
+    supplier_ids = [s["supplier_id"] for s in suppliers]
+    offers = []
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    # Supplier pricing tendencies (reduced variance)
+    supplier_profiles = {}
+    for s in suppliers:
+        sid = s["supplier_id"]
+        strategy_rand = random.random()
+        if strategy_rand < 0.25:
+            profile = {
+                "strategy": "discount",
+                "mult": np.random.uniform(0.90, 0.98),
+                "var": 0.02,
+            }
+        elif strategy_rand < 0.50:
+            profile = {
+                "strategy": "premium",
+                "mult": np.random.uniform(1.02, 1.10),
+                "var": 0.02,
+            }
+        else:
+            profile = {
+                "strategy": "competitive",
+                "mult": np.random.uniform(0.97, 1.03),
+                "var": 0.02,
+            }
+        supplier_profiles[sid] = profile
+
+    for med in medications:
+        med_id = med["med_id"]
+        med_category = med["category"]
+        name = med["name"]
+        base_price = latest_base_price.get(med_id)
+        if base_price is None:
+            base_price = _estimate_base_price_for_med(name, med_category)
+
+        primary_supplier = med["supplier_id"]
+        offers.append(
+            {
+                "med_id": med_id,
+                "supplier_id": primary_supplier,
+                "valid_from": today,
+                "price_per_unit": float(
+                    round(base_price * np.random.uniform(0.98, 1.02), 2)
+                ),
+            }
+        )
+
+        alternates = [sid for sid in supplier_ids if sid != primary_supplier]
+        num_alternates = random.randint(2, min(4, len(alternates)))
+        selected_alternates = random.sample(alternates, num_alternates)
+
+        # 20% chance of identical competitive prices
+        create_identical = random.random() < 0.20
+        match_price = None
+
+        for i, sid in enumerate(selected_alternates):
+            profile = supplier_profiles[sid]
+            if create_identical and i == 0:
+                match_price = round(base_price * np.random.uniform(0.97, 1.03), 2)
+                alt_price = match_price
+            elif create_identical and match_price and random.random() < 0.6:
+                alt_price = match_price
+            else:
+                mult = profile["mult"]
+                var = profile["var"]
+                # Light specialty tweaks
+                if med_category == "Chronic" and profile["strategy"] == "discount":
+                    mult *= 0.98
+                elif med_category == "Sporadic" and profile["strategy"] == "premium":
+                    mult *= 1.02
+                alt_price = round(
+                    base_price * mult * np.random.uniform(1 - var, 1 + var), 2
+                )
+
+            # Clamp to within 50%..+150% of base
+            alt_price = max(
+                round(base_price * 0.5, 2), min(round(base_price * 1.5, 2), alt_price)
+            )
+
+            offers.append(
+                {
+                    "med_id": med_id,
+                    "supplier_id": sid,
+                    "valid_from": today,
+                    "price_per_unit": float(alt_price),
+                }
+            )
+
+    return offers
 
 
 # -----------------------
@@ -1375,15 +1642,15 @@ def generate_all(
 
     cur = conn.cursor()
     cur.executemany(
-        "INSERT INTO suppliers (supplier_id, name, status, avg_lead_time, last_delivery_date) VALUES (:supplier_id, :name, :status, :avg_lead_time, :last_delivery_date);",
+        "INSERT OR REPLACE INTO suppliers (supplier_id, name, status, avg_lead_time, last_delivery_date, email, contact_name, phone, address) VALUES (:supplier_id, :name, :status, :avg_lead_time, :last_delivery_date, :email, :contact_name, :phone, :address);",
         suppliers,
     )
     cur.executemany(
-        "INSERT INTO medications (med_id, name, category, pack_size, shelf_life_days, supplier_id) VALUES (:med_id, :name, :category, :pack_size, :shelf_life_days, :supplier_id);",
+        "INSERT OR REPLACE INTO medications (med_id, name, category, pack_size, shelf_life_days, supplier_id) VALUES (:med_id, :name, :category, :pack_size, :shelf_life_days, :supplier_id);",
         meds,
     )
     cur.executemany(
-        "INSERT INTO stores (store_id, name, location) VALUES (:store_id, :name, :location);",
+        "INSERT OR REPLACE INTO stores (store_id, name, location) VALUES (:store_id, :name, :location);",
         stores,
     )
     conn.commit()
@@ -1406,6 +1673,23 @@ def generate_all(
     conn.commit()
     pd.DataFrame(all_price_rows).to_csv(
         os.path.join(output_dir, "drug_prices.csv"), index=False
+    )
+
+    # Supplier-specific current prices for each medication
+    supplier_price_rows = generate_supplier_prices_for_meds(
+        meds, suppliers, all_price_rows, seed=seed + 44
+    )
+
+    # Insert supplier prices into database
+    print("Writing supplier prices to DB …")
+    cur.executemany(
+        "INSERT INTO med_supplier_prices (med_id, supplier_id, valid_from, price_per_unit) VALUES (:med_id, :supplier_id, :valid_from, :price_per_unit);",
+        supplier_price_rows,
+    )
+    conn.commit()
+
+    pd.DataFrame(supplier_price_rows).to_csv(
+        os.path.join(output_dir, "med_supplier_prices.csv"), index=False
     )
 
     # Consumption & receipts & forecasts

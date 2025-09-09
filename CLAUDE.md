@@ -2,216 +2,139 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## AI Guidance
+
+* Ignore GEMINI.md and GEMINI-*.md files
+* To save main context space, for code searches, inspections, troubleshooting or analysis, use code-searcher subagent where appropriate - giving the subagent full context background for the task(s) you assign it.
+* After receiving tool results, carefully reflect on their quality and determine optimal next steps before proceeding. Use your thinking to plan and iterate based on this new information, and then take the best next action.
+* For maximum efficiency, whenever you need to perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.
+* Before you finish, please verify your solution
+* Do what has been asked; nothing more, nothing less.
+* NEVER create files unless they're absolutely necessary for achieving your goal.
+* ALWAYS prefer editing an existing file to creating a new one.
+* NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+* When you update or modify core context files, also update markdown documentation and memory bank
+* When asked to commit changes, exclude CLAUDE.md and CLAUDE-*.md referenced memory bank system files from any commits. Never delete these files.
+
+## Memory Bank System
+
+This project uses a structured memory bank system with specialized context files. Always check these files for relevant information before starting work:
+
+### Core Context Files
+
+* **CLAUDE-activeContext.md** - Current session state, goals, and progress (if exists)
+* **CLAUDE-patterns.md** - Established code patterns and conventions (if exists)
+* **CLAUDE-decisions.md** - Architecture decisions and rationale (if exists)
+* **CLAUDE-troubleshooting.md** - Common issues and proven solutions (if exists)
+* **CLAUDE-config-variables.md** - Configuration variables reference (if exists)
+* **CLAUDE-temp.md** - Temporary scratch pad (only read when referenced)
+
+**Important:** Always reference the active context file first to understand what's currently being worked on and maintain session continuity.
+
+### Memory Bank System Backups
+
+When asked to backup Memory Bank System files, you will copy the core context files above and @.claude settings directory to directory @/path/to/backup-directory. If files already exist in the backup directory, you will overwrite them.
+
 ## Project Overview
 
-This is a FastAPI-based Pharmacy Warehouse Management System designed as a Proof-of-Concept (POC) for testing warehouse optimization algorithms. The system simulates an intentionally disorganized warehouse with realistic pharmaceutical inventory data.
+This is a **FastAPI-based pharmaceutical warehouse management system** with a multi-agent AI system for automated purchase order generation. The architecture consists of:
 
-## Key Development Commands
+### Core Architecture
 
-### Local Development (uv package manager)
+1. **FastAPI Application** (`src/main.py`)
+   * Serves static files and API endpoints
+   * Lifespan management for data loading
+   * Routes for inventory, medication details, and purchase orders
+
+2. **Multi-Agent AI System** (`src/ai_agents/`)
+   * **LangGraph workflow orchestration** using state machines
+   * **Three specialized agents**: ForecastAgent, AdjustmentAgent, SupplierAgent
+   * **Asynchronous processing** with timeout handling and caching
+   * **Integration** via AIPoHandler in api_handler.py
+
+3. **Data Layer** (`src/data_loader.py`)
+   * Centralized CSV data loading and caching
+   * Inventory management with filtering and pagination
+   * Consumption history and forecasting data
+
+4. **Frontend** (Static files in `src/static/`, templates in `src/templates/`)
+   * Responsive web interface with dark mode
+   * Purchase order creation and management pages
+   * Interactive charts using Plotly.js
+
+### AI Agents System
+
+The AI system uses **LangGraph** for state machine-based workflow orchestration:
+* **State Management**: POGenerationState with progress tracking and reasoning
+* **Sequential Flow**: forecast → adjust → optimize → finalize
+* **Error Handling**: Timeout management and graceful failure handling
+* **Caching**: Configurable result caching with TTL
+
+## Development Commands
+
+### Quick Start
 
 ```bash
-# Install dependencies
-uv sync
+# Development with live reload (recommended)
+make dev
 
-# Run locally with auto-reload
+# Local development without Docker  
+uv sync
 uv run python src/main.py
 
-# Run linting
-uv run ruff check src/
-
-# Fix linting issues
-uv run ruff check --fix src/
-
-# Update dependencies
-uv lock
-```
-
-### Docker Development (Recommended)
-
-```bash
-# Development with live reload
-make dev
-# or: docker-compose -f docker-compose.dev.yml up --build
-
-# Production build
-make prod
-# or: docker-compose -f docker-compose.prod.yml up --build -d
-
-# View logs
-make logs
-# or: docker-compose logs -f warehouse-app
-
-# Get shell access
-make shell
-# or: docker exec -it warehouse-management bash
-
-# Run tests (in Docker)
-make test
-# or: docker-compose -f docker-compose.dev.yml exec warehouse-app-dev uv run pytest
-
-# Run linting (in Docker)
-make lint
-# or: docker-compose -f docker-compose.dev.yml exec warehouse-app-dev uv run ruff check src/
-```
-
-### Health Checks
-
-```bash
-# Test application health
-curl http://localhost:8000/api/filters
-
-# Test chart data endpoint  
-curl http://localhost:8000/api/medication/1/consumption-history
-```
-
-## Architecture Overview
-
-### Backend Architecture
-
-- **FastAPI Application** (`src/main.py`): Main application entry point with lifespan management and static file serving
-- **API Routes** (`src/api/routes.py`): RESTful endpoints for inventory data with pagination and filtering
-- **Data Layer** (`src/data_loader.py`): CSV data loading and in-memory caching with NaN value cleaning
-- **Data Generation** (`src/utils/synthetic_data_generator.py`): Comprehensive synthetic pharmaceutical data generator (1772 lines)
-
-### Frontend
-
-- **Static Web App**: HTML/CSS/JavaScript files in `src/static/`
-- **Features**: Dark mode, responsive tables, inventory management UI, interactive charts
-- **Chart Visualization**: Plotly.js integration for consumption history and forecasting charts
-- **Medication Detail Pages**: Dedicated pages with comprehensive analytics and chart views
-- **API Integration**: Consumes FastAPI endpoints for data visualization and real-time charting
-
-### Data Architecture
-
-The system uses CSV files for data storage with an intentionally messy warehouse simulation:
-
-**Core Data Entities:**
-
-- `medications.csv`: 50 pharmaceutical products with categories (Chronic, Intermittent, Sporadic)
-- `suppliers.csv`: Pharmaceutical suppliers with lead times and status
-- `consumption_history.csv`: 365 days of realistic demand patterns across 3 stores
-- `sku_meta.csv`: Physical warehouse metadata (volume, weight, storage requirements)
-- `storage_loc_simple.csv`: Fragmented storage locations with inconsistent capacities
-- `slot_assignments.csv`: Intentionally disorganized SKU-to-location mappings
-
-**Enhanced Data (Optional):**
-
-- `current_inventory.csv`: Real-time stock levels with reorder points
-- `batch_info.csv`: Lot tracking and expiration data
-- `warehouse_zones.csv`: Zone definitions with capacity utilization
-- `purchase_orders.csv`: PO history and status tracking
-
-### Messy Warehouse Simulation
-
-The data generator creates realistic warehouse chaos:
-
-- 30% SKU fragmentation (same item in multiple locations)
-- 10% zone violations (items in wrong storage zones)
-- 70% clustering (most items in 30% of locations)
-- 5% orphaned items (no assigned location)
-- Inconsistent storage capacities and inverted distance scores
-
-## Development Patterns
-
-### Data Loading
-
-- All CSV data loaded into memory at startup via `DataLoader` class
-- Graceful fallback for missing enhanced data files
-- NaN values cleaned for JSON serialization
-- Pagination and filtering implemented in-memory
-
-### API Design
-
-- RESTful endpoints with `/api` prefix
-- Query parameter validation using FastAPI Query types
-- Comprehensive error handling with HTTPException
-- JSON responses with cleaned NaN values
-- **Chart Data Endpoints**: Specialized routes for consumption history and forecasting data
-- **Medication Detail API**: Rich data endpoints for individual medication analytics
-
-### Docker Optimization
-
-- Multi-stage builds with uv package manager (10x faster than pip)
-- Non-root execution with security hardening
-- Health checks for container orchestration
-- Separate dev/prod configurations with live reload support
-
-## File Structure
-
-```bash
-src/
-├── main.py              # FastAPI application entry point
-├── data_loader.py       # CSV data loading and caching
-├── api/
-│   ├── __init__.py
-│   └── routes.py        # API endpoints with chart data routes
-├── utils/
-│   └── synthetic_data_generator.py  # Large data generation script
-├── static/              # Frontend assets (HTML/CSS/JS)
-│   ├── css/
-│   │   ├── chart-styles.css     # Chart-specific styling
-│   │   └── ...
-│   └── js/
-│       ├── consumption-chart.js # Chart rendering logic
-│       └── ...
-└── templates/           # HTML templates
-    └── medication-detail.html   # Medication detail page with charts
-
-data/                    # Generated CSV files
-docker-compose*.yml      # Docker configurations  
-Makefile                # Development shortcuts
-pyproject.toml          # uv dependencies
-```
-
-## Testing and Quality
-
-### Code Quality
-
-- **Ruff** for linting with automatic fixes
-- **uv** for fast dependency management
-- Health checks via `/api/filters` endpoint
-
-### Expected Data Validation Issues
-
-The intentionally messy warehouse will trigger validation warnings:
-
-- "Extreme slot over-concentration"
-- "SKU fragmentation detected"
-- "Zone violations" for storage placement
-- 25-35% fragmentation rate expected
-
-## Environment Configuration
-
-### Docker Environment Variables
-
-- `PORT`: Application port (default: 8000)
-- `HOST`: Bind address (default: 0.0.0.0)
-- `WORKERS`: Uvicorn workers (default: 1)
-- `PYTHONOPTIMIZE`: Python optimization level
-
-### Production Considerations
-
-- Resource limits: 1GB memory, 1.0 CPU cores
-- Read-only filesystem with tmpfs for temporary files
-- JSON logging with rotation (10MB, 3 files)
-- Nginx reverse proxy support with caching
-
-## Data Generation
-
-To regenerate synthetic data:
-
-```bash
-# Generate fresh dataset (run from project root)
+# Generate synthetic data (if needed)
 uv run python src/utils/synthetic_data_generator.py --skus 50 --stores 3 --days 365
-
-# This creates poc_supplychain.db and exports all CSV files to data/
 ```
 
-## Working with Purchase Orders
+### Essential Commands
 
-The system includes purchase order functionality via the `feat/po-creation` branch:
+```bash
+# Development
+make dev              # Start dev environment with live reload
+make dev-bg          # Start dev environment in background
+uv run python src/main.py  # Run locally on port 8000
 
-- PO data linked to medications and suppliers
-- Status tracking (pending, approved, completed)
-- Integration with inventory levels and reorder points
+# Code Quality
+make lint            # Run ruff linting in container
+make lint-fix        # Auto-fix linting issues  
+uv run ruff check src/  # Run ruff locally
+uv run ruff check --fix src/  # Auto-fix locally
+
+# Testing
+make test            # Run pytest in container
+uv run pytest       # Run tests locally
+
+# Production
+make prod            # Production deployment
+make prod-nginx      # With Nginx reverse proxy
+
+# Data Management
+uv run python src/utils/synthetic_data_generator.py  # Generate test data
+```
+
+### Docker Commands
+
+```bash
+make logs            # View application logs
+make shell           # Get container shell access
+make clean           # Clean up containers and images
+make health          # Test API health endpoint
+```
+
+### Key Endpoints
+
+* `http://localhost:8000` - Main dashboard
+* `http://localhost:8000/docs` - FastAPI documentation
+* `http://localhost:8000/api/inventory` - Inventory API
+* `http://localhost:8000/create-po` - AI-powered PO creation
+
+### Dependencies
+
+- **Python 3.12+** with uv package manager
+* **LangGraph** for AI workflow orchestration  
+* **FastAPI** for REST API
+* **Docker** for containerization (recommended)
+
+### Testing Strategy
+
+Run tests with `make test` or `uv run pytest`. Verify linting with `make lint` before committing changes.
