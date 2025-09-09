@@ -262,6 +262,18 @@ def create_tables(conn):
         "CREATE INDEX IF NOT EXISTS idx_ai_po_metadata_session_id ON ai_po_metadata(session_id)"
     )
 
+    # Ensure new supplier contact columns exist on older DBs
+    cur.execute("PRAGMA table_info(suppliers)")
+    cols = {row[1] for row in cur.fetchall()}
+    for col_name, col_type in (
+        ("email", "TEXT"),
+        ("contact_name", "TEXT"),
+        ("phone", "TEXT"),
+        ("address", "TEXT"),
+    ):
+        if col_name not in cols:
+            cur.execute(f"ALTER TABLE suppliers ADD COLUMN {col_name} {col_type}")
+
     conn.commit()
 
 
@@ -517,30 +529,28 @@ def simulate_inventory_and_history(
 # Price history generator
 # -----------------------
 def generate_price_history_for_med(med_id, start_date, days):
-    base_price = round(np.random.uniform(5, 500), 2)
+    # Base prices adjusted to realistic pharmaceutical wholesale ranges (USD per unit)
+    # Defaults if we cannot infer from name/category
+    base_price = round(np.random.uniform(1.5, 25.0), 2)
     price_rows = []
     t = 0
 
-    # More realistic pharmaceutical pricing: changes less frequently with smaller volatility
-    annual_price_drift = np.random.normal(
-        0.0, 0.015
-    )  # 1.5% annual drift (inflation, etc.)
+    # More realistic pharmaceutical pricing: small, infrequent changes
+    annual_price_drift = np.random.normal(0.0, 0.01)  # ~1% annual drift
 
     while t < days:
         valid_from = (pd.Timestamp(start_date) + pd.Timedelta(days=t)).date()
 
-        # Calculate time-based price adjustment (gradual annual changes)
-        time_factor = t / 365.0  # Years elapsed
+        # Calculate time-based price adjustment (gradual changes)
+        time_factor = t / 365.0
         trend_adjustment = 1.0 + (annual_price_drift * time_factor)
 
-        # Occasional price updates (every 6-18 months instead of every 2-6 months)
-        if t == 0 or np.random.random() < 0.15:  # 15% chance of price adjustment
-            # Small price adjustments typical of pharmaceutical markets
-            change_factor = 1.0 + np.random.normal(
-                0.0, 0.008
-            )  # 0.8% volatility instead of 3%
+        # Less frequent price updates (every 9-18 months)
+        if t == 0 or np.random.random() < 0.08:
+            # Category-aware baseline could be applied by caller if needed; here keep small variance
+            change_factor = 1.0 + np.random.normal(0.0, 0.005)  # 0.5% volatility
             base_price = round(
-                max(0.01, base_price * change_factor * trend_adjustment), 2
+                max(0.1, base_price * change_factor * trend_adjustment), 2
             )
 
             price_rows.append(
@@ -551,10 +561,10 @@ def generate_price_history_for_med(med_id, start_date, days):
                 }
             )
 
-        # Price updates happen less frequently: every 180-540 days (6-18 months)
-        t += int(np.random.randint(180, 541))
+        # Next update in 270-540 days
+        t += int(np.random.randint(270, 541))
 
-    # Ensure we have at least one price record
+    # Ensure at least one price record
     if not price_rows:
         price_rows.append(
             {
@@ -565,6 +575,145 @@ def generate_price_history_for_med(med_id, start_date, days):
         )
 
     return price_rows
+
+
+def _estimate_base_price_for_med(name: str, category: str) -> float:
+    n = name.lower()
+    # Common low-cost generics
+    if "ibuprofen" in n or "paracetamol" in n or "amoxicillin" in n:
+        return float(round(np.random.uniform(0.05, 0.50), 2))
+    if (
+        "atorvastatin" in n
+        or "lisinopril" in n
+        or "amlodipine" in n
+        or "omeprazole" in n
+    ):
+        return float(round(np.random.uniform(0.05, 0.60), 2))
+    if "ceftriaxone" in n:
+        return float(round(np.random.uniform(0.50, 3.00), 2))
+    if "insulin" in n:
+        # Per-unit here can represent per mL or per vial component; keep realistic order-of-magnitude
+        return float(round(np.random.uniform(5.00, 25.00), 2))
+    if "salbutamol" in n:
+        return float(round(np.random.uniform(0.80, 3.00), 2))
+
+    # Category fallback ranges
+    if category == "Chronic":
+        return float(round(np.random.uniform(0.10, 2.00), 2))
+    if category == "Intermittent":
+        return float(round(np.random.uniform(0.10, 3.00), 2))
+    # Sporadic/rare
+    return float(round(np.random.uniform(0.20, 5.00), 2))
+
+
+def generate_supplier_prices_for_meds(
+    medications, suppliers, drug_prices_rows, seed=DEFAULT_SEED + 44
+):
+    """
+    Create supplier-specific current prices with realistic variation.
+    Base prices derived from medication name/category; limited variance.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+
+    # Build latest base price per med; if not present, estimate from name/category
+    latest_base_price = {}
+    by_med = {}
+    for row in sorted(drug_prices_rows, key=lambda r: pd.to_datetime(r["valid_from"])):
+        latest_base_price[row["med_id"]] = float(row["price_per_unit"]) or 1.0
+        by_med.setdefault(row["med_id"], []).append(row)
+
+    supplier_ids = [s["supplier_id"] for s in suppliers]
+    offers = []
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    # Supplier pricing tendencies (reduced variance)
+    supplier_profiles = {}
+    for s in suppliers:
+        sid = s["supplier_id"]
+        strategy_rand = random.random()
+        if strategy_rand < 0.25:
+            profile = {
+                "strategy": "discount",
+                "mult": np.random.uniform(0.90, 0.98),
+                "var": 0.02,
+            }
+        elif strategy_rand < 0.50:
+            profile = {
+                "strategy": "premium",
+                "mult": np.random.uniform(1.02, 1.10),
+                "var": 0.02,
+            }
+        else:
+            profile = {
+                "strategy": "competitive",
+                "mult": np.random.uniform(0.97, 1.03),
+                "var": 0.02,
+            }
+        supplier_profiles[sid] = profile
+
+    for med in medications:
+        med_id = med["med_id"]
+        med_category = med["category"]
+        name = med["name"]
+        base_price = latest_base_price.get(med_id)
+        if base_price is None:
+            base_price = _estimate_base_price_for_med(name, med_category)
+
+        primary_supplier = med["supplier_id"]
+        offers.append(
+            {
+                "med_id": med_id,
+                "supplier_id": primary_supplier,
+                "valid_from": today,
+                "price_per_unit": float(
+                    round(base_price * np.random.uniform(0.98, 1.02), 2)
+                ),
+            }
+        )
+
+        alternates = [sid for sid in supplier_ids if sid != primary_supplier]
+        num_alternates = random.randint(2, min(4, len(alternates)))
+        selected_alternates = random.sample(alternates, num_alternates)
+
+        # 20% chance of identical competitive prices
+        create_identical = random.random() < 0.20
+        match_price = None
+
+        for i, sid in enumerate(selected_alternates):
+            profile = supplier_profiles[sid]
+            if create_identical and i == 0:
+                match_price = round(base_price * np.random.uniform(0.97, 1.03), 2)
+                alt_price = match_price
+            elif create_identical and match_price and random.random() < 0.6:
+                alt_price = match_price
+            else:
+                mult = profile["mult"]
+                var = profile["var"]
+                # Light specialty tweaks
+                if med_category == "Chronic" and profile["strategy"] == "discount":
+                    mult *= 0.98
+                elif med_category == "Sporadic" and profile["strategy"] == "premium":
+                    mult *= 1.02
+                alt_price = round(
+                    base_price * mult * np.random.uniform(1 - var, 1 + var), 2
+                )
+
+            # Clamp to within 50%..+150% of base
+            alt_price = max(
+                round(base_price * 0.5, 2), min(round(base_price * 1.5, 2), alt_price)
+            )
+
+            offers.append(
+                {
+                    "med_id": med_id,
+                    "supplier_id": sid,
+                    "valid_from": today,
+                    "price_per_unit": float(alt_price),
+                }
+            )
+
+    return offers
 
 
 # -----------------------
@@ -1464,149 +1613,6 @@ def generate_purchase_orders(
     return po_rows
 
 
-def generate_supplier_prices_for_meds(
-    medications, suppliers, drug_prices_rows, seed=DEFAULT_SEED + 44
-):
-    """
-    Create supplier-specific current prices for each medication with realistic variation.
-    Each medication has 3-5 suppliers with different pricing strategies:
-    - Some suppliers are consistently cheaper (high volume/generic focus)
-    - Some are premium (brand/quality focus)
-    - Some have competitive identical prices
-    - Category specialization affects pricing
-    Output schema: { med_id, supplier_id, valid_from, price_per_unit }
-    """
-    random.seed(seed)
-    np.random.seed(seed)
-
-    # Build latest base price per med
-    latest_base_price = {}
-    for row in sorted(drug_prices_rows, key=lambda r: pd.to_datetime(r["valid_from"])):
-        latest_base_price[row["med_id"]] = float(row["price_per_unit"]) or 10.0
-
-    # Create supplier profiles with pricing tendencies
-    supplier_profiles = {}
-    for s in suppliers:
-        sid = s["supplier_id"]
-        # Assign pricing strategy to each supplier
-        strategy_rand = random.random()
-        if strategy_rand < 0.25:  # 25% are discount suppliers
-            profile = {
-                "strategy": "discount",
-                "base_multiplier": np.random.uniform(0.85, 0.95),
-                "variance": 0.03,
-                "specialties": random.sample(["Chronic", "Intermittent"], 1),
-            }
-        elif strategy_rand < 0.50:  # 25% are premium suppliers
-            profile = {
-                "strategy": "premium",
-                "base_multiplier": np.random.uniform(1.05, 1.15),
-                "variance": 0.02,
-                "specialties": random.sample(["Sporadic", "Intermittent"], 1),
-            }
-        else:  # 50% are competitive/standard suppliers
-            profile = {
-                "strategy": "competitive",
-                "base_multiplier": np.random.uniform(0.97, 1.03),
-                "variance": 0.04,
-                "specialties": random.sample(
-                    ["Chronic", "Intermittent", "Sporadic"], 2
-                ),
-            }
-        supplier_profiles[sid] = profile
-
-    supplier_ids = [s["supplier_id"] for s in suppliers]
-    offers = []
-    today = datetime.now(timezone.utc).date().isoformat()
-
-    for med in medications:
-        med_id = med["med_id"]
-        med_category = med["category"]
-        base_supplier = med["supplier_id"]
-        base_price = latest_base_price.get(med_id, round(np.random.uniform(5, 500), 2))
-
-        # Primary supplier gets a slight advantage (established relationship)
-        primary_profile = supplier_profiles[base_supplier]
-        if med_category in primary_profile["specialties"]:
-            # Better price for specialty category
-            primary_multiplier = primary_profile["base_multiplier"] * 0.95
-        else:
-            primary_multiplier = primary_profile["base_multiplier"]
-
-        primary_price = round(
-            base_price
-            * primary_multiplier
-            * np.random.uniform(
-                1 - primary_profile["variance"], 1 + primary_profile["variance"]
-            ),
-            2,
-        )
-        offers.append(
-            {
-                "med_id": med_id,
-                "supplier_id": base_supplier,
-                "valid_from": today,
-                "price_per_unit": float(primary_price),
-            }
-        )
-
-        # Select 2-4 additional suppliers (ensuring 3-5 total suppliers per medication)
-        alternates = [sid for sid in supplier_ids if sid != base_supplier]
-        num_alternates = random.randint(2, min(4, len(alternates)))
-        selected_alternates = random.sample(alternates, num_alternates)
-
-        # Track if we should create identical prices (competitive market scenario)
-        create_identical = random.random() < 0.20  # 20% chance of price matching
-        match_price = None
-
-        for i, sid in enumerate(selected_alternates):
-            profile = supplier_profiles[sid]
-
-            # Check for competitive price matching
-            if create_identical and i == 0:
-                # First alternate sets the competitive price
-                match_price = round(base_price * np.random.uniform(0.96, 1.04), 2)
-                alt_price = match_price
-            elif create_identical and match_price and random.random() < 0.6:
-                # 60% chance other suppliers match the competitive price
-                alt_price = match_price
-            else:
-                # Normal pricing based on supplier profile
-                if med_category in profile["specialties"]:
-                    multiplier = profile["base_multiplier"] * 0.93  # Specialty discount
-                else:
-                    multiplier = profile["base_multiplier"]
-
-                # Add variance based on supplier strategy
-                variance_factor = np.random.uniform(
-                    1 - profile["variance"], 1 + profile["variance"]
-                )
-
-                # Additional factors for realism
-                # Volume discount for chronic medications (higher volume)
-                if med_category == "Chronic" and profile["strategy"] == "discount":
-                    multiplier *= 0.95
-                # Premium markup for sporadic/rare medications
-                elif med_category == "Sporadic" and profile["strategy"] == "premium":
-                    multiplier *= 1.08
-
-                alt_price = round(base_price * multiplier * variance_factor, 2)
-
-            # Ensure price is reasonable (not below 50% or above 150% of base)
-            alt_price = max(base_price * 0.5, min(base_price * 1.5, alt_price))
-
-            offers.append(
-                {
-                    "med_id": med_id,
-                    "supplier_id": sid,
-                    "valid_from": today,
-                    "price_per_unit": float(alt_price),
-                }
-            )
-
-    return offers
-
-
 # -----------------------
 # Orchestrator
 # -----------------------
@@ -1636,15 +1642,15 @@ def generate_all(
 
     cur = conn.cursor()
     cur.executemany(
-        "INSERT INTO suppliers (supplier_id, name, status, avg_lead_time, last_delivery_date, email, contact_name, phone, address) VALUES (:supplier_id, :name, :status, :avg_lead_time, :last_delivery_date, :email, :contact_name, :phone, :address);",
+        "INSERT OR REPLACE INTO suppliers (supplier_id, name, status, avg_lead_time, last_delivery_date, email, contact_name, phone, address) VALUES (:supplier_id, :name, :status, :avg_lead_time, :last_delivery_date, :email, :contact_name, :phone, :address);",
         suppliers,
     )
     cur.executemany(
-        "INSERT INTO medications (med_id, name, category, pack_size, shelf_life_days, supplier_id) VALUES (:med_id, :name, :category, :pack_size, :shelf_life_days, :supplier_id);",
+        "INSERT OR REPLACE INTO medications (med_id, name, category, pack_size, shelf_life_days, supplier_id) VALUES (:med_id, :name, :category, :pack_size, :shelf_life_days, :supplier_id);",
         meds,
     )
     cur.executemany(
-        "INSERT INTO stores (store_id, name, location) VALUES (:store_id, :name, :location);",
+        "INSERT OR REPLACE INTO stores (store_id, name, location) VALUES (:store_id, :name, :location);",
         stores,
     )
     conn.commit()

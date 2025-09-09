@@ -12,3 +12,5 @@ data/
 .claude-flow/
 .claude/
 docs/
+.vscode/
+.venv/

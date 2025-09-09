@@ -137,7 +137,7 @@ def create_tables(conn):
     )
 
     conn.commit()
-    print("✅ Tables created successfully")
+    print("Tables created successfully")
 
 
 def import_supplier_prices(conn):
@@ -147,7 +147,7 @@ def import_supplier_prices(conn):
     csv_path = os.path.join(data_dir, "med_supplier_prices.csv")
 
     if not os.path.exists(csv_path):
-        print(f"⚠️  Warning: {csv_path} not found, skipping supplier prices import")
+        print(f"Warning: {csv_path} not found, skipping supplier prices import")
         return
 
     # Check if data already exists
@@ -182,7 +182,7 @@ def import_supplier_prices(conn):
     # Verify import
     cursor.execute("SELECT COUNT(*) FROM med_supplier_prices")
     imported_count = cursor.fetchone()[0]
-    print(f"✅ Imported {imported_count} supplier price records")
+    print(f"Imported {imported_count} supplier price records")
 
 
 def verify_migration(conn):
@@ -199,14 +199,14 @@ def verify_migration(conn):
     tables = cursor.fetchall()
 
     if len(tables) == 5:
-        print("✅ All required tables exist (including AI metadata tables)")
+        print("All required tables exist (including AI metadata tables)")
     else:
-        print(f"⚠️  Warning: Only {len(tables)} of 5 tables found")
+        print(f"Warning: Only {len(tables)} of 5 tables found")
 
     # Check supplier prices data
     cursor.execute("SELECT COUNT(*) FROM med_supplier_prices")
     price_count = cursor.fetchone()[0]
-    print(f"📊 med_supplier_prices contains {price_count} records")
+    print(f"med_supplier_prices contains {price_count} records")
 
     # Check if we have prices for multiple suppliers per medication
     cursor.execute("""
@@ -225,11 +225,11 @@ def verify_migration(conn):
 
 def main():
     """Run the migration"""
-    print("🚀 Starting database migration...")
+    print("Starting database migration...")
 
     db_path = get_db_path()
     if not os.path.exists(db_path):
-        print(f"❌ Database not found at {db_path}")
+        print(f"Database not found at {db_path}")
         return
 
     conn = sqlite3.connect(db_path)
@@ -244,10 +244,10 @@ def main():
         # Verify migration
         verify_migration(conn)
 
-        print("✅ Migration completed successfully!")
+        print("Migration completed successfully!")
 
     except Exception as e:
-        print(f"❌ Migration failed: {e}")
+        print(f"Migration failed: {e}")
         conn.rollback()
         raise
     finally:

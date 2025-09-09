@@ -9,6 +9,7 @@ import numpy as np
 import sqlite3
 from typing import Dict, List, Any, Optional
 from datetime import timedelta
+from loguru import logger
 
 
 def clean_nan_values(data):
@@ -141,7 +142,7 @@ class DataLoader:
                     "med_id"
                 ).to_dict("index")
             except FileNotFoundError:
-                print("Warning: current_inventory.csv not found, using fallback data")
+                logger.warning("current_inventory.csv not found, using fallback data")
                 self.current_inventory = {}
 
             try:
@@ -154,7 +155,7 @@ class DataLoader:
                         "records"
                     )
             except FileNotFoundError:
-                print("Warning: batch_info.csv not found, using fallback data")
+                logger.warning("batch_info.csv not found, using fallback data")
                 self.batch_info = {}
 
             try:
@@ -164,7 +165,7 @@ class DataLoader:
                 )
                 self.warehouse_zones = zones_df.to_dict("records")
             except FileNotFoundError:
-                print("Warning: warehouse_zones.csv not found, using fallback data")
+                logger.warning("warehouse_zones.csv not found, using fallback data")
                 self.warehouse_zones = []
 
             try:
@@ -177,7 +178,7 @@ class DataLoader:
                         columns=["med_id"]
                     ).to_dict("records")
             except FileNotFoundError:
-                print("Warning: purchase_orders.csv not found, using fallback data")
+                logger.warning("purchase_orders.csv not found, using fallback data")
                 self.purchase_orders = {}
 
             # Load supplier-specific prices from database
@@ -193,7 +194,7 @@ class DataLoader:
                 self.med_supplier_prices[int(med_id)] = group.to_dict("records")
 
         except Exception as e:
-            print(f"Error loading data: {e}")
+            logger.error(f"Error loading data: {e}")
             raise
 
     def get_inventory_data(

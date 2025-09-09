@@ -282,6 +282,14 @@ class AIPoHandler:
                 self._prepare_inputs(medication_ids)
             )
 
+            # Define progress callback to update active_sessions in real-time
+            def progress_callback(progress_data):
+                if temp_session_id in self.active_sessions:
+                    self.active_sessions[temp_session_id]["progress"] = progress_data
+                    self.active_sessions[temp_session_id]["updated_at"] = (
+                        datetime.utcnow().isoformat() + "Z"
+                    )
+
             # Run workflow (synchronously inside this task)
             import asyncio
 
@@ -293,6 +301,7 @@ class AIPoHandler:
                     current_stock=current_stock,
                     consumption_history=consumption_history,
                     suppliers=suppliers,
+                    progress_callback=progress_callback,
                 )
             )
             loop.close()

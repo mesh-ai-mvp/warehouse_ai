@@ -36,6 +36,10 @@ class POGenerationWorkflow:
         # Cache for storing results temporarily
         self._cache = {}
         self._cache_ttl = self.config.cache_ttl_seconds
+
+        # Progress callback for real-time updates
+        self._progress_callback = None
+
         logger.info("POGenerationWorkflow initialized successfully")
 
     def _build_workflow(self) -> StateGraph:
@@ -69,12 +73,16 @@ class POGenerationWorkflow:
         consumption_history: Dict[int, Dict[str, Any]],
         suppliers: List[Dict[str, Any]],
         session_id: Optional[str] = None,
+        progress_callback: Optional[callable] = None,
     ) -> Dict[str, Any]:
         """Generate purchase orders using multi-agent workflow"""
 
         # Generate session ID if not provided
         if not session_id:
             session_id = str(uuid4())
+
+        # Store progress callback for use in workflow nodes
+        self._progress_callback = progress_callback
 
         logger.info(f"Starting PO generation for session {session_id}")
         logger.debug(
@@ -176,28 +184,46 @@ class POGenerationWorkflow:
         state = update_progress(
             state, "forecast_agent", "Analyzing consumption patterns", 25
         )
+        if self._progress_callback:
+            self._progress_callback(state["progress"])
+
         state = self.forecast_agent(state)
         state = update_progress(
             state, "forecast_agent", "Forecast generation complete", 33
         )
+        if self._progress_callback:
+            self._progress_callback(state["progress"])
+
         return state
 
     def _run_adjust(self, state: POGenerationState) -> POGenerationState:
         state = update_progress(
             state, "adjustment_agent", "Applying US context adjustments", 50
         )
+        if self._progress_callback:
+            self._progress_callback(state["progress"])
+
         state = self.adjustment_agent(state)
         state = update_progress(state, "adjustment_agent", "Adjustment complete", 66)
+        if self._progress_callback:
+            self._progress_callback(state["progress"])
+
         return state
 
     def _run_supplier(self, state: POGenerationState) -> POGenerationState:
         state = update_progress(
             state, "supplier_agent", "Optimizing supplier selection", 85
         )
+        if self._progress_callback:
+            self._progress_callback(state["progress"])
+
         state = self.supplier_agent(state)
         state = update_progress(
             state, "supplier_agent", "Supplier optimization complete", 95
         )
+        if self._progress_callback:
+            self._progress_callback(state["progress"])
+
         return state
 
     def _finalize_workflow(self, state: POGenerationState) -> POGenerationState:
@@ -213,6 +239,8 @@ class POGenerationWorkflow:
             state = update_progress(
                 state, "system", "PO generation completed successfully", 100
             )
+            if self._progress_callback:
+                self._progress_callback(state["progress"])
         else:
             missing = []
             if not has_forecast:
@@ -227,6 +255,8 @@ class POGenerationWorkflow:
                 success=False,
                 error=f"Missing required data: {', '.join(missing)}",
             )
+            if self._progress_callback:
+                self._progress_callback(state["progress"])
 
         return state
 

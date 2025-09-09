@@ -12,6 +12,7 @@ import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from loguru import logger
 
 # Add parent directory to path to import data_loader
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,6 +27,9 @@ data_loader = DataLoader()
 
 # Initialize AI PO handler
 ai_po_handler = AIPoHandler(data_loader)
+
+# Logger for email flow - using loguru with context
+email_logger = logger.bind(name="email")
 
 # Purchase orders are now stored in the database via data_loader
 
@@ -272,59 +276,70 @@ def _render_supplier_email_html(
 <meta name='viewport' content='width=device-width, initial-scale=1.0'>
 <title>Purchase Order Request</title>
 <style>
-  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif; background:#f6f7f9; color:#111827; margin:0; padding:24px; }}
-  .card {{ max-width:720px; margin:0 auto; background:#ffffff; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.08); overflow:hidden; }}
-  .header {{ padding:20px 24px; background:linear-gradient(180deg,#f9fafb,#ffffff); border-bottom:1px solid #e5e7eb; }}
-  .title {{ margin:0; font-size:18px; font-weight:700; }}
-  .subtitle {{ margin:6px 0 0 0; font-size:13px; color:#6b7280; }}
-  .content {{ padding:24px; }}
-  .meta-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }}
-  .meta {{ background:#f9fafb; border:1px solid #eef0f2; border-radius:8px; padding:12px; }}
-  .meta .label {{ font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; }}
-  .meta .value {{ font-size:14px; font-weight:600; margin-top:4px; }}
-  table {{ width:100%; border-collapse:separate; border-spacing:0; margin-top:8px; }}
-  thead th {{ background:#f3f4f6; color:#374151; font-size:12px; text-transform:uppercase; letter-spacing:.5px; padding:10px 12px; border-top:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; text-align:left; }}
-  .cell {{ padding:10px 12px; border-bottom:1px solid #eef0f2; font-size:14px; }}
+  :root {{ --bg:#f5f7fb; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --accent:#2563eb; --soft:#eef2ff; }}
+  body {{ margin:0; padding:24px; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,Helvetica,Arial,sans-serif; }}
+  .wrap {{ max-width:760px; margin:0 auto; }}
+  .card {{ background:var(--card); border-radius:12px; border:1px solid #e5e7eb; overflow:hidden; }}
+  /* High-contrast header */
+  .header {{ background:#0f172a; color:#ffffff; padding:20px 24px; }}
+  .title {{ margin:0; font-size:20px; font-weight:800; letter-spacing:.2px; }}
+  .subtitle {{ margin:6px 0 0 0; font-size:13px; color:#cbd5e1; }}
+  .content {{ padding:20px 24px; }}
+  .meta-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }}
+  .meta {{ background:var(--soft); border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; }}
+  .label {{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }}
+  .value {{ font-size:14px; font-weight:700; color:var(--ink); margin-top:3px; }}
+  table {{ width:100%; border-collapse:separate; border-spacing:0; margin-top:6px; }}
+  thead th {{ background: #eef2ff; color:#334155; border-top:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; font-size:12px; text-transform:uppercase; letter-spacing:.5px; padding:10px 12px; text-align:left; }}
+  tbody tr:nth-child(odd) td {{ background:#fafafa; }}
+  .cell {{ padding:10px 12px; border-bottom:1px solid #e9ecef; font-size:14px; color:#0f172a; }}
   .right {{ text-align:right; }}
   tfoot td {{ padding:12px; font-weight:800; }}
-  .footer {{ padding:16px 24px; background:#fafafa; border-top:1px solid #e5e7eb; color:#6b7280; font-size:12px; }}
+  .totals {{ display:flex; justify-content:flex-end; gap:16px; align-items:center; padding-top:8px; }}
+  .totals-label {{ color:#334155; font-weight:700; }}
+  .totals-amount {{ background: #eef2ff; color:#1e40af; border:1px solid #dbeafe; padding:8px 12px; border-radius:8px; font-weight:800; }}
+  .footer {{ padding:14px 24px; background:#f8fafc; border-top:1px solid #e5e7eb; color:#64748b; font-size:12px; }}
+  /* Remove outer glow/shadow entirely for a flat, professional look */
 </style>
 </head>
 <body>
-  <div class='card'>
-    <div class='header'>
-      <h1 class='title'>Purchase Order Request</h1>
-      <p class='subtitle'>Supplier: {supplier_name}</p>
-    </div>
-    <div class='content'>
-      <div class='meta-grid'>
-        <div class='meta'>
-          <div class='label'>Requested Delivery Date</div>
-          <div class='value'>{requested}</div>
+  <div class='wrap'>
+    <div class='card'>
+      <div class='header'>
+        <h1 class='title'>Purchase Order Request</h1>
+        <p class='subtitle'>Supplier: {supplier_name}</p>
+      </div>
+      <div class='content'>
+        <div class='meta-grid'>
+          <div class='meta'>
+            <div class='label'>Requested Delivery Date</div>
+            <div class='value'>{requested}</div>
+          </div>
+          <div class='meta'>
+            <div class='label'>Buyer</div>
+            <div class='value'>{buyer}</div>
+          </div>
         </div>
-        <div class='meta'>
-          <div class='label'>Buyer</div>
-          <div class='value'>{buyer}</div>
+        <table role='presentation' aria-label='Order Lines'>
+          <thead>
+            <tr><th>Medication</th><th class='right'>Quantity</th><th class='right'>Unit Price</th><th class='right'>Amount</th></tr>
+          </thead>
+          <tbody>
+            {rows}
+          </tbody>
+        </table>
+        <div class='totals'>
+          <span class='totals-label'>Total</span>
+          <span class='totals-amount'>${total:.2f}</span>
+        </div>
+        <div style='margin-top:12px; font-size:13px;'>
+          <div class='label'>Notes</div>
+          <div>{notes}</div>
         </div>
       </div>
-      <table role='presentation'>
-        <thead>
-          <tr><th>Medication</th><th class='right'>Quantity</th><th class='right'>Unit Price</th><th class='right'>Amount</th></tr>
-        </thead>
-        <tbody>
-          {rows}
-        </tbody>
-        <tfoot>
-          <tr><td colspan='3' class='right'>Total</td><td class='right'>${total:.2f}</td></tr>
-        </tfoot>
-      </table>
-      <div style='margin-top:12px; font-size:13px;'>
-        <div class='label'>Notes</div>
-        <div>{notes}</div>
+      <div class='footer'>
+        This is an automated request from the Inventory Management system. Please reply with confirmation and estimated delivery date.
       </div>
-    </div>
-    <div class='footer'>
-      This is an automated request from the Inventory Management system. Please reply with confirmation and estimated delivery date.
     </div>
   </div>
 </body>
@@ -332,21 +347,37 @@ def _render_supplier_email_html(
 """
 
 
-def _send_email_via_gmail(
+def _smtp_settings() -> Dict[str, Any]:
+    return {
+        "host": os.getenv("SMTP_HOST", os.getenv("GMAIL_HOST", "smtp.zoho.com")),
+        "port": int(os.getenv("SMTP_PORT", os.getenv("GMAIL_PORT", "465"))),
+        "user": os.getenv("SMTP_USER", os.getenv("GMAIL_USER", "")),
+        "password": os.getenv("SMTP_PASSWORD", os.getenv("GMAIL_APP_PASSWORD", "")),
+        "from_name": os.getenv("EMAIL_FROM_NAME", "Inventory Management"),
+        "from_addr": os.getenv(
+            "EMAIL_FROM_ADDRESS", os.getenv("SMTP_USER", os.getenv("GMAIL_USER", ""))
+        ),
+        "use_starttls": os.getenv("SMTP_STARTTLS", "false").lower() == "true",
+        "use_ssl": os.getenv("SMTP_SSL", "true").lower() != "false",
+    }
+
+
+def _send_email_via_smtp(
     subject: str, html_body: str, to_email: str, bcc: Optional[str] = None
 ):
-    user = os.getenv("GMAIL_USER")
-    app_password = os.getenv("GMAIL_APP_PASSWORD")
-    from_name = os.getenv("EMAIL_FROM_NAME", "Inventory Management")
-    if not user or not app_password:
+    cfg = _smtp_settings()
+    if not cfg["user"] or not cfg["password"]:
+        email_logger.error(
+            "Email not configured: missing SMTP_USER/SMTP_PASSWORD (or GMAIL_*)"
+        )
         raise HTTPException(
             status_code=500,
-            detail="Email is not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD in .env",
+            detail="Email is not configured. Set SMTP_USER and SMTP_PASSWORD in .env",
         )
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = f"{from_name} <{user}>"
+    msg["From"] = f"{cfg['from_name']} <{cfg['from_addr']}>"
     msg["To"] = to_email
     if bcc:
         msg["Bcc"] = bcc
@@ -354,9 +385,38 @@ def _send_email_via_gmail(
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     context = ssl.create_default_context()
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-        server.login(user, app_password)
-        server.send_message(msg)
+    email_logger.info(
+        f"Email send start | host={cfg['host']} | port={cfg['port']} | to={to_email} | subject={subject}"
+    )
+    try:
+        if cfg["use_starttls"]:
+            with smtplib.SMTP(cfg["host"], cfg["port"]) as server:
+                server.ehlo()
+                server.starttls(context=context)
+                server.login(cfg["user"], cfg["password"])
+                server.send_message(msg)
+        elif cfg["use_ssl"]:
+            with smtplib.SMTP_SSL(cfg["host"], cfg["port"], context=context) as server:
+                server.login(cfg["user"], cfg["password"])
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(cfg["host"], cfg["port"]) as server:
+                server.login(cfg["user"], cfg["password"])
+                server.send_message(msg)
+        email_logger.info(f"Email send success | to={to_email} | subject={subject}")
+    except smtplib.SMTPAuthenticationError as e:
+        email_logger.exception(
+            f"SMTP auth failed | host={cfg['host']} | user={cfg['user']} | error={e}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="SMTP authentication failed. Check SMTP_USER/SMTP_PASSWORD and 2FA/app password settings.",
+        )
+    except Exception as e:
+        email_logger.exception(
+            f"Email send failed | host={cfg['host']} | to={to_email} | error={e}"
+        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/purchase-orders/send-emails")
@@ -365,6 +425,7 @@ async def send_po_emails(payload: Dict[str, Any]):
     try:
         items = payload.get("items", [])
         meta = payload.get("meta", {})
+        email_logger.info(f"Pre-submit email flow start | items={len(items)}")
 
         # Group allocations by supplier similar to PO creation
         supplier_to_lines: Dict[int, List[Dict[str, Any]]] = {}
@@ -389,6 +450,7 @@ async def send_po_emails(payload: Dict[str, Any]):
                 )
 
         if not supplier_to_lines:
+            email_logger.info("Pre-submit email flow: no suppliers to notify")
             return {"sent": 0}
 
         fallback_to = os.getenv("SUPPLIER_FALLBACK_EMAIL")
@@ -398,25 +460,28 @@ async def send_po_emails(payload: Dict[str, Any]):
         for supplier_id, lines in supplier_to_lines.items():
             supplier = data_loader.suppliers.get(supplier_id, {})
             supplier_name = supplier.get("name", f"Supplier {supplier_id}")
-            # Determine recipient email
-            to_email = supplier.get("email")
-            if not to_email:
-                if fallback_to:
-                    to_email = fallback_to
-                else:
-                    # Derive a plausible test email if none configured
-                    to_email = f"{_slugify(supplier_name)}@example.com"
-
+            to_email = (
+                supplier.get("email")
+                or fallback_to
+                or f"{_slugify(supplier_name)}@example.com"
+            )
             subject = f"Purchase Order Request - {supplier_name}"
+            email_logger.info(
+                f"Pre-submit email: composing | supplier_id={supplier_id} | supplier={supplier_name} | to={to_email} | lines={len(lines)}"
+            )
             html_body = _render_supplier_email_html(supplier_name, lines, meta)
-            _send_email_via_gmail(subject, html_body, to_email, bcc=bcc)
+            _send_email_via_smtp(subject, html_body, to_email, bcc=bcc)
             sent_count += 1
 
+        email_logger.info(
+            f"Pre-submit email flow success | suppliers_notified={sent_count}"
+        )
         return {"sent": sent_count}
 
     except HTTPException:
         raise
     except Exception as e:
+        email_logger.exception(f"Pre-submit email flow failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -484,10 +549,10 @@ async def create_po_from_ai_result(payload: Dict[str, Any]):
         # Before saving, send emails to suppliers represented in po_list
         fallback_to = os.getenv("SUPPLIER_FALLBACK_EMAIL")
         bcc = os.getenv("EMAIL_BCC")
+        email_logger.info(f"AI-create email flow start | suppliers={len(po_list)}")
         for po_data in po_list:
             supplier_id = po_data["supplier_id"]
             supplier_name = po_data["supplier_name"]
-            # Build lines format compatible with renderer
             lines = [
                 {
                     "med_id": it["med_id"],
@@ -499,15 +564,17 @@ async def create_po_from_ai_result(payload: Dict[str, Any]):
                 for it in po_data["items"]
             ]
             html_body = _render_supplier_email_html(supplier_name, lines, meta)
-            to_email = data_loader.suppliers.get(supplier_id, {}).get("email")
-            if not to_email:
-                to_email = fallback_to or f"{_slugify(supplier_name)}@example.com"
-            _send_email_via_gmail(
-                f"Purchase Order Request - {supplier_name}",
-                html_body,
-                to_email,
-                bcc=bcc,
+            to_email = (
+                data_loader.suppliers.get(supplier_id, {}).get("email")
+                or fallback_to
+                or f"{_slugify(supplier_name)}@example.com"
             )
+            subject = f"Purchase Order Request - {supplier_name}"
+            email_logger.info(
+                f"AI-create email: composing | supplier_id={supplier_id} | supplier={supplier_name} | to={to_email} | lines={len(lines)}"
+            )
+            _send_email_via_smtp(subject, html_body, to_email, bcc=bcc)
+        email_logger.info("AI-create email flow success")
 
         for po_data in po_list:
             po_id = f"PO-{datetime.utcnow().strftime('%Y%m%d')}-{str(uuid4())[:8].upper()}-AI"
@@ -541,6 +608,7 @@ async def create_po_from_ai_result(payload: Dict[str, Any]):
         }
 
     except Exception as e:
+        email_logger.exception(f"AI-create email flow failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -1,40 +1,32 @@
 """Logging configuration for AI agents"""
 
-import logging
 import sys
+from loguru import logger
 
 
-def setup_logger(name: str) -> logging.Logger:
-    """Setup a logger with consistent formatting"""
+def configure_logging():
+    """Configure loguru with consistent formatting"""
 
-    logger = logging.getLogger(name)
+    # Remove default handler
+    logger.remove()
 
-    # Only setup if not already configured
-    if not logger.handlers:
-        logger.setLevel(logging.DEBUG)
-
-        # Console handler with detailed format
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.DEBUG)
-
-        # Format with timestamp, logger name, level, and message
-        formatter = logging.Formatter(
-            "%(asctime)s - [%(name)s] - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-        console_handler.setFormatter(formatter)
-
-        logger.addHandler(console_handler)
-
-        # Prevent propagation to avoid duplicate logs
-        logger.propagate = False
-
-    return logger
+    # Add custom handler with consistent formatting
+    logger.add(
+        sys.stdout,
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {name}:{function}:{line} | {message}",
+        level="DEBUG",
+        colorize=True,
+        backtrace=True,
+        diagnose=True,
+    )
 
 
-# Create module-level loggers
-api_logger = setup_logger("ai_agents.api_handler")
-workflow_logger = setup_logger("ai_agents.workflow")
-forecast_logger = setup_logger("ai_agents.forecast")
-adjustment_logger = setup_logger("ai_agents.adjustment")
-supplier_logger = setup_logger("ai_agents.supplier")
+# Configure loguru on import
+configure_logging()
+
+# Create module-level loggers with proper context
+api_logger = logger.bind(name="api_handler")
+workflow_logger = logger.bind(name="workflow")
+forecast_logger = logger.bind(name="forecast")
+adjustment_logger = logger.bind(name="adjustment")
+supplier_logger = logger.bind(name="supplier")

@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from api.routes import router as api_router, data_loader
+from loguru import logger
 import os
 import uvicorn
 
@@ -17,17 +18,17 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         data_loader.load_all_data()
-        print("✅ Data loaded successfully")
-        print(f"📦 Loaded {len(data_loader.medications)} medications")
-        print(f"🏢 Loaded {len(data_loader.suppliers)} suppliers")
+        logger.success("Data loaded successfully")
+        logger.info(f"Loaded {len(data_loader.medications)} medications")
+        logger.info(f"Loaded {len(data_loader.suppliers)} suppliers")
     except Exception as e:
-        print(f"❌ Failed to load data: {e}")
+        logger.error(f"Failed to load data: {e}")
         raise
 
     yield
 
     # Shutdown (if needed)
-    print("🔄 Application shutdown")
+    logger.info("Application shutdown")
 
 
 # Get the directory where this script is located
@@ -89,8 +90,8 @@ async def favicon():
 
 
 if __name__ == "__main__":
-    print("🚀 Starting Inventory Management POC...")
-    print("📍 Server will be available at: http://localhost:8000")
-    print("📊 API documentation at: http://localhost:8000/docs")
+    logger.info("Starting Inventory Management POC")
+    logger.info("Server will be available at: http://localhost:8000")
+    logger.info("API documentation at: http://localhost:8000/docs")
 
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, reload_dirs=["./"])
