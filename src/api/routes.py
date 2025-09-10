@@ -79,6 +79,43 @@ async def get_filter_options():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/dashboard/stats")
+async def get_dashboard_stats():
+    """Get dashboard statistics"""
+    try:
+        # Get inventory data using the same method as the inventory endpoint
+        inventory_data = data_loader.get_inventory_data(page_size=100)
+        medications = inventory_data["items"]
+        
+        # Calculate statistics
+        total_medications = len(medications)
+        
+        low_stock_count = sum(
+            1 for med in medications 
+            if med["current_stock"] <= med["reorder_point"]
+        )
+        
+        critical_stock_count = sum(
+            1 for med in medications 
+            if med["current_stock"] <= med["reorder_point"] * 0.5
+        )
+        
+        total_value = sum(med["current_stock"] * med.get("current_price", 0) for med in medications)
+        
+        # For orders_today, we'll return 0 for now since PO tracking is not implemented
+        orders_today = 0
+        
+        return {
+            "total_medications": total_medications,
+            "low_stock_count": low_stock_count,
+            "critical_stock_count": critical_stock_count,
+            "total_value": total_value,
+            "orders_today": orders_today
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/medication/{med_id}/consumption-history")
 async def get_medication_consumption_history(
     med_id: int,

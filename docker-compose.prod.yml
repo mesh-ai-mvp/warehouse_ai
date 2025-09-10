@@ -52,6 +52,34 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: warehouse-frontend:latest
+    container_name: warehouse-frontend-prod
+    ports:
+      - "3000:80"
+    depends_on:
+      - warehouse-app
+    networks:
+      - warehouse-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
   # Optional: Add nginx reverse proxy for production
   nginx:
     image: nginx:alpine
@@ -64,6 +92,7 @@ services:
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - warehouse-app
+      - frontend
     networks:
       - warehouse-network
     restart: always

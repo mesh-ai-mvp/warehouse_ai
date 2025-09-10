@@ -1,6 +1,6 @@
 # Makefile for Warehouse Management Docker operations
 
-.PHONY: help dev prod build clean logs shell test lint
+.PHONY: help dev prod build clean logs shell test lint frontend
 
 # Default target
 help:
@@ -14,6 +14,11 @@ help:
 	@echo "  test     - Run tests in container"
 	@echo "  lint     - Run linting with ruff"
 	@echo "  deps     - Update dependencies with uv"
+	@echo ""
+	@echo "Frontend commands:"
+	@echo "  frontend-dev    - Start frontend development server"
+	@echo "  frontend-build  - Build frontend for production"
+	@echo "  frontend-test   - Run frontend tests"
 
 # Development with live reload
 dev:
@@ -99,3 +104,19 @@ restart-dev:
 
 restart-prod:
 	docker-compose -f docker-compose.prod.yml restart
+
+# Frontend commands
+frontend-dev:
+	cd frontend && npm run dev
+
+frontend-build:
+	cd frontend && npm run build
+
+frontend-test:
+	cd frontend && npm run test
+
+frontend-lint:
+	cd frontend && npm run lint
+
+frontend-install:
+	cd frontend && npm install
