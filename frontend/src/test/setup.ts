@@ -45,8 +45,8 @@ vi.mock('plotly.js', () => ({
     newPlot: vi.fn(),
     react: vi.fn(),
     redraw: vi.fn(),
-    purge: vi.fn()
-  }
+    purge: vi.fn(),
+  },
 }))
 
 // Mock for framer-motion

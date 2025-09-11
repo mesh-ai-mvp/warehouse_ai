@@ -25,11 +25,7 @@ interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
 
 export function renderWithProviders(
   ui: ReactElement,
-  {
-    queryClient = createTestQueryClient(),
-    route = '/',
-    ...renderOptions
-  }: CustomRenderOptions = {}
+  { queryClient = createTestQueryClient(), route = '/', ...renderOptions }: CustomRenderOptions = {}
 ) {
   // Set the initial URL if provided
   if (route !== '/') {
@@ -39,9 +35,7 @@ export function renderWithProviders(
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          {children}
-        </BrowserRouter>
+        <BrowserRouter>{children}</BrowserRouter>
       </QueryClientProvider>
     )
   }
@@ -61,12 +55,12 @@ export const createMockMedication = (overrides = {}) => ({
   current_stock: 45,
   reorder_point: 100,
   supplier: 'PharmaCorp',
-  unit_cost: 2.50,
+  unit_cost: 2.5,
   pack_size: 100,
   storage_location: 'A1-B2',
   expiry_date: '2024-12-31',
   batch_number: 'AMX123',
-  ...overrides
+  ...overrides,
 })
 
 export const createMockPurchaseOrder = (overrides = {}) => ({
@@ -75,19 +69,19 @@ export const createMockPurchaseOrder = (overrides = {}) => ({
   status: 'pending' as const,
   created_date: '2024-01-15T10:30:00Z',
   delivery_date: '2024-01-22T10:30:00Z',
-  total_amount: 1250.00,
+  total_amount: 1250.0,
   buyer_name: 'John Doe',
   line_items: [
     {
       medication_id: 'med-1',
       medication_name: 'Amoxicillin 500mg',
       quantity: 500,
-      unit_cost: 2.50,
-      total_cost: 1250.00
-    }
+      unit_cost: 2.5,
+      total_cost: 1250.0,
+    },
   ],
   ai_generated: false,
-  ...overrides
+  ...overrides,
 })
 
 export const createMockInventoryResponse = (overrides = {}) => ({
@@ -96,6 +90,5 @@ export const createMockInventoryResponse = (overrides = {}) => ({
   page: 1,
   page_size: 20,
   total_pages: 1,
-  ...overrides
+  ...overrides,
 })
-

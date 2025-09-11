@@ -1,11 +1,11 @@
-import { useParams, Link, Navigate } from "react-router-dom"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
+import { useParams, Link, Navigate } from 'react-router-dom'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Progress } from '@/components/ui/progress'
+import { Separator } from '@/components/ui/separator'
 import {
   Table,
   TableBody,
@@ -13,7 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from '@/components/ui/table'
 import {
   ArrowLeft,
   Package,
@@ -27,18 +27,14 @@ import {
   Clock,
   ShoppingCart,
   Activity,
-} from "lucide-react"
+} from 'lucide-react'
 
-import { 
-  useMedication, 
-  useConsumptionHistory, 
-  useSupplierPrices 
-} from "@/hooks/use-api"
-import MedicationHistoryChart from "@/components/medication-history-chart"
+import { useMedication, useConsumptionHistory, useSupplierPrices } from '@/hooks/use-api'
+import MedicationHistoryChart from '@/components/medication-history-chart'
 
 function getStockLevelInfo(currentStock: number, reorderPoint: number) {
   const percentage = (currentStock / reorderPoint) * 100
-  
+
   if (currentStock <= reorderPoint * 0.25) {
     return { level: 'critical', label: 'Critical', color: 'destructive', percentage }
   } else if (currentStock <= reorderPoint * 0.5) {
@@ -52,12 +48,12 @@ function getStockLevelInfo(currentStock: number, reorderPoint: number) {
   }
 }
 
-function StatCard({ 
-  title, 
-  value, 
-  icon: Icon, 
-  subtitle, 
-  trend 
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  subtitle,
+  trend,
 }: {
   title: string
   value: string | number
@@ -73,9 +69,7 @@ function StatCard({
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
-        {subtitle && (
-          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-        )}
+        {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
         {trend && (
           <div className="flex items-center gap-1 mt-1">
             {trend.direction === 'up' ? (
@@ -83,7 +77,9 @@ function StatCard({
             ) : (
               <TrendingDown className="h-3 w-3 text-red-500" />
             )}
-            <span className={`text-xs ${trend.direction === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+            <span
+              className={`text-xs ${trend.direction === 'up' ? 'text-green-600' : 'text-red-600'}`}
+            >
               {trend.value}% vs last period
             </span>
           </div>
@@ -95,7 +91,7 @@ function StatCard({
 
 export function MedicationDetail() {
   const { id } = useParams<{ id: string }>()
-  
+
   if (!id) {
     return <Navigate to="/inventory" replace />
   }
@@ -118,14 +114,14 @@ export function MedicationDetail() {
             <p className="text-muted-foreground">Error loading medication information</p>
           </div>
         </div>
-        
+
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             Failed to load medication details. Please try again later.
           </AlertDescription>
         </Alert>
-        
+
         <Button asChild>
           <Link to="/inventory">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -146,7 +142,7 @@ export function MedicationDetail() {
             <Skeleton className="h-4 w-48" />
           </div>
         </div>
-        
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
@@ -190,7 +186,7 @@ export function MedicationDetail() {
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button asChild>
             <Link to={`/create-po?medication=${medication.med_id}`}>
@@ -210,8 +206,8 @@ export function MedicationDetail() {
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>Critical Stock Level!</strong> This medication is critically low. 
-            Consider creating a purchase order immediately to avoid stockouts.
+            <strong>Critical Stock Level!</strong> This medication is critically low. Consider
+            creating a purchase order immediately to avoid stockouts.
           </AlertDescription>
         </Alert>
       )}
@@ -220,8 +216,8 @@ export function MedicationDetail() {
         <Alert variant="destructive">
           <Clock className="h-4 w-4" />
           <AlertDescription>
-            <strong>Urgent:</strong> This medication will run out in {daysUntilStockout} days 
-            at the current consumption rate.
+            <strong>Urgent:</strong> This medication will run out in {daysUntilStockout} days at the
+            current consumption rate.
           </AlertDescription>
         </Alert>
       )}
@@ -234,7 +230,7 @@ export function MedicationDetail() {
           icon={Package}
           subtitle={`Reorder at ${medication.reorder_point || 0}`}
         />
-        
+
         <StatCard
           title="Days Until Stockout"
           value={daysUntilStockout > 0 ? `${daysUntilStockout} days` : 'Out of stock'}
@@ -242,14 +238,14 @@ export function MedicationDetail() {
           subtitle={`${(medication.avg_daily_pick || 0).toFixed(1)} daily usage`}
           trend={daysUntilStockout < 30 ? { value: 15, direction: 'down' } : undefined}
         />
-        
+
         <StatCard
           title="Inventory Value"
           value={`$${(medication.total_value || 0).toLocaleString()}`}
           icon={DollarSign}
           subtitle={`$${(medication.unit_cost || 0).toFixed(2)} per unit`}
         />
-        
+
         <StatCard
           title="Pack Size"
           value={medication.pack_size}
@@ -279,13 +275,17 @@ export function MedicationDetail() {
               <span>Optimal Level</span>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-3 gap-4 pt-4 border-t">
             <div className="text-center">
               <div className="text-2xl font-bold text-red-600">
-                {(medication.current_stock || 0) <= (medication.reorder_point || 0) * 0.25 ? 'Critical' : 
-                 (medication.current_stock || 0) <= (medication.reorder_point || 0) * 0.5 ? 'Very Low' : 
-                 (medication.current_stock || 0) <= (medication.reorder_point || 0) ? 'Low' : 'Normal'}
+                {(medication.current_stock || 0) <= (medication.reorder_point || 0) * 0.25
+                  ? 'Critical'
+                  : (medication.current_stock || 0) <= (medication.reorder_point || 0) * 0.5
+                    ? 'Very Low'
+                    : (medication.current_stock || 0) <= (medication.reorder_point || 0)
+                      ? 'Low'
+                      : 'Normal'}
               </div>
               <div className="text-sm text-muted-foreground">Status</div>
             </div>
@@ -297,7 +297,10 @@ export function MedicationDetail() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">
-                {Math.round(((medication.current_stock || 0) - (medication.reorder_point || 0)) / Math.max(medication.avg_daily_pick || 1, 1))}
+                {Math.round(
+                  ((medication.current_stock || 0) - (medication.reorder_point || 0)) /
+                    Math.max(medication.avg_daily_pick || 1, 1)
+                )}
               </div>
               <div className="text-sm text-muted-foreground">Days Buffer</div>
             </div>
@@ -324,7 +327,9 @@ export function MedicationDetail() {
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Storage Location</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Storage Location
+                </label>
                 <div className="mt-1 flex items-center gap-1">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
                   <Badge variant="outline" className="font-mono">
@@ -341,18 +346,22 @@ export function MedicationDetail() {
                 <div className="mt-1 font-mono">${(medication.unit_cost || 0).toFixed(2)}</div>
               </div>
             </div>
-            
+
             {medication.batch_number && (
               <>
                 <Separator />
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Batch Number</label>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Batch Number
+                    </label>
                     <div className="mt-1 font-mono">{medication.batch_number}</div>
                   </div>
                   {medication.expiry_date && (
                     <div>
-                      <label className="text-sm font-medium text-muted-foreground">Expiry Date</label>
+                      <label className="text-sm font-medium text-muted-foreground">
+                        Expiry Date
+                      </label>
                       <div className="mt-1 flex items-center gap-1">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         {new Date(medication.expiry_date).toLocaleDateString()}
@@ -378,11 +387,13 @@ export function MedicationDetail() {
               <label className="text-sm font-medium text-muted-foreground">Primary Supplier</label>
               <div className="mt-1 text-lg font-medium">{medication.supplier || 'Unknown'}</div>
             </div>
-            
+
             <div>
               <label className="text-sm font-medium text-muted-foreground">Last Updated</label>
               <div className="mt-1 text-sm text-muted-foreground">
-                {medication.last_updated ? new Date(medication.last_updated).toLocaleString() : 'Unknown'}
+                {medication.last_updated
+                  ? new Date(medication.last_updated).toLocaleString()
+                  : 'Unknown'}
               </div>
             </div>
 
@@ -394,8 +405,11 @@ export function MedicationDetail() {
                     Alternative Suppliers
                   </label>
                   <div className="space-y-2">
-                    {supplierPrices.slice(0, 3).map((supplier) => (
-                      <div key={supplier.supplier_id} className="flex justify-between items-center text-sm">
+                    {supplierPrices.slice(0, 3).map(supplier => (
+                      <div
+                        key={supplier.supplier_id}
+                        className="flex justify-between items-center text-sm"
+                      >
                         <span>{supplier.supplier_name}</span>
                         <div className="text-right">
                           <div className="font-mono">${(supplier.unit_price || 0).toFixed(2)}</div>
@@ -444,17 +458,11 @@ export function MedicationDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {consumptionHistory.slice(0, 10).map((record) => (
+                {consumptionHistory.slice(0, 10).map(record => (
                   <TableRow key={record.date}>
-                    <TableCell>
-                      {new Date(record.date).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="font-mono">
-                      {record.quantity_consumed}
-                    </TableCell>
-                    <TableCell className="font-mono">
-                      {record.remaining_stock}
-                    </TableCell>
+                    <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                    <TableCell className="font-mono">{record.quantity_consumed}</TableCell>
+                    <TableCell className="font-mono">{record.remaining_stock}</TableCell>
                     <TableCell>
                       {record.ai_prediction ? (
                         <span className="font-mono text-blue-600">

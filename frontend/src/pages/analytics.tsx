@@ -1,14 +1,47 @@
-import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart3, TrendingUp, TrendingDown, Package, DollarSign, AlertTriangle, Users, FileText, Download, RefreshCw } from "lucide-react"
-import { StatCard } from "@/components/analytics/stat-card"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
-import { apiClient } from "@/lib/api-client"
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
+  Package,
+  DollarSign,
+  AlertTriangle,
+  Users,
+  FileText,
+  Download,
+  RefreshCw,
+} from 'lucide-react'
+import { StatCard } from '@/components/analytics/stat-card'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts'
+import { apiClient } from '@/lib/api-client'
 
 // Mock data for analytics - will be replaced with real API calls
 const mockAnalyticsData = {
@@ -20,13 +53,13 @@ const mockAnalyticsData = {
     criticalStockItems: 8,
     totalSuppliers: 45,
     onTimeDeliveries: 94.5,
-    inventoryTurnover: 8.2
+    inventoryTurnover: 8.2,
   },
   trends: {
     revenueChange: 12.5,
     ordersChange: 8.3,
     avgOrderChange: 3.7,
-    stockAlertsChange: -15.2
+    stockAlertsChange: -15.2,
   },
   consumptionData: [
     { month: 'Jan', consumption: 450000, orders: 120, forecast: 460000 },
@@ -34,36 +67,46 @@ const mockAnalyticsData = {
     { month: 'Mar', consumption: 480000, orders: 128, forecast: 485000 },
     { month: 'Apr', consumption: 590000, orders: 155, forecast: 580000 },
     { month: 'May', consumption: 610000, orders: 162, forecast: 615000 },
-    { month: 'Jun', consumption: 580000, orders: 148, forecast: 570000 }
+    { month: 'Jun', consumption: 580000, orders: 148, forecast: 570000 },
   ],
   supplierPerformance: [
     { name: 'PharmaCorp', orders: 45, onTime: 96.2, avgDelay: 1.2, rating: 4.8 },
     { name: 'MedSupply Pro', orders: 38, onTime: 94.1, avgDelay: 2.1, rating: 4.6 },
     { name: 'HealthDist Inc', orders: 32, onTime: 91.8, avgDelay: 3.2, rating: 4.3 },
     { name: 'BioPharma Ltd', orders: 28, onTime: 98.5, avgDelay: 0.8, rating: 4.9 },
-    { name: 'MediCore Systems', orders: 25, onTime: 89.3, avgDelay: 4.1, rating: 4.1 }
+    { name: 'MediCore Systems', orders: 25, onTime: 89.3, avgDelay: 4.1, rating: 4.1 },
   ],
   categoryBreakdown: [
     { name: 'Antibiotics', value: 35, color: '#0088FE' },
     { name: 'Pain Relief', value: 25, color: '#00C49F' },
     { name: 'Cardiovascular', value: 20, color: '#FFBB28' },
     { name: 'Respiratory', value: 12, color: '#FF8042' },
-    { name: 'Other', value: 8, color: '#8884D8' }
+    { name: 'Other', value: 8, color: '#8884D8' },
   ],
   stockAlerts: [
-    { medication: 'Amoxicillin 500mg', current: 45, reorder: 100, daysLeft: 3, priority: 'critical' },
+    {
+      medication: 'Amoxicillin 500mg',
+      current: 45,
+      reorder: 100,
+      daysLeft: 3,
+      priority: 'critical',
+    },
     { medication: 'Ibuprofen 200mg', current: 78, reorder: 150, daysLeft: 5, priority: 'low' },
     { medication: 'Lisinopril 10mg', current: 32, reorder: 80, daysLeft: 4, priority: 'low' },
-    { medication: 'Metformin 500mg', current: 15, reorder: 120, daysLeft: 2, priority: 'critical' }
-  ]
+    { medication: 'Metformin 500mg', current: 15, reorder: 120, daysLeft: 2, priority: 'critical' },
+  ],
 }
 
 export function Analytics() {
-  const [timeRange, setTimeRange] = useState("30d")
-  const [selectedCategory, setSelectedCategory] = useState("all")
-  
+  const [timeRange, setTimeRange] = useState('30d')
+  const [selectedCategory, setSelectedCategory] = useState('all')
+
   // This would be replaced with actual API calls
-  const { data: analyticsData, isLoading, refetch } = useQuery({
+  const {
+    data: analyticsData,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['analytics', timeRange, selectedCategory],
     queryFn: () => Promise.resolve(mockAnalyticsData),
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -99,7 +142,9 @@ export function Analytics() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">Comprehensive insights into your pharmaceutical operations</p>
+          <p className="text-muted-foreground">
+            Comprehensive insights into your pharmaceutical operations
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={timeRange} onValueChange={setTimeRange}>
@@ -133,7 +178,7 @@ export function Analytics() {
           trend={analyticsData?.trends.revenueChange}
           description="vs. previous period"
         />
-        
+
         <StatCard
           title="Total Orders"
           value={analyticsData?.kpis.totalOrders.toLocaleString()}
@@ -141,7 +186,7 @@ export function Analytics() {
           trend={analyticsData?.trends.ordersChange}
           description="purchase orders processed"
         />
-        
+
         <StatCard
           title="Avg Order Value"
           value={`$${analyticsData?.kpis.avgOrderValue.toLocaleString()}`}
@@ -149,7 +194,7 @@ export function Analytics() {
           trend={analyticsData?.trends.avgOrderChange}
           description="per order"
         />
-        
+
         <StatCard
           title="Stock Alerts"
           value={analyticsData?.kpis.lowStockItems}
@@ -167,13 +212,15 @@ export function Analytics() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Critical Stock</p>
-                <p className="text-2xl font-bold text-destructive">{analyticsData?.kpis.criticalStockItems}</p>
+                <p className="text-2xl font-bold text-destructive">
+                  {analyticsData?.kpis.criticalStockItems}
+                </p>
               </div>
               <AlertTriangle className="h-8 w-8 text-destructive" />
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -185,19 +232,21 @@ export function Analytics() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">On-Time Delivery</p>
-                <p className="text-2xl font-bold text-green-600">{analyticsData?.kpis.onTimeDeliveries}%</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {analyticsData?.kpis.onTimeDeliveries}%
+                </p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -238,8 +287,21 @@ export function Analytics() {
                     <YAxis yAxisId="right" orientation="right" />
                     <Tooltip />
                     <Legend />
-                    <Area yAxisId="left" type="monotone" dataKey="consumption" stroke="#8884d8" fillOpacity={0.3} fill="#8884d8" />
-                    <Line yAxisId="right" type="monotone" dataKey="orders" stroke="#82ca9d" strokeWidth={2} />
+                    <Area
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="consumption"
+                      stroke="#8884d8"
+                      fillOpacity={0.3}
+                      fill="#8884d8"
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="orders"
+                      stroke="#82ca9d"
+                      strokeWidth={2}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -290,8 +352,22 @@ export function Analytics() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Area type="monotone" dataKey="consumption" stackId="1" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-                  <Area type="monotone" dataKey="forecast" stackId="2" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
+                  <Area
+                    type="monotone"
+                    dataKey="consumption"
+                    stackId="1"
+                    stroke="#8884d8"
+                    fill="#8884d8"
+                    fillOpacity={0.6}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="forecast"
+                    stackId="2"
+                    stroke="#82ca9d"
+                    fill="#82ca9d"
+                    fillOpacity={0.3}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
@@ -307,7 +383,10 @@ export function Analytics() {
             <CardContent>
               <div className="space-y-4">
                 {analyticsData?.supplierPerformance.map((supplier, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                  >
                     <div className="flex-1">
                       <h4 className="font-semibold">{supplier.name}</h4>
                       <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
@@ -317,7 +396,15 @@ export function Analytics() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <Badge variant={supplier.rating >= 4.5 ? "success" : supplier.rating >= 4.0 ? "warning" : "destructive"}>
+                      <Badge
+                        variant={
+                          supplier.rating >= 4.5
+                            ? 'success'
+                            : supplier.rating >= 4.0
+                              ? 'warning'
+                              : 'destructive'
+                        }
+                      >
                         ⭐ {supplier.rating}
                       </Badge>
                     </div>
@@ -346,7 +433,7 @@ export function Analytics() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
                 <CardTitle>Inventory Health Score</CardTitle>
@@ -383,7 +470,10 @@ export function Analytics() {
             <CardContent>
               <div className="space-y-4">
                 {analyticsData?.stockAlerts.map((alert, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                  >
                     <div className="flex-1">
                       <h4 className="font-semibold">{alert.medication}</h4>
                       <p className="text-sm text-muted-foreground">

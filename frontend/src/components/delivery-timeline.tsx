@@ -1,109 +1,120 @@
-'use client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
-import { 
-  Package, 
-  Truck, 
-  CheckCircle, 
-  Clock, 
-  AlertCircle, 
+'use client'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Separator } from '@/components/ui/separator'
+import {
+  Package,
+  Truck,
+  CheckCircle,
+  Clock,
+  AlertCircle,
   Calendar,
-  ShoppingCart
-} from 'lucide-react';
-import { format, isAfter, isBefore } from 'date-fns';
+  ShoppingCart,
+} from 'lucide-react'
+import { format, isAfter, isBefore } from 'date-fns'
 
 interface TimelineTask {
-  id: string;
-  title: string;
-  description?: string;
-  startDate: Date;
-  endDate: Date;
-  status: 'pending' | 'in-progress' | 'completed' | 'delayed';
-  type: 'order' | 'delivery';
-  progress?: number;
-  priority?: 'low' | 'medium' | 'high' | 'critical';
+  id: string
+  title: string
+  description?: string
+  startDate: Date
+  endDate: Date
+  status: 'pending' | 'in-progress' | 'completed' | 'delayed'
+  type: 'order' | 'delivery'
+  progress?: number
+  priority?: 'low' | 'medium' | 'high' | 'critical'
   metadata?: {
-    supplier?: string;
-    amount?: number;
-    items?: number;
-  };
+    supplier?: string
+    amount?: number
+    items?: number
+  }
 }
 
 interface DeliveryTimelineProps {
-  tasks: TimelineTask[];
-  title?: string;
-  subtitle?: string;
-  height?: number;
-  showToday?: boolean;
+  tasks: TimelineTask[]
+  title?: string
+  subtitle?: string
+  height?: number
+  showToday?: boolean
 }
 
 const getStatusIcon = (status: string) => {
   switch (status) {
-    case 'completed': return CheckCircle;
-    case 'in-progress': return Clock;
-    case 'delayed': return AlertCircle;
-    default: return Clock;
+    case 'completed':
+      return CheckCircle
+    case 'in-progress':
+      return Clock
+    case 'delayed':
+      return AlertCircle
+    default:
+      return Clock
   }
-};
+}
 
 const getTypeIcon = (type: string) => {
   switch (type) {
-    case 'order': return ShoppingCart;
-    case 'delivery': return Truck;
-    default: return Package;
+    case 'order':
+      return ShoppingCart
+    case 'delivery':
+      return Truck
+    default:
+      return Package
   }
-};
+}
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'completed': return 'success';
-    case 'in-progress': return 'default';
-    case 'delayed': return 'destructive';
-    default: return 'secondary';
+    case 'completed':
+      return 'success'
+    case 'in-progress':
+      return 'default'
+    case 'delayed':
+      return 'destructive'
+    default:
+      return 'secondary'
   }
-};
+}
 
 const getPriorityBadge = (priority: string = 'medium') => {
   const variants = {
     critical: 'destructive',
     high: 'secondary',
     medium: 'outline',
-    low: 'outline'
-  } as const;
-  
+    low: 'outline',
+  } as const
+
   return (
     <Badge variant={variants[priority as keyof typeof variants]} className="text-xs">
       {priority.charAt(0).toUpperCase() + priority.slice(1)}
     </Badge>
-  );
-};
+  )
+}
 
 export default function DeliveryTimeline({
   tasks,
-  title = "Delivery Timeline",
-  subtitle = "Track purchase orders and delivery schedules",
+  title = 'Delivery Timeline',
+  subtitle = 'Track purchase orders and delivery schedules',
   height = 400,
-  showToday = true
+  showToday = true,
 }: DeliveryTimelineProps) {
-  
-  const today = new Date();
-  const sortedTasks = [...tasks].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-  
+  const today = new Date()
+  const sortedTasks = [...tasks].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+
   // Calculate overall progress
-  const completedTasks = tasks.filter(task => task.status === 'completed').length;
-  const overallProgress = (completedTasks / tasks.length) * 100;
-  
+  const completedTasks = tasks.filter(task => task.status === 'completed').length
+  const overallProgress = (completedTasks / tasks.length) * 100
+
   // Get upcoming and active tasks
-  const activeTasks = tasks.filter(task => 
-    task.status === 'in-progress' || 
-    (isAfter(today, task.startDate) && isBefore(today, task.endDate))
-  );
-  
-  const upcomingTasks = tasks.filter(task => 
-    isAfter(task.startDate, today) && task.status === 'pending'
-  ).slice(0, 3);
+  const activeTasks = tasks.filter(
+    task =>
+      task.status === 'in-progress' ||
+      (isAfter(today, task.startDate) && isBefore(today, task.endDate))
+  )
+
+  const upcomingTasks = tasks
+    .filter(task => isAfter(task.startDate, today) && task.status === 'pending')
+    .slice(0, 3)
 
   return (
     <Card className="overflow-hidden">
@@ -115,7 +126,7 @@ export default function DeliveryTimeline({
           </CardTitle>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-xs">
             {tasks.length} Tasks
@@ -145,24 +156,28 @@ export default function DeliveryTimeline({
               <Clock className="h-4 w-4 text-blue-600" />
               Active Tasks ({activeTasks.length})
             </h3>
-            
+
             <div className="space-y-3">
-              {activeTasks.map((task) => {
-                const StatusIcon = getStatusIcon(task.status);
-                const TypeIcon = getTypeIcon(task.type);
-                
+              {activeTasks.map(task => {
+                const StatusIcon = getStatusIcon(task.status)
+                const TypeIcon = getTypeIcon(task.type)
+
                 return (
                   <div key={task.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
                     <div className="flex-shrink-0">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                        task.status === 'completed' ? 'bg-green-100 text-green-600' :
-                        task.status === 'delayed' ? 'bg-red-100 text-red-600' :
-                        'bg-blue-100 text-blue-600'
-                      }`}>
+                      <div
+                        className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                          task.status === 'completed'
+                            ? 'bg-green-100 text-green-600'
+                            : task.status === 'delayed'
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-blue-100 text-blue-600'
+                        }`}
+                      >
                         <StatusIcon className="h-4 w-4" />
                       </div>
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <TypeIcon className="h-4 w-4 text-muted-foreground" />
@@ -171,29 +186,25 @@ export default function DeliveryTimeline({
                           {task.status.replace('-', ' ')}
                         </Badge>
                       </div>
-                      
+
                       <div className="flex items-center gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           {format(task.startDate, 'MMM dd')} - {format(task.endDate, 'MMM dd')}
                         </div>
-                        {task.metadata?.supplier && (
-                          <span>Supplier: {task.metadata.supplier}</span>
-                        )}
+                        {task.metadata?.supplier && <span>Supplier: {task.metadata.supplier}</span>}
                       </div>
-                      
+
                       {task.progress !== undefined && (
                         <div className="mt-2">
                           <Progress value={task.progress} className="h-1" />
                         </div>
                       )}
                     </div>
-                    
-                    <div className="flex-shrink-0">
-                      {getPriorityBadge(task.priority)}
-                    </div>
+
+                    <div className="flex-shrink-0">{getPriorityBadge(task.priority)}</div>
                   </div>
-                );
+                )
               })}
             </div>
           </div>
@@ -208,38 +219,43 @@ export default function DeliveryTimeline({
               <Calendar className="h-4 w-4 text-orange-600" />
               Upcoming Tasks ({upcomingTasks.length})
             </h3>
-            
+
             <div className="space-y-2">
-              {upcomingTasks.map((task) => {
-                const TypeIcon = getTypeIcon(task.type);
-                const daysUntilStart = Math.ceil((task.startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                
+              {upcomingTasks.map(task => {
+                const TypeIcon = getTypeIcon(task.type)
+                const daysUntilStart = Math.ceil(
+                  (task.startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+                )
+
                 return (
-                  <div key={task.id} className="flex items-center gap-3 p-2 hover:bg-muted/30 rounded-lg transition-colors">
+                  <div
+                    key={task.id}
+                    className="flex items-center gap-3 p-2 hover:bg-muted/30 rounded-lg transition-colors"
+                  >
                     <div className="flex-shrink-0">
                       <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center">
                         <TypeIcon className="h-3 w-3 text-gray-600" />
                       </div>
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium truncate">{task.title}</span>
                         <Badge variant="outline" className="text-xs">
-                          {daysUntilStart === 0 ? 'Today' : 
-                           daysUntilStart === 1 ? 'Tomorrow' : 
-                           `in ${daysUntilStart}d`}
+                          {daysUntilStart === 0
+                            ? 'Today'
+                            : daysUntilStart === 1
+                              ? 'Tomorrow'
+                              : `in ${daysUntilStart}d`}
                         </Badge>
                       </div>
-                      
+
                       {task.metadata?.supplier && (
-                        <p className="text-xs text-muted-foreground">
-                          {task.metadata.supplier}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{task.metadata.supplier}</p>
                       )}
                     </div>
                   </div>
-                );
+                )
               })}
             </div>
           </div>
@@ -256,5 +272,5 @@ export default function DeliveryTimeline({
         )}
       </CardContent>
     </Card>
-  );
+  )
 }

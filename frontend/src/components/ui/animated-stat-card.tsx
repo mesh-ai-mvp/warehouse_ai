@@ -1,9 +1,9 @@
-import { motion } from "framer-motion"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { TrendingUp, TrendingDown, Minus } from "lucide-react"
-import { useInView } from "react-intersection-observer"
-import { useEffect, useState } from "react"
+import { motion } from 'framer-motion'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { useInView } from 'react-intersection-observer'
+import { useEffect, useState } from 'react'
 
 interface AnimatedStatCardProps {
   title: string
@@ -21,10 +21,10 @@ interface AnimatedStatCardProps {
 }
 
 const cardVariants = {
-  hidden: { 
-    opacity: 0, 
+  hidden: {
+    opacity: 0,
     y: 50,
-    scale: 0.95
+    scale: 0.95,
   },
   visible: (delay: number) => ({
     opacity: 1,
@@ -33,9 +33,9 @@ const cardVariants = {
     transition: {
       duration: 0.6,
       delay: delay * 0.1,
-      ease: [0.22, 1, 0.36, 1]
-    }
-  })
+      ease: [0.22, 1, 0.36, 1],
+    },
+  }),
 }
 
 const iconVariants = {
@@ -46,11 +46,11 @@ const iconVariants = {
     transition: {
       duration: 0.5,
       delay: 0.3,
-      type: "spring",
+      type: 'spring',
       stiffness: 200,
-      damping: 10
-    }
-  }
+      damping: 10,
+    },
+  },
 }
 
 const valueVariants = {
@@ -61,9 +61,9 @@ const valueVariants = {
     transition: {
       duration: 0.4,
       delay: 0.4,
-      ease: [0.22, 1, 0.36, 1]
-    }
-  }
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
 }
 
 const trendVariants = {
@@ -74,9 +74,9 @@ const trendVariants = {
     transition: {
       duration: 0.3,
       delay: 0.6,
-      ease: "easeOut"
-    }
-  }
+      ease: 'easeOut',
+    },
+  },
 }
 
 export function AnimatedStatCard({
@@ -87,15 +87,15 @@ export function AnimatedStatCard({
   icon: Icon,
   variant = 'default',
   delay = 0,
-  className = ""
+  className = '',
 }: AnimatedStatCardProps) {
   const { ref, inView } = useInView({
     threshold: 0.1,
-    triggerOnce: true
+    triggerOnce: true,
   })
-  
+
   const [animatedValue, setAnimatedValue] = useState(0)
-  
+
   // Animate number counting
   useEffect(() => {
     if (inView && typeof value === 'number') {
@@ -103,7 +103,7 @@ export function AnimatedStatCard({
       const end = value
       const duration = 1000 // 1 second
       const increment = end / (duration / 16) // 60fps
-      
+
       const timer = setInterval(() => {
         start += increment
         if (start >= end) {
@@ -113,7 +113,7 @@ export function AnimatedStatCard({
           setAnimatedValue(Math.floor(start))
         }
       }, 16)
-      
+
       return () => clearInterval(timer)
     }
   }, [inView, value])
@@ -133,7 +133,7 @@ export function AnimatedStatCard({
 
   const getTrendIcon = () => {
     if (!trend) return null
-    
+
     switch (trend.direction) {
       case 'up':
         return <TrendingUp className="h-3 w-3 text-green-500" />
@@ -146,7 +146,7 @@ export function AnimatedStatCard({
 
   const getTrendColor = () => {
     if (!trend) return 'text-muted-foreground'
-    
+
     switch (trend.direction) {
       case 'up':
         return 'text-green-600'
@@ -163,24 +163,22 @@ export function AnimatedStatCard({
       custom={delay}
       variants={cardVariants}
       initial="hidden"
-      animate={inView ? "visible" : "hidden"}
-      whileHover={{ 
+      animate={inView ? 'visible' : 'hidden'}
+      whileHover={{
         scale: 1.02,
-        transition: { duration: 0.2 }
+        transition: { duration: 0.2 },
       }}
       whileTap={{ scale: 0.98 }}
       className={className}
     >
       <Card className={`cursor-pointer transition-colors duration-200 ${getVariantStyles()}`}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            {title}
-          </CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
           {Icon && (
             <motion.div
               variants={iconVariants}
               initial="hidden"
-              animate={inView ? "visible" : "hidden"}
+              animate={inView ? 'visible' : 'hidden'}
             >
               <Icon className="h-4 w-4 text-muted-foreground" />
             </motion.div>
@@ -190,29 +188,25 @@ export function AnimatedStatCard({
           <motion.div
             variants={valueVariants}
             initial="hidden"
-            animate={inView ? "visible" : "hidden"}
+            animate={inView ? 'visible' : 'hidden'}
             className="text-2xl font-bold tracking-tight"
           >
             {typeof value === 'number' ? animatedValue.toLocaleString() : value}
           </motion.div>
-          
-          {subtitle && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {subtitle}
-            </p>
-          )}
-          
+
+          {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
+
           {trend && (
             <motion.div
               variants={trendVariants}
               initial="hidden"
-              animate={inView ? "visible" : "hidden"}
+              animate={inView ? 'visible' : 'hidden'}
               className="flex items-center gap-1 mt-2"
             >
               {getTrendIcon()}
               <span className={`text-xs font-medium ${getTrendColor()}`}>
-                {trend.value > 0 ? '+' : ''}{trend.value}%
-                {trend.label && ` ${trend.label}`}
+                {trend.value > 0 ? '+' : ''}
+                {trend.value}%{trend.label && ` ${trend.label}`}
               </span>
               {trend.direction === 'up' && (
                 <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">

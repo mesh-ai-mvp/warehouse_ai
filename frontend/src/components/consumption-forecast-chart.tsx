@@ -1,25 +1,25 @@
-'use client';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip } from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
-import { TrendingUp, Brain } from 'lucide-react';
-import { Area, CartesianGrid, ComposedChart, Line, XAxis, YAxis, ReferenceLine } from 'recharts';
+'use client'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
+import type { ChartConfig } from '@/components/ui/chart'
+import { TrendingUp, Brain } from 'lucide-react'
+import { Area, CartesianGrid, ComposedChart, Line, XAxis, YAxis, ReferenceLine } from 'recharts'
 
 interface ConsumptionDataPoint {
-  date: string;
-  consumption?: number;
-  predicted?: number;
-  upper_bound?: number;
-  lower_bound?: number;
+  date: string
+  consumption?: number
+  predicted?: number
+  upper_bound?: number
+  lower_bound?: number
 }
 
 interface ConsumptionForecastChartProps {
-  historicalData: ConsumptionDataPoint[];
-  forecastData: ConsumptionDataPoint[];
-  title?: string;
-  subtitle?: string;
-  height?: number;
+  historicalData: ConsumptionDataPoint[]
+  forecastData: ConsumptionDataPoint[]
+  title?: string
+  subtitle?: string
+  height?: number
 }
 
 const chartConfig = {
@@ -34,8 +34,8 @@ const chartConfig = {
   confidence: {
     label: 'Confidence Interval',
     color: '#10B981', // Green with opacity
-  }
-} satisfies ChartConfig;
+  },
+} satisfies ChartConfig
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -46,68 +46,71 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         </div>
         <div className="space-y-2">
           {payload.map((entry: any, index: number) => {
-            const config = chartConfig[entry.dataKey as keyof typeof chartConfig];
+            const config = chartConfig[entry.dataKey as keyof typeof chartConfig]
             if (!config || entry.dataKey === 'upper_bound' || entry.dataKey === 'lower_bound') {
-              return null; // Don't show bounds in tooltip
+              return null // Don't show bounds in tooltip
             }
-            
+
             return (
               <div key={index} className="flex items-center gap-2 text-xs">
-                <div 
-                  className="w-2 h-2 rounded-full" 
-                  style={{ backgroundColor: entry.color }}
-                />
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
                 <span className="text-muted-foreground">{config.label}:</span>
                 <span className="font-semibold text-popover-foreground">
                   {entry.value.toLocaleString()} units
                 </span>
               </div>
-            );
+            )
           })}
-          
+
           {/* Show confidence interval if available */}
           {payload.find((p: any) => p.dataKey === 'upper_bound') && (
             <div className="text-xs text-muted-foreground pt-1 border-t">
-              Range: {payload.find((p: any) => p.dataKey === 'lower_bound')?.value.toLocaleString()} - {payload.find((p: any) => p.dataKey === 'upper_bound')?.value.toLocaleString()} units
+              Range: {payload.find((p: any) => p.dataKey === 'lower_bound')?.value.toLocaleString()}{' '}
+              - {payload.find((p: any) => p.dataKey === 'upper_bound')?.value.toLocaleString()}{' '}
+              units
             </div>
           )}
         </div>
       </div>
-    );
+    )
   }
-  return null;
-};
+  return null
+}
 
 export default function ConsumptionForecastChart({
   historicalData,
   forecastData,
-  title = "Consumption Forecast with AI",
-  subtitle = "Historical data with predictive analytics",
-  height = 350
+  title = 'Consumption Forecast with AI',
+  subtitle = 'Historical data with predictive analytics',
+  height = 350,
 }: ConsumptionForecastChartProps) {
-  
   // Combine historical and forecast data
-  const combinedData = [
-    ...historicalData,
-    ...forecastData
-  ];
+  const combinedData = [...historicalData, ...forecastData]
 
   // Build weekly ticks (every 7th point)
   const weeklyTicks = combinedData
     .map((d, i) => ({ i, date: d.date }))
     .filter(({ i }) => i % 7 === 0)
-    .map(({ date }) => date);
+    .map(({ date }) => date)
 
   // Calculate metrics
-  const totalHistoricalConsumption = historicalData.reduce((sum, item) => sum + (item.consumption || 0), 0);
-  const avgDailyConsumption = totalHistoricalConsumption / historicalData.length;
-  const totalForecastConsumption = forecastData.reduce((sum, item) => sum + (item.predicted || 0), 0);
-  const forecastTrend = totalForecastConsumption > totalHistoricalConsumption ? 'up' : 'down';
-  const trendPercentage = Math.abs(((totalForecastConsumption - totalHistoricalConsumption) / totalHistoricalConsumption) * 100);
+  const totalHistoricalConsumption = historicalData.reduce(
+    (sum, item) => sum + (item.consumption || 0),
+    0
+  )
+  const avgDailyConsumption = totalHistoricalConsumption / historicalData.length
+  const totalForecastConsumption = forecastData.reduce(
+    (sum, item) => sum + (item.predicted || 0),
+    0
+  )
+  const forecastTrend = totalForecastConsumption > totalHistoricalConsumption ? 'up' : 'down'
+  const trendPercentage = Math.abs(
+    ((totalForecastConsumption - totalHistoricalConsumption) / totalHistoricalConsumption) * 100
+  )
 
   // Find today's date index for reference line
-  const today = new Date().toISOString().split('T')[0];
-  const todayIndex = combinedData.findIndex(d => d.date === today);
+  const today = new Date().toISOString().split('T')[0]
+  const todayIndex = combinedData.findIndex(d => d.date === today)
 
   return (
     <Card className="overflow-hidden">
@@ -119,7 +122,7 @@ export default function ConsumptionForecastChart({
           </CardTitle>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        
+
         <Badge variant="outline" className="text-xs">
           AI Powered
         </Badge>
@@ -129,8 +132,8 @@ export default function ConsumptionForecastChart({
         {/* Stats Section */}
         <div className="flex items-center flex-wrap gap-3.5 md:gap-10 px-5 mb-8 text-sm">
           <div className="flex items-center gap-3.5">
-            <div 
-              className="w-3 h-3 rounded-full" 
+            <div
+              className="w-3 h-3 rounded-full"
               style={{ backgroundColor: chartConfig.consumption.color }}
             />
             <div className="flex items-center gap-2">
@@ -139,13 +142,16 @@ export default function ConsumptionForecastChart({
             </div>
           </div>
           <div className="flex items-center gap-3.5">
-            <div 
-              className="w-3 h-3 rounded-full" 
+            <div
+              className="w-3 h-3 rounded-full"
               style={{ backgroundColor: chartConfig.predicted.color }}
             />
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Forecast Trend:</span>
-              <Badge variant={forecastTrend === 'up' ? 'destructive' : 'success'} className="text-xs">
+              <Badge
+                variant={forecastTrend === 'up' ? 'destructive' : 'success'}
+                className="text-xs"
+              >
                 {forecastTrend === 'up' ? <TrendingUp className="size-3 mr-1" /> : '↓'}
                 {trendPercentage.toFixed(1)}%
               </Badge>
@@ -154,11 +160,7 @@ export default function ConsumptionForecastChart({
         </div>
 
         {/* Chart */}
-        <ChartContainer
-          config={chartConfig}
-          className="w-full"
-          style={{ height: `${height}px` }}
-        >
+        <ChartContainer config={chartConfig} className="w-full" style={{ height: `${height}px` }}>
           <ComposedChart
             data={combinedData}
             margin={{
@@ -194,7 +196,9 @@ export default function ConsumptionForecastChart({
               tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
               tickMargin={10}
               ticks={weeklyTicks}
-              tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              tickFormatter={value =>
+                new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              }
             />
 
             <YAxis
@@ -203,14 +207,14 @@ export default function ConsumptionForecastChart({
               tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
               tickMargin={10}
               interval={0}
-              tickFormatter={(v) => `${Math.round(v)}`}
+              tickFormatter={v => `${Math.round(v)}`}
             />
 
             {/* Today reference line */}
             {todayIndex >= 0 && (
-              <ReferenceLine 
-                x={combinedData[todayIndex].date} 
-                stroke="var(--destructive)" 
+              <ReferenceLine
+                x={combinedData[todayIndex].date}
+                stroke="var(--destructive)"
                 strokeDasharray="2 2"
                 strokeOpacity={0.7}
               />
@@ -256,5 +260,5 @@ export default function ConsumptionForecastChart({
         </ChartContainer>
       </CardContent>
     </Card>
-  );
+  )
 }

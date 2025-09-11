@@ -1,25 +1,38 @@
-import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DateRangePicker } from "@/components/ui/date-range-picker"
-import { Separator } from "@/components/ui/separator"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { 
-  FileText, 
-  Download, 
-  Plus, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Calendar, 
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import {
+  FileText,
+  Download,
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
+  Calendar,
   Mail,
   Settings,
   BarChart3,
@@ -29,9 +42,9 @@ import {
   Filter,
   Save,
   Play,
-  Copy
-} from "lucide-react"
-import { format } from "date-fns"
+  Copy,
+} from 'lucide-react'
+import { format } from 'date-fns'
 // Define our own DateRange type since react-day-picker v9 doesn't export it directly
 type DateRange = {
   from: Date | undefined
@@ -70,7 +83,7 @@ const mockReportTemplates: ReportTemplate[] = [
     format: 'pdf',
     recipients: ['warehouse@company.com', 'manager@company.com'],
     parameters: { includeExpired: true, lowStockOnly: false },
-    chartTypes: ['bar', 'pie']
+    chartTypes: ['bar', 'pie'],
   },
   {
     id: '2',
@@ -82,7 +95,7 @@ const mockReportTemplates: ReportTemplate[] = [
     format: 'excel',
     recipients: ['finance@company.com'],
     parameters: { includeForecasts: true },
-    chartTypes: ['line', 'area']
+    chartTypes: ['line', 'area'],
   },
   {
     id: '3',
@@ -93,7 +106,7 @@ const mockReportTemplates: ReportTemplate[] = [
     format: 'pdf',
     recipients: ['procurement@company.com'],
     parameters: { minOrderThreshold: 1000 },
-    chartTypes: ['bar', 'scatter']
+    chartTypes: ['bar', 'scatter'],
   },
   {
     id: '4',
@@ -104,18 +117,42 @@ const mockReportTemplates: ReportTemplate[] = [
     format: 'excel',
     recipients: ['planning@company.com'],
     parameters: { timeRange: '90d', includeForecasts: true },
-    chartTypes: ['line', 'area']
-  }
+    chartTypes: ['line', 'area'],
+  },
 ]
 
 const availableFields: ReportField[] = [
   { id: 'med_name', name: 'Medication Name', type: 'text', category: 'medication', required: true },
   { id: 'med_category', name: 'Category', type: 'select', category: 'medication', required: false },
-  { id: 'current_stock', name: 'Current Stock', type: 'number', category: 'inventory', required: false },
-  { id: 'reorder_point', name: 'Reorder Point', type: 'number', category: 'inventory', required: false },
+  {
+    id: 'current_stock',
+    name: 'Current Stock',
+    type: 'number',
+    category: 'inventory',
+    required: false,
+  },
+  {
+    id: 'reorder_point',
+    name: 'Reorder Point',
+    type: 'number',
+    category: 'inventory',
+    required: false,
+  },
   { id: 'unit_cost', name: 'Unit Cost', type: 'number', category: 'financial', required: false },
-  { id: 'supplier_name', name: 'Supplier Name', type: 'text', category: 'supplier', required: false },
-  { id: 'last_order_date', name: 'Last Order Date', type: 'date', category: 'order', required: false },
+  {
+    id: 'supplier_name',
+    name: 'Supplier Name',
+    type: 'text',
+    category: 'supplier',
+    required: false,
+  },
+  {
+    id: 'last_order_date',
+    name: 'Last Order Date',
+    type: 'date',
+    category: 'order',
+    required: false,
+  },
   { id: 'expiry_date', name: 'Expiry Date', type: 'date', category: 'medication', required: false },
 ]
 
@@ -127,7 +164,9 @@ export function Reports() {
   const [reportDescription, setReportDescription] = useState('')
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [reportFormat, setReportFormat] = useState<'pdf' | 'excel' | 'csv'>('pdf')
-  const [reportFrequency, setReportFrequency] = useState<'manual' | 'daily' | 'weekly' | 'monthly'>('manual')
+  const [reportFrequency, setReportFrequency] = useState<'manual' | 'daily' | 'weekly' | 'monthly'>(
+    'manual'
+  )
   const [chartTypes, setChartTypes] = useState<string[]>(['bar'])
 
   const { data: reports, isLoading } = useQuery({
@@ -161,25 +200,21 @@ export function Reports() {
       format: reportFormat,
       recipients: [],
       parameters: { dateRange, selectedFields },
-      chartTypes: chartTypes
+      chartTypes: chartTypes,
     }
     console.log('Saving custom report:', newReport)
     setIsBuilderOpen(false)
   }
 
   const toggleField = (fieldId: string) => {
-    setSelectedFields(prev => 
-      prev.includes(fieldId) 
-        ? prev.filter(id => id !== fieldId)
-        : [...prev, fieldId]
+    setSelectedFields(prev =>
+      prev.includes(fieldId) ? prev.filter(id => id !== fieldId) : [...prev, fieldId]
     )
   }
 
   const toggleChartType = (chartType: string) => {
-    setChartTypes(prev => 
-      prev.includes(chartType) 
-        ? prev.filter(type => type !== chartType)
-        : [...prev, chartType]
+    setChartTypes(prev =>
+      prev.includes(chartType) ? prev.filter(type => type !== chartType) : [...prev, chartType]
     )
   }
 
@@ -208,7 +243,9 @@ export function Reports() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Reports</h1>
-          <p className="text-muted-foreground">Generate and manage custom reports for your pharmaceutical operations</p>
+          <p className="text-muted-foreground">
+            Generate and manage custom reports for your pharmaceutical operations
+          </p>
         </div>
         <Dialog open={isBuilderOpen} onOpenChange={setIsBuilderOpen}>
           <DialogTrigger asChild>
@@ -224,7 +261,7 @@ export function Reports() {
                 Build a custom report with the fields and visualizations you need
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-6">
               {/* Report Basic Info */}
               <div className="grid grid-cols-2 gap-4">
@@ -233,13 +270,16 @@ export function Reports() {
                   <Input
                     id="report-name"
                     value={reportName}
-                    onChange={(e) => setReportName(e.target.value)}
+                    onChange={e => setReportName(e.target.value)}
                     placeholder="Enter report name"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="report-format">Export Format</Label>
-                  <Select value={reportFormat} onValueChange={(value: any) => setReportFormat(value)}>
+                  <Select
+                    value={reportFormat}
+                    onValueChange={(value: any) => setReportFormat(value)}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -257,7 +297,7 @@ export function Reports() {
                 <Input
                   id="report-description"
                   value={reportDescription}
-                  onChange={(e) => setReportDescription(e.target.value)}
+                  onChange={e => setReportDescription(e.target.value)}
                   placeholder="Enter report description"
                 />
               </div>
@@ -274,12 +314,14 @@ export function Reports() {
                   <h3 className="text-lg font-semibold">Data Fields</h3>
                   <Badge variant="secondary">{selectedFields.length} selected</Badge>
                 </div>
-                
+
                 <ScrollArea className="h-48 border rounded p-4">
                   <div className="space-y-3">
-                    {['medication', 'inventory', 'supplier', 'order', 'financial'].map((category) => (
+                    {['medication', 'inventory', 'supplier', 'order', 'financial'].map(category => (
                       <div key={category}>
-                        <h4 className="font-medium mb-2 capitalize text-muted-foreground">{category}</h4>
+                        <h4 className="font-medium mb-2 capitalize text-muted-foreground">
+                          {category}
+                        </h4>
                         <div className="space-y-2 pl-4">
                           {availableFields
                             .filter(field => field.category === category)
@@ -315,7 +357,7 @@ export function Reports() {
                   ].map(chart => (
                     <Button
                       key={chart.id}
-                      variant={chartTypes.includes(chart.id) ? "default" : "outline"}
+                      variant={chartTypes.includes(chart.id) ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => toggleChartType(chart.id)}
                     >
@@ -329,7 +371,10 @@ export function Reports() {
               {/* Schedule */}
               <div className="space-y-2">
                 <Label>Schedule</Label>
-                <Select value={reportFrequency} onValueChange={(value: any) => setReportFrequency(value)}>
+                <Select
+                  value={reportFrequency}
+                  onValueChange={(value: any) => setReportFrequency(value)}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -346,7 +391,10 @@ export function Reports() {
                 <Button variant="outline" onClick={() => setIsBuilderOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleSaveCustomReport} disabled={!reportName || selectedFields.length === 0}>
+                <Button
+                  onClick={handleSaveCustomReport}
+                  disabled={!reportName || selectedFields.length === 0}
+                >
                   <Save className="h-4 w-4 mr-2" />
                   Save Report
                 </Button>
@@ -366,7 +414,7 @@ export function Reports() {
 
         <TabsContent value="templates">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {reports?.map((template) => (
+            {reports?.map(template => (
               <Card key={template.id} className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
@@ -384,10 +432,12 @@ export function Reports() {
                     <span className="text-muted-foreground">Format:</span>
                     <Badge variant="outline">{template.format.toUpperCase()}</Badge>
                   </div>
-                  
+
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Schedule:</span>
-                    <Badge variant="outline" className="capitalize">{template.frequency}</Badge>
+                    <Badge variant="outline" className="capitalize">
+                      {template.frequency}
+                    </Badge>
                   </div>
 
                   {template.lastRun && (
@@ -409,11 +459,19 @@ export function Reports() {
                       <Play className="h-3 w-3 mr-1" />
                       Run
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => setSelectedTemplate(template)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedTemplate(template)}
+                    >
                       <Eye className="h-3 w-3 mr-1" />
                       Preview
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleExportReport(template, template.format)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExportReport(template, template.format)}
+                    >
                       <Download className="h-3 w-3 mr-1" />
                       Export
                     </Button>
@@ -422,7 +480,11 @@ export function Reports() {
                       Clone
                     </Button>
                     {template.type === 'custom' && (
-                      <Button size="sm" variant="outline" onClick={() => handleDeleteReport(template.id)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteReport(template.id)}
+                      >
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     )}
@@ -441,22 +503,28 @@ export function Reports() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {reports?.filter(r => r.frequency !== 'manual').map(report => (
-                  <div key={report.id} className="flex items-center justify-between p-4 border rounded">
-                    <div>
-                      <h4 className="font-semibold">{report.name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Runs {report.frequency} • Delivers to {report.recipients.length} recipients
-                      </p>
+                {reports
+                  ?.filter(r => r.frequency !== 'manual')
+                  .map(report => (
+                    <div
+                      key={report.id}
+                      className="flex items-center justify-between p-4 border rounded"
+                    >
+                      <div>
+                        <h4 className="font-semibold">{report.name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Runs {report.frequency} • Delivers to {report.recipients.length}{' '}
+                          recipients
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge>{report.frequency}</Badge>
+                        <Button size="sm" variant="outline">
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge>{report.frequency}</Badge>
-                      <Button size="sm" variant="outline">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </CardContent>
           </Card>
@@ -472,16 +540,37 @@ export function Reports() {
               <div className="space-y-4">
                 {/* Mock history data */}
                 {[
-                  { name: 'Inventory Stock Report', date: '2024-01-10T10:30:00Z', size: '2.4 MB', format: 'PDF' },
-                  { name: 'Monthly Financial Summary', date: '2024-01-01T00:00:00Z', size: '1.8 MB', format: 'Excel' },
-                  { name: 'Supplier Performance', date: '2024-01-08T09:00:00Z', size: '856 KB', format: 'PDF' },
-                  { name: 'Consumption Trends', date: '2024-01-07T15:30:00Z', size: '1.2 MB', format: 'Excel' },
+                  {
+                    name: 'Inventory Stock Report',
+                    date: '2024-01-10T10:30:00Z',
+                    size: '2.4 MB',
+                    format: 'PDF',
+                  },
+                  {
+                    name: 'Monthly Financial Summary',
+                    date: '2024-01-01T00:00:00Z',
+                    size: '1.8 MB',
+                    format: 'Excel',
+                  },
+                  {
+                    name: 'Supplier Performance',
+                    date: '2024-01-08T09:00:00Z',
+                    size: '856 KB',
+                    format: 'PDF',
+                  },
+                  {
+                    name: 'Consumption Trends',
+                    date: '2024-01-07T15:30:00Z',
+                    size: '1.2 MB',
+                    format: 'Excel',
+                  },
                 ].map((historyItem, index) => (
                   <div key={index} className="flex items-center justify-between p-4 border rounded">
                     <div>
                       <h4 className="font-semibold">{historyItem.name}</h4>
                       <p className="text-sm text-muted-foreground">
-                        Generated on {format(new Date(historyItem.date), 'MMM d, yyyy at h:mm a')} • {historyItem.size}
+                        Generated on {format(new Date(historyItem.date), 'MMM d, yyyy at h:mm a')} •{' '}
+                        {historyItem.size}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

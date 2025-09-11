@@ -1,12 +1,5 @@
-import {
-  BarChart3,
-  Package,
-  ShoppingCart,
-  FileText,
-  Home,
-  Settings,
-} from "lucide-react"
-import { Link, useLocation } from "react-router-dom"
+import { BarChart3, Package, ShoppingCart, FileText, Home, Settings } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
 
 import {
   Sidebar,
@@ -18,42 +11,42 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
-} from "@/components/ui/sidebar"
+} from '@/components/ui/sidebar'
 
 const menuItems = [
   {
-    title: "Dashboard",
-    url: "/",
+    title: 'Dashboard',
+    url: '/',
     icon: Home,
   },
   {
-    title: "Inventory",
-    url: "/inventory", 
+    title: 'Inventory',
+    url: '/inventory',
     icon: Package,
   },
   {
-    title: "Purchase Orders",
-    url: "/purchase-orders",
+    title: 'Purchase Orders',
+    url: '/purchase-orders',
     icon: ShoppingCart,
   },
   {
-    title: "Create PO",
-    url: "/create-po",
+    title: 'Create PO',
+    url: '/create-po',
     icon: FileText,
   },
   {
-    title: "Analytics",
-    url: "/analytics",
+    title: 'Analytics',
+    url: '/analytics',
     icon: BarChart3,
   },
   {
-    title: "Reports",
-    url: "/reports",
+    title: 'Reports',
+    url: '/reports',
     icon: FileText,
   },
   {
-    title: "Settings",
-    url: "/settings",
+    title: 'Settings',
+    url: '/settings',
     icon: Settings,
   },
 ]
@@ -77,12 +70,9 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {menuItems.map(item => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild
-                    isActive={location.pathname === item.url}
-                  >
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
                     <Link to={item.url}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>

@@ -1,23 +1,23 @@
-'use client';
+'use client'
 
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip } from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
-import { TrendingDown, TrendingUp, AlertTriangle, Package } from 'lucide-react';
-import { Line, CartesianGrid, ComposedChart, XAxis, YAxis, ReferenceLine, Area } from 'recharts';
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
+import type { ChartConfig } from '@/components/ui/chart'
+import { TrendingDown, TrendingUp, AlertTriangle, Package } from 'lucide-react'
+import { Line, CartesianGrid, ComposedChart, XAxis, YAxis, ReferenceLine, Area } from 'recharts'
 
 interface StockDataPoint {
-  date: string;
-  stock_level: number;
+  date: string
+  stock_level: number
 }
 
 interface StockLevelChartProps {
-  data: StockDataPoint[];
-  reorderPoint: number;
-  title?: string;
-  subtitle?: string;
-  height?: number;
+  data: StockDataPoint[]
+  reorderPoint: number
+  title?: string
+  subtitle?: string
+  height?: number
 }
 
 const chartConfig = {
@@ -32,13 +32,13 @@ const chartConfig = {
   critical: {
     label: 'Critical Level',
     color: '#DC2626', // Dark red
-  }
-} satisfies ChartConfig;
+  },
+} satisfies ChartConfig
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    const stockLevel = payload[0]?.value;
-    
+    const stockLevel = payload[0]?.value
+
     return (
       <div className="rounded-lg border bg-popover p-3 shadow-sm shadow-black/5 min-w-[150px]">
         <div className="text-xs font-medium text-muted-foreground tracking-wide mb-2.5">
@@ -46,8 +46,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         </div>
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs">
-            <div 
-              className="w-2 h-2 rounded-full" 
+            <div
+              className="w-2 h-2 rounded-full"
               style={{ backgroundColor: chartConfig.stock_level.color }}
             />
             <span className="text-muted-foreground">Stock Level:</span>
@@ -55,60 +55,67 @@ const CustomTooltip = ({ active, payload, label }: any) => {
               {stockLevel?.toLocaleString()} units
             </span>
           </div>
-          
+
           {/* Status indicator */}
           <div className="pt-1 border-t">
-            <Badge 
+            <Badge
               variant={
-                stockLevel <= payload[0]?.payload.criticalLevel ? 'destructive' :
-                stockLevel <= payload[0]?.payload.reorderPoint ? 'secondary' : 'success'
+                stockLevel <= payload[0]?.payload.criticalLevel
+                  ? 'destructive'
+                  : stockLevel <= payload[0]?.payload.reorderPoint
+                    ? 'secondary'
+                    : 'success'
               }
               className="text-xs"
             >
-              {stockLevel <= payload[0]?.payload.criticalLevel ? 'Critical' :
-               stockLevel <= payload[0]?.payload.reorderPoint ? 'Low Stock' : 'Normal'}
+              {stockLevel <= payload[0]?.payload.criticalLevel
+                ? 'Critical'
+                : stockLevel <= payload[0]?.payload.reorderPoint
+                  ? 'Low Stock'
+                  : 'Normal'}
             </Badge>
           </div>
         </div>
       </div>
-    );
+    )
   }
-  return null;
-};
+  return null
+}
 
 export default function StockLevelChart({
   data,
   reorderPoint,
-  title = "Stock Level Monitoring",
-  subtitle = "Real-time stock tracking with alerts",
-  height = 350
+  title = 'Stock Level Monitoring',
+  subtitle = 'Real-time stock tracking with alerts',
+  height = 350,
 }: StockLevelChartProps) {
-  
-  const criticalLevel = reorderPoint * 0.5;
-  
+  const criticalLevel = reorderPoint * 0.5
+
   // Add reference levels to data
   const enhancedData = data.map(item => ({
     ...item,
     reorderPoint,
-    criticalLevel
-  }));
+    criticalLevel,
+  }))
 
   // Weekly ticks for x-axis
   const weeklyTicks = enhancedData
     .map((d, i) => ({ i, date: d.date }))
     .filter(({ i }) => i % 7 === 0)
-    .map(({ date }) => date);
+    .map(({ date }) => date)
 
   // Calculate metrics
-  const currentStock = data[data.length - 1]?.stock_level || 0;
-  const previousStock = data[data.length - 2]?.stock_level || currentStock;
-  const stockTrend = currentStock > previousStock ? 'up' : 'down';
-  const trendPercentage = Math.abs(((currentStock - previousStock) / previousStock) * 100);
-  
-  const daysOfStock = Math.floor(currentStock / ((data[0]?.stock_level - currentStock) / data.length || 1));
-  
-  const stockStatus = currentStock <= criticalLevel ? 'critical' : 
-                     currentStock <= reorderPoint ? 'low' : 'normal';
+  const currentStock = data[data.length - 1]?.stock_level || 0
+  const previousStock = data[data.length - 2]?.stock_level || currentStock
+  const stockTrend = currentStock > previousStock ? 'up' : 'down'
+  const trendPercentage = Math.abs(((currentStock - previousStock) / previousStock) * 100)
+
+  const daysOfStock = Math.floor(
+    currentStock / ((data[0]?.stock_level - currentStock) / data.length || 1)
+  )
+
+  const stockStatus =
+    currentStock <= criticalLevel ? 'critical' : currentStock <= reorderPoint ? 'low' : 'normal'
 
   return (
     <Card className="overflow-hidden">
@@ -120,11 +127,14 @@ export default function StockLevelChart({
           </CardTitle>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        
-        <Badge 
+
+        <Badge
           variant={
-            stockStatus === 'critical' ? 'destructive' :
-            stockStatus === 'low' ? 'secondary' : 'success'
+            stockStatus === 'critical'
+              ? 'destructive'
+              : stockStatus === 'low'
+                ? 'secondary'
+                : 'success'
           }
           className="text-xs"
         >
@@ -137,15 +147,19 @@ export default function StockLevelChart({
         {/* Stats Section */}
         <div className="flex items-center flex-wrap gap-3.5 md:gap-10 px-5 mb-8 text-sm">
           <div className="flex items-center gap-3.5">
-            <div 
-              className="w-3 h-3 rounded-full" 
+            <div
+              className="w-3 h-3 rounded-full"
               style={{ backgroundColor: chartConfig.stock_level.color }}
             />
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Current:</span>
               <span className="text-lg font-bold">{currentStock.toLocaleString()} units</span>
               <Badge variant={stockTrend === 'up' ? 'success' : 'destructive'} className="text-xs">
-                {stockTrend === 'up' ? <TrendingUp className="size-3 mr-1" /> : <TrendingDown className="size-3 mr-1" />}
+                {stockTrend === 'up' ? (
+                  <TrendingUp className="size-3 mr-1" />
+                ) : (
+                  <TrendingDown className="size-3 mr-1" />
+                )}
                 {trendPercentage.toFixed(1)}%
               </Badge>
             </div>
@@ -153,7 +167,9 @@ export default function StockLevelChart({
           <div className="flex items-center gap-3.5">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Days of Stock:</span>
-              <span className={`text-lg font-bold ${daysOfStock <= 7 ? 'text-red-600' : daysOfStock <= 14 ? 'text-yellow-600' : 'text-green-600'}`}>
+              <span
+                className={`text-lg font-bold ${daysOfStock <= 7 ? 'text-red-600' : daysOfStock <= 14 ? 'text-yellow-600' : 'text-green-600'}`}
+              >
                 {daysOfStock > 0 ? `~${daysOfStock}d` : 'N/A'}
               </span>
             </div>
@@ -161,11 +177,7 @@ export default function StockLevelChart({
         </div>
 
         {/* Chart */}
-        <ChartContainer
-          config={chartConfig}
-          className="w-full"
-          style={{ height: `${height}px` }}
-        >
+        <ChartContainer config={chartConfig} className="w-full" style={{ height: `${height}px` }}>
           <ComposedChart
             data={enhancedData}
             margin={{
@@ -201,7 +213,9 @@ export default function StockLevelChart({
               tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
               tickMargin={10}
               ticks={weeklyTicks}
-              tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              tickFormatter={value =>
+                new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              }
             />
 
             <YAxis
@@ -210,7 +224,7 @@ export default function StockLevelChart({
               tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
               tickMargin={10}
               interval={0}
-              tickFormatter={(v) => `${Math.round(v)}`}
+              tickFormatter={v => `${Math.round(v)}`}
             />
 
             {/* Critical zone background */}
@@ -222,16 +236,16 @@ export default function StockLevelChart({
             />
 
             {/* Reorder point reference line */}
-            <ReferenceLine 
-              y={reorderPoint} 
+            <ReferenceLine
+              y={reorderPoint}
               stroke={chartConfig.reorder.color}
               strokeDasharray="5 5"
               strokeOpacity={0.8}
             />
 
             {/* Critical level reference line */}
-            <ReferenceLine 
-              y={criticalLevel} 
+            <ReferenceLine
+              y={criticalLevel}
               stroke={chartConfig.critical.color}
               strokeDasharray="2 2"
               strokeOpacity={0.8}
@@ -252,7 +266,12 @@ export default function StockLevelChart({
               type="monotone"
               stroke={chartConfig.stock_level.color}
               strokeWidth={3}
-              dot={{ r: 4, fill: chartConfig.stock_level.color, strokeWidth: 2, stroke: 'var(--background)' }}
+              dot={{
+                r: 4,
+                fill: chartConfig.stock_level.color,
+                strokeWidth: 2,
+                stroke: 'var(--background)',
+              }}
               activeDot={{ r: 6, stroke: chartConfig.stock_level.color, strokeWidth: 2 }}
             />
 
@@ -261,5 +280,5 @@ export default function StockLevelChart({
         </ChartContainer>
       </CardContent>
     </Card>
-  );
+  )
 }

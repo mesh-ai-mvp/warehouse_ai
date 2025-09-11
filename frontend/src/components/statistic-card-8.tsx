@@ -1,7 +1,7 @@
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Briefcase, ShoppingCart, TrendingDown, TrendingUp, Users } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { Briefcase, ShoppingCart, TrendingDown, TrendingUp, Users } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const cards = [
   {
@@ -43,7 +43,7 @@ const cards = [
     value: 89,
     dateRange: 'From Jan 01 - Jul 30, 2024',
   },
-];
+]
 
 export default function StatisticCard8() {
   return (
@@ -70,8 +70,12 @@ export default function StatisticCard8() {
                 <div className="flex-1 flex flex-col justify-between grow">
                   {/* Value */}
                   <div>
-                    <div className="text-base font-medium text-muted-foreground mb-1">{card.title}</div>
-                    <div className="text-3xl font-bold text-foreground mb-6">{card.value.toLocaleString()}</div>
+                    <div className="text-base font-medium text-muted-foreground mb-1">
+                      {card.title}
+                    </div>
+                    <div className="text-3xl font-bold text-foreground mb-6">
+                      {card.value.toLocaleString()}
+                    </div>
                   </div>
                   <div className="pt-3 border-t border-muted text-xs text-muted-foreground font-medium">
                     {card.dateRange}
@@ -83,5 +87,5 @@ export default function StatisticCard8() {
         </div>
       </div>
     </div>
-  );
+  )
 }

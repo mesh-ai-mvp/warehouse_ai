@@ -1,16 +1,16 @@
-import { motion } from "framer-motion"
-import { useInView } from "react-intersection-observer"
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { AnimatedStatCard } from "@/components/ui/animated-card"
-import { AnimatedChart } from "@/components/ui/animated-chart"
-import { ReUIStatCard, PharmacyStatPresets } from "@/components/ui/reui-stats"
-import { GanttChart, PharmaGanttPresets } from "@/components/charts/gantt-chart"
-import ConsumptionForecastChart from "@/components/consumption-forecast-chart"
-import StockLevelChart from "@/components/stock-level-chart"
-import DeliveryTimeline from "@/components/delivery-timeline"
+import { motion } from 'framer-motion'
+import { useInView } from 'react-intersection-observer'
+import { useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { AnimatedStatCard } from '@/components/ui/animated-card'
+import { AnimatedChart } from '@/components/ui/animated-chart'
+import { ReUIStatCard, PharmacyStatPresets } from '@/components/ui/reui-stats'
+import { GanttChart, PharmaGanttPresets } from '@/components/charts/gantt-chart'
+import ConsumptionForecastChart from '@/components/consumption-forecast-chart'
+import StockLevelChart from '@/components/stock-level-chart'
+import DeliveryTimeline from '@/components/delivery-timeline'
 import {
   Package,
   AlertTriangle,
@@ -22,10 +22,16 @@ import {
   Zap,
   Brain,
   Sparkles,
-  RefreshCw
-} from "lucide-react"
-import { useDashboardStats, useInventory, usePurchaseOrders } from "@/hooks/use-api"
-import { useCategoryBreakdown, useConsumptionForecast, useStockLevelTrends, useDeliveryTimeline, useStockAlerts } from "@/hooks/useAnalytics"
+  RefreshCw,
+} from 'lucide-react'
+import { useDashboardStats, useInventory, usePurchaseOrders } from '@/hooks/use-api'
+import {
+  useCategoryBreakdown,
+  useConsumptionForecast,
+  useStockLevelTrends,
+  useDeliveryTimeline,
+  useStockAlerts,
+} from '@/hooks/useAnalytics'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -33,9 +39,9 @@ const containerVariants = {
     opacity: 1,
     transition: {
       duration: 0.6,
-      staggerChildren: 0.1
-    }
-  }
+      staggerChildren: 0.1,
+    },
+  },
 }
 
 const headerVariants = {
@@ -45,9 +51,9 @@ const headerVariants = {
     y: 0,
     transition: {
       duration: 0.8,
-      ease: [0.22, 1, 0.36, 1]
-    }
-  }
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
 }
 
 const sectionVariants = {
@@ -57,17 +63,16 @@ const sectionVariants = {
     y: 0,
     transition: {
       duration: 0.6,
-      ease: "easeOut"
-    }
-  }
+      ease: 'easeOut',
+    },
+  },
 }
 
 export function Dashboard() {
   const { ref, inView } = useInView({
     threshold: 0.1,
-    triggerOnce: true
+    triggerOnce: true,
   })
-
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useDashboardStats()
   const { data: inventory } = useInventory({ page_size: 100 })
@@ -75,7 +80,10 @@ export function Dashboard() {
 
   // Real data from analytics API - using monthly timeline data
   const { data: categoryBreakdown, isLoading: categoryLoading } = useCategoryBreakdown()
-  const { data: consumptionForecast, isLoading: forecastLoading } = useConsumptionForecast(undefined, 30) // 30 days forecast
+  const { data: consumptionForecast, isLoading: forecastLoading } = useConsumptionForecast(
+    undefined,
+    30
+  ) // 30 days forecast
   const { data: stockTrends, isLoading: stockTrendsLoading } = useStockLevelTrends(undefined, '30d') // 30 days trend
   const { data: timelineTasks, isLoading: timelineLoading } = useDeliveryTimeline()
   const { data: stockAlerts, isLoading: alertsLoading } = useStockAlerts()
@@ -84,20 +92,23 @@ export function Dashboard() {
   const categoryData = categoryBreakdown || []
 
   // Transform stock alerts for low stock data
-  const lowStockData = stockAlerts?.slice(0, 8)?.map(alert => ({
-    medication: alert.medication?.substring(0, 15) + (alert.medication?.length > 15 ? '...' : ''),
-    current_stock: alert.current,
-    reorder_point: alert.reorder,
-    value: alert.current
-  })) || inventory?.items
-    ?.filter(med => med.current_stock <= med.reorder_point)
-    ?.slice(0, 8)
-    ?.map(med => ({
-      medication: med.name.substring(0, 15) + (med.name.length > 15 ? '...' : ''),
-      current_stock: med.current_stock,
-      reorder_point: med.reorder_point,
-      value: med.current_stock
-    })) || []
+  const lowStockData =
+    stockAlerts?.slice(0, 8)?.map(alert => ({
+      medication: alert.medication?.substring(0, 15) + (alert.medication?.length > 15 ? '...' : ''),
+      current_stock: alert.current,
+      reorder_point: alert.reorder,
+      value: alert.current,
+    })) ||
+    inventory?.items
+      ?.filter(med => med.current_stock <= med.reorder_point)
+      ?.slice(0, 8)
+      ?.map(med => ({
+        medication: med.name.substring(0, 15) + (med.name.length > 15 ? '...' : ''),
+        current_stock: med.current_stock,
+        reorder_point: med.reorder_point,
+        value: med.current_stock,
+      })) ||
+    []
 
   const consumptionData = [
     { date: 'Mon', consumption: 145 },
@@ -114,20 +125,20 @@ export function Dashboard() {
       ref={ref}
       variants={containerVariants}
       initial="hidden"
-      animate={inView ? "visible" : "hidden"}
+      animate={inView ? 'visible' : 'hidden'}
       className="space-y-8"
     >
       {/* Header */}
       <motion.div variants={headerVariants} className="flex items-center justify-between">
         <div>
-          <motion.h1 
+          <motion.h1
             className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
             whileHover={{ scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 300 }}
+            transition={{ type: 'spring', stiffness: 300 }}
           >
             Dashboard
           </motion.h1>
-          <motion.p 
+          <motion.p
             className="text-muted-foreground mt-2"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -136,8 +147,8 @@ export function Dashboard() {
             Real-time pharmaceutical inventory management with AI insights
           </motion.p>
         </div>
-        
-        <motion.div 
+
+        <motion.div
           className="flex items-center gap-3"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -147,7 +158,7 @@ export function Dashboard() {
             <Sparkles className="h-3 w-3 mr-1" />
             AI Powered
           </Badge>
-          <Button 
+          <Button
             onClick={() => refetchStats()}
             variant="outline"
             size="sm"
@@ -170,7 +181,7 @@ export function Dashboard() {
             trend={{ value: 12, direction: 'up' }}
             delay={0}
           />
-          
+
           <AnimatedStatCard
             title="Low Stock Alerts"
             value={(stats?.low_stock_count || 0).toString()}
@@ -180,7 +191,7 @@ export function Dashboard() {
             variant="warning"
             delay={1}
           />
-          
+
           <AnimatedStatCard
             title="Inventory Value"
             value={`$${(stats?.total_value || 0).toLocaleString()}`}
@@ -190,7 +201,7 @@ export function Dashboard() {
             variant="success"
             delay={2}
           />
-          
+
           <AnimatedStatCard
             title="Orders Today"
             value={(stats?.orders_today || 0).toString()}
@@ -213,7 +224,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
-              <motion.div 
+              <motion.div
                 className="flex items-center gap-3 p-3 bg-white/60 dark:bg-white/5 rounded-lg"
                 whileHover={{ scale: 1.02 }}
                 transition={{ duration: 0.2 }}
@@ -222,12 +233,16 @@ export function Dashboard() {
                   <Zap className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-blue-900 dark:text-blue-100">Optimal Reorder Time</p>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">3 medications need immediate attention</p>
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                    Optimal Reorder Time
+                  </p>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    3 medications need immediate attention
+                  </p>
                 </div>
               </motion.div>
-              
-              <motion.div 
+
+              <motion.div
                 className="flex items-center gap-3 p-3 bg-white/60 dark:bg-white/5 rounded-lg"
                 whileHover={{ scale: 1.02 }}
                 transition={{ duration: 0.2 }}
@@ -237,11 +252,13 @@ export function Dashboard() {
                 </div>
                 <div>
                   <p className="font-medium text-green-900 dark:text-green-100">Demand Forecast</p>
-                  <p className="text-sm text-green-700 dark:text-green-300">15% increase expected next month</p>
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    15% increase expected next month
+                  </p>
                 </div>
               </motion.div>
-              
-              <motion.div 
+
+              <motion.div
                 className="flex items-center gap-3 p-3 bg-white/60 dark:bg-white/5 rounded-lg"
                 whileHover={{ scale: 1.02 }}
                 transition={{ duration: 0.2 }}
@@ -250,8 +267,12 @@ export function Dashboard() {
                   <Activity className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-purple-900 dark:text-purple-100">Cost Optimization</p>
-                  <p className="text-sm text-purple-700 dark:text-purple-300">Potential savings: $12,450</p>
+                  <p className="font-medium text-purple-900 dark:text-purple-100">
+                    Cost Optimization
+                  </p>
+                  <p className="text-sm text-purple-700 dark:text-purple-300">
+                    Potential savings: $12,450
+                  </p>
                 </div>
               </motion.div>
             </div>
@@ -264,15 +285,17 @@ export function Dashboard() {
         <div className="grid gap-6 md:grid-cols-2">
           <AnimatedChart
             type="area"
-            data={stockTrends?.data || [
-              { date: '2024-01-01', stock_level: 2450 },
-              { date: '2024-01-02', stock_level: 2380 },
-              { date: '2024-01-03', stock_level: 2290 },
-              { date: '2024-01-04', stock_level: 2420 },
-              { date: '2024-01-05', stock_level: 2510 },
-              { date: '2024-01-06', stock_level: 2480 },
-              { date: '2024-01-07', stock_level: 2560 },
-            ]}
+            data={
+              stockTrends?.data || [
+                { date: '2024-01-01', stock_level: 2450 },
+                { date: '2024-01-02', stock_level: 2380 },
+                { date: '2024-01-03', stock_level: 2290 },
+                { date: '2024-01-04', stock_level: 2420 },
+                { date: '2024-01-05', stock_level: 2510 },
+                { date: '2024-01-06', stock_level: 2480 },
+                { date: '2024-01-07', stock_level: 2560 },
+              ]
+            }
             title="Inventory Levels Trend"
             subtitle="Stock levels over the past week"
             xAxisKey="date"
@@ -280,7 +303,7 @@ export function Dashboard() {
             height={300}
             delay={0}
           />
-          
+
           <AnimatedChart
             type="pie"
             data={categoryData}
@@ -303,7 +326,7 @@ export function Dashboard() {
             height={300}
             delay={2}
           />
-          
+
           <AnimatedChart
             type="line"
             data={consumptionData}
@@ -329,8 +352,6 @@ export function Dashboard() {
             </div>
           </div>
 
-
-
           {/* Enhanced Analytics Charts */}
           <div className="grid gap-6">
             <ConsumptionForecastChart
@@ -338,16 +359,18 @@ export function Dashboard() {
               forecastData={consumptionForecast?.forecast_data || []}
               height={350}
             />
-            
+
             <StockLevelChart
-              data={stockTrends?.data || [
-                { date: '2024-01-01', stock_level: 450 },
-                { date: '2024-01-02', stock_level: 420 },
-                { date: '2024-01-03', stock_level: 390 },
-                { date: '2024-01-04', stock_level: 360 },
-                { date: '2024-01-05', stock_level: 335 },
-                { date: '2024-01-06', stock_level: 310 }
-              ]}
+              data={
+                stockTrends?.data || [
+                  { date: '2024-01-01', stock_level: 450 },
+                  { date: '2024-01-02', stock_level: 420 },
+                  { date: '2024-01-03', stock_level: 390 },
+                  { date: '2024-01-04', stock_level: 360 },
+                  { date: '2024-01-05', stock_level: 335 },
+                  { date: '2024-01-06', stock_level: 310 },
+                ]
+              }
               reorderPoint={stockTrends?.reorder_point || 400}
               height={350}
             />
@@ -358,7 +381,7 @@ export function Dashboard() {
             tasks={(timelineTasks || []).map(task => ({
               ...task,
               startDate: new Date(task.startDate),
-              endDate: new Date(task.endDate)
+              endDate: new Date(task.endDate),
             }))}
             showToday={true}
             height={400}

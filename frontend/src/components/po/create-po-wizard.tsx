@@ -1,199 +1,227 @@
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Package, 
-  Truck, 
-  FileText, 
-  CheckCircle, 
+import { useState } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Package,
+  Truck,
+  FileText,
+  CheckCircle,
   Calendar as CalendarIcon,
   Search,
   Plus,
   Minus,
   AlertTriangle,
   RefreshCw,
-  Info
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { useInventory, useSuppliers, useCreatePurchaseOrder } from '@/hooks/use-api';
-import { AIPOGenerator } from '@/components/ai-po/ai-po-generator';
-import { toast } from 'sonner';
-import { ProfessionalNotification } from '@/components/animations/success-animation';
+  Info,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { format } from 'date-fns'
+import { useInventory, useSuppliers, useCreatePurchaseOrder } from '@/hooks/use-api'
+import { AIPOGenerator } from '@/components/ai-po/ai-po-generator'
+import { toast } from 'sonner'
+import { ProfessionalNotification } from '@/components/animations/success-animation'
 
 interface POLineItem {
-  medication_id: number;
-  medication_name: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
+  medication_id: number
+  medication_name: string
+  quantity: number
+  unit_price: number
+  total_price: number
 }
 
 interface POFormData {
-  supplier: string;
-  delivery_date: Date;
-  buyer_name: string;
-  notes: string;
-  line_items: POLineItem[];
-  send_emails: boolean;
+  supplier: string
+  delivery_date: Date
+  buyer_name: string
+  notes: string
+  line_items: POLineItem[]
+  send_emails: boolean
 }
 
 const STEPS = [
-  { id: 'supplier', title: 'Supplier Selection', description: 'Choose supplier and delivery details' },
+  {
+    id: 'supplier',
+    title: 'Supplier Selection',
+    description: 'Choose supplier and delivery details',
+  },
   { id: 'medications', title: 'Medications', description: 'Select medications and quantities' },
-  { id: 'review', title: 'Review & Submit', description: 'Review and finalize your order' }
-];
+  { id: 'review', title: 'Review & Submit', description: 'Review and finalize your order' },
+]
 
 export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void }) {
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0)
   const [formData, setFormData] = useState<POFormData>({
     supplier: '',
     delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
     buyer_name: '',
     notes: '',
     line_items: [],
-    send_emails: false
-  });
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showNotification, setShowNotification] = useState(false);
-  const [aiInsights, setAiInsights] = useState<Record<number, { reason: string; suggested_quantity: number }>>({});
-  
-  const { data: suppliers } = useSuppliers();
-  const { data: inventory } = useInventory({ search: searchTerm, page_size: 50 });
-  const createPOMutation = useCreatePurchaseOrder();
+    send_emails: false,
+  })
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showNotification, setShowNotification] = useState(false)
+  const [aiInsights, setAiInsights] = useState<
+    Record<number, { reason: string; suggested_quantity: number }>
+  >({})
 
-  const progress = ((currentStep + 1) / STEPS.length) * 100;
+  const { data: suppliers } = useSuppliers()
+  const { data: inventory } = useInventory({ search: searchTerm, page_size: 50 })
+  const createPOMutation = useCreatePurchaseOrder()
+
+  const progress = ((currentStep + 1) / STEPS.length) * 100
 
   const updateFormData = (updates: Partial<POFormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
-  };
+    setFormData(prev => ({ ...prev, ...updates }))
+  }
 
   const addLineItem = (medication: any, qty: number = 1) => {
-    const existing = formData.line_items.find(item => item.medication_id === medication.med_id);
+    const existing = formData.line_items.find(item => item.medication_id === medication.med_id)
     if (existing) {
       updateFormData({
-        line_items: formData.line_items.map(item => 
-          item.medication_id === medication.med_id 
-            ? { ...item, quantity: item.quantity + qty, total_price: (item.quantity + qty) * item.unit_price }
+        line_items: formData.line_items.map(item =>
+          item.medication_id === medication.med_id
+            ? {
+                ...item,
+                quantity: item.quantity + qty,
+                total_price: (item.quantity + qty) * item.unit_price,
+              }
             : item
-        )
-      });
+        ),
+      })
     } else {
-      const price = medication.current_price || 0;
-      const quantity = Math.max(1, qty);
+      const price = medication.current_price || 0
+      const quantity = Math.max(1, qty)
       const newItem: POLineItem = {
         medication_id: medication.med_id,
         medication_name: medication.name,
         quantity,
         unit_price: price,
-        total_price: price * quantity
-      };
+        total_price: price * quantity,
+      }
       updateFormData({
-        line_items: [...formData.line_items, newItem]
-      });
+        line_items: [...formData.line_items, newItem],
+      })
     }
-    toast.success(`Added ${medication.name} to order`);
-  };
+    toast.success(`Added ${medication.name} to order`)
+  }
 
   const updateLineItem = (medication_id: number, updates: Partial<POLineItem>) => {
     updateFormData({
       line_items: formData.line_items.map(item =>
         item.medication_id === medication_id
-          ? { ...item, ...updates, total_price: (updates.quantity ?? item.quantity) * (updates.unit_price ?? item.unit_price) }
+          ? {
+              ...item,
+              ...updates,
+              total_price:
+                (updates.quantity ?? item.quantity) * (updates.unit_price ?? item.unit_price),
+            }
           : item
-      )
-    });
-  };
+      ),
+    })
+  }
 
   const removeLineItem = (medication_id: number) => {
     updateFormData({
-      line_items: formData.line_items.filter(item => item.medication_id !== medication_id)
-    });
-  };
+      line_items: formData.line_items.filter(item => item.medication_id !== medication_id),
+    })
+  }
 
   const handleAIRecommendations = (result: any) => {
     // Keep user on the medications step and do not auto-fill notes
     // Map AI items to real meds/prices and store per-item reasoning
-    const byId: Record<number, any> = {};
-    (inventory?.items || []).forEach((m: any) => { byId[m.med_id] = m; });
+    const byId: Record<number, any> = {}
+    ;(inventory?.items || []).forEach((m: any) => {
+      byId[m.med_id] = m
+    })
 
     const aiLineItems: POLineItem[] = result.items.map((item: any) => {
-      const med = byId[item.medication_id] || {};
-      const name = item.medication_name || med.name || `Medication ${item.medication_id}`;
-      const price = med.current_price || 0;
-      const quantity = Math.max(1, Math.round(item.suggested_quantity || 0));
+      const med = byId[item.medication_id] || {}
+      const name = item.medication_name || med.name || `Medication ${item.medication_id}`
+      const price = med.current_price || 0
+      const quantity = Math.max(1, Math.round(item.suggested_quantity || 0))
       return {
         medication_id: item.medication_id,
         medication_name: name,
         quantity,
         unit_price: price,
         total_price: price * quantity,
-      };
-    });
+      }
+    })
 
     // Merge with existing items (dedupe by medication_id)
-    const merged = [...formData.line_items];
+    const merged = [...formData.line_items]
     aiLineItems.forEach(aiItem => {
-      const existingIdx = merged.findIndex(li => li.medication_id === aiItem.medication_id);
+      const existingIdx = merged.findIndex(li => li.medication_id === aiItem.medication_id)
       if (existingIdx >= 0) {
-        merged[existingIdx] = { ...merged[existingIdx], quantity: aiItem.quantity, unit_price: aiItem.unit_price, total_price: aiItem.total_price };
+        merged[existingIdx] = {
+          ...merged[existingIdx],
+          quantity: aiItem.quantity,
+          unit_price: aiItem.unit_price,
+          total_price: aiItem.total_price,
+        }
       } else {
-        merged.push(aiItem);
+        merged.push(aiItem)
       }
-    });
+    })
 
     // Store AI reasoning for per-med popovers
-    const insights: Record<number, { reason: string; suggested_quantity: number }> = {};
+    const insights: Record<number, { reason: string; suggested_quantity: number }> = {}
     result.items.forEach((it: any) => {
-      insights[it.medication_id] = { reason: it.reason, suggested_quantity: it.suggested_quantity };
-    });
+      insights[it.medication_id] = { reason: it.reason, suggested_quantity: it.suggested_quantity }
+    })
 
-    setAiInsights(insights);
-    updateFormData({ line_items: merged });
+    setAiInsights(insights)
+    updateFormData({ line_items: merged })
     if (result.supplier_suggestion && !formData.supplier) {
-      updateFormData({ supplier: result.supplier_suggestion });
+      updateFormData({ supplier: result.supplier_suggestion })
     }
 
-    toast.success('AI recommendations inserted. Review and adjust as needed.');
-  };
+    toast.success('AI recommendations inserted. Review and adjust as needed.')
+  }
 
   const canGoNext = () => {
     switch (currentStep) {
       case 0: // Supplier step
-        return formData.supplier && formData.buyer_name;
+        return formData.supplier && formData.buyer_name
       case 1: // Medications step
-        return formData.line_items.length > 0;
+        return formData.line_items.length > 0
       case 2: // Review step
-        return true;
+        return true
       default:
-        return false;
+        return false
     }
-  };
+  }
 
   const handleNext = () => {
     if (currentStep < STEPS.length - 1 && canGoNext()) {
-      setCurrentStep(currentStep + 1);
+      setCurrentStep(currentStep + 1)
     }
-  };
+  }
 
   const handlePrevious = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      setCurrentStep(currentStep - 1)
     }
-  };
+  }
 
   const handleSubmit = async () => {
     try {
@@ -205,31 +233,31 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
         line_items: formData.line_items.map(item => ({
           medication_id: item.medication_id.toString(),
           quantity: item.quantity,
-          unit_price: item.unit_price
-        }))
-      };
+          unit_price: item.unit_price,
+        })),
+      }
 
       await createPOMutation.mutateAsync({
         data: poData,
-        options: { sendEmails: formData.send_emails }
-      });
-      
-      setShowNotification(true);
-      setTimeout(() => {
-        setShowNotification(false);
-        if (onComplete) onComplete(poData);
-      }, 3000);
-    } catch (error) {
-      toast.error('Failed to create purchase order');
-    }
-  };
+        options: { sendEmails: formData.send_emails },
+      })
 
-  const totalAmount = formData.line_items.reduce((sum, item) => sum + item.total_price, 0);
+      setShowNotification(true)
+      setTimeout(() => {
+        setShowNotification(false)
+        if (onComplete) onComplete(poData)
+      }, 3000)
+    } catch (error) {
+      toast.error('Failed to create purchase order')
+    }
+  }
+
+  const totalAmount = formData.line_items.reduce((sum, item) => sum + item.total_price, 0)
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Professional Success Notification */}
-      <ProfessionalNotification 
+      <ProfessionalNotification
         show={showNotification}
         message="Purchase Order Created Successfully!"
         type="success"
@@ -248,26 +276,33 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
         <CardContent className="pt-6">
           <div className="space-y-4">
             <div className="flex justify-between text-sm">
-              <span>Step {currentStep + 1} of {STEPS.length}</span>
+              <span>
+                Step {currentStep + 1} of {STEPS.length}
+              </span>
               <span>{Math.round(progress)}% complete</span>
             </div>
             <Progress value={progress} className="w-full" />
-            
+
             <div className="flex justify-between">
               {STEPS.map((step, index) => (
-                <div 
-                  key={step.id} 
+                <div
+                  key={step.id}
                   className={cn(
                     'flex items-center space-x-2 text-sm',
                     index === currentStep ? 'text-primary font-medium' : 'text-muted-foreground',
                     index < currentStep ? 'text-green-600' : ''
                   )}
                 >
-                  <div className={cn(
-                    'w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs',
-                    index === currentStep ? 'border-primary bg-primary text-primary-foreground' : 
-                    index < currentStep ? 'border-green-600 bg-green-600 text-white' : 'border-muted-foreground'
-                  )}>
+                  <div
+                    className={cn(
+                      'w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs',
+                      index === currentStep
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : index < currentStep
+                          ? 'border-green-600 bg-green-600 text-white'
+                          : 'border-muted-foreground'
+                    )}
+                  >
                     {index < currentStep ? <CheckCircle className="w-3 h-3" /> : index + 1}
                   </div>
                   <span className="hidden sm:inline">{step.title}</span>
@@ -292,11 +327,9 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
             {currentStep === 2 && <FileText className="h-5 w-5" />}
             {STEPS[currentStep].title}
           </CardTitle>
-          <CardDescription>
-            {STEPS[currentStep].description}
-          </CardDescription>
+          <CardDescription>{STEPS[currentStep].description}</CardDescription>
         </CardHeader>
-        
+
         <CardContent className="space-y-6">
           {/* Step 1: Supplier Selection */}
           {currentStep === 0 && (
@@ -304,7 +337,10 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="supplier">Supplier *</Label>
-                  <Select value={formData.supplier} onValueChange={(value) => updateFormData({ supplier: value })}>
+                  <Select
+                    value={formData.supplier}
+                    onValueChange={value => updateFormData({ supplier: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select supplier" />
                     </SelectTrigger>
@@ -323,7 +359,7 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                   <Input
                     id="buyer"
                     value={formData.buyer_name}
-                    onChange={(e) => updateFormData({ buyer_name: e.target.value })}
+                    onChange={e => updateFormData({ buyer_name: e.target.value })}
                     placeholder="Enter buyer name"
                   />
                 </div>
@@ -334,7 +370,10 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                   <Label>Delivery Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {format(formData.delivery_date, 'PPP')}
                       </Button>
@@ -343,8 +382,8 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                       <Calendar
                         mode="single"
                         selected={formData.delivery_date}
-                        onSelect={(date) => date && updateFormData({ delivery_date: date })}
-                        disabled={(date) => date < new Date()}
+                        onSelect={date => date && updateFormData({ delivery_date: date })}
+                        disabled={date => date < new Date()}
                         initialFocus
                       />
                     </PopoverContent>
@@ -356,7 +395,7 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                   <Textarea
                     id="notes"
                     value={formData.notes}
-                    onChange={(e) => updateFormData({ notes: e.target.value })}
+                    onChange={e => updateFormData({ notes: e.target.value })}
                     placeholder="Add any special instructions..."
                     rows={3}
                   />
@@ -375,7 +414,7 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                     <Input
                       placeholder="Search medications..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={e => setSearchTerm(e.target.value)}
                       className="pl-10"
                     />
                   </div>
@@ -386,19 +425,29 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
               {formData.line_items.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Selected Items ({formData.line_items.length})</CardTitle>
+                    <CardTitle className="text-lg">
+                      Selected Items ({formData.line_items.length})
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {formData.line_items.map((item) => (
-                        <div key={item.medication_id} className="flex items-center justify-between p-3 border rounded">
+                      {formData.line_items.map(item => (
+                        <div
+                          key={item.medication_id}
+                          className="flex items-center justify-between p-3 border rounded"
+                        >
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <div className="font-medium">{item.medication_name}</div>
                               {aiInsights[item.medication_id] && (
                                 <Popover>
                                   <PopoverTrigger asChild>
-                                    <Button size="icon" variant="ghost" className="h-6 w-6" title="AI reasoning">
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6"
+                                      title="AI reasoning"
+                                    >
                                       <Info className="h-4 w-4" />
                                     </Button>
                                   </PopoverTrigger>
@@ -409,41 +458,65 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                                         {aiInsights[item.medication_id].reason}
                                       </div>
                                       <div className="text-xs text-muted-foreground pt-1">
-                                        Suggested: {aiInsights[item.medication_id].suggested_quantity.toLocaleString()} units
+                                        Suggested:{' '}
+                                        {aiInsights[
+                                          item.medication_id
+                                        ].suggested_quantity.toLocaleString()}{' '}
+                                        units
                                       </div>
                                     </div>
                                   </PopoverContent>
                                 </Popover>
                               )}
                             </div>
-                            <div className="text-sm text-muted-foreground">${item.unit_price} per unit</div>
+                            <div className="text-sm text-muted-foreground">
+                              ${item.unit_price} per unit
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => updateLineItem(item.medication_id, { quantity: Math.max(1, item.quantity - 1) })}
+                                onClick={() =>
+                                  updateLineItem(item.medication_id, {
+                                    quantity: Math.max(1, item.quantity - 1),
+                                  })
+                                }
                               >
                                 <Minus className="h-3 w-3" />
                               </Button>
                               <Input
                                 type="number"
                                 value={item.quantity}
-                                onChange={(e) => updateLineItem(item.medication_id, { quantity: parseInt(e.target.value) || 1 })}
+                                onChange={e =>
+                                  updateLineItem(item.medication_id, {
+                                    quantity: parseInt(e.target.value) || 1,
+                                  })
+                                }
                                 className="w-20 text-center"
                                 min="1"
                               />
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => updateLineItem(item.medication_id, { quantity: item.quantity + 1 })}
+                                onClick={() =>
+                                  updateLineItem(item.medication_id, {
+                                    quantity: item.quantity + 1,
+                                  })
+                                }
                               >
                                 <Plus className="h-3 w-3" />
                               </Button>
                             </div>
                             <div className="text-right min-w-20">
-                              <div className="font-medium">${item.total_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                              <div className="font-medium">
+                                $
+                                {item.total_price.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </div>
                             </div>
                             <Button
                               size="sm"
@@ -467,20 +540,27 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {inventory?.items?.slice(0, 10).map((med) => (
-                      <div key={med.med_id} className="flex items-center justify-between p-3 border rounded hover:bg-muted/50">
+                    {inventory?.items?.slice(0, 10).map(med => (
+                      <div
+                        key={med.med_id}
+                        className="flex items-center justify-between p-3 border rounded hover:bg-muted/50"
+                      >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <div className="font-medium">{med.name}</div>
                             {aiInsights[med.med_id] && (
-                              <Badge variant="secondary" className="text-xs">AI</Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                AI
+                              </Badge>
                             )}
                           </div>
                           <div className="text-sm text-muted-foreground flex items-center gap-4">
                             <span>Stock: {med.current_stock}</span>
                             <span>Reorder: {med.reorder_point}</span>
                             {med.current_stock <= med.reorder_point && (
-                              <Badge variant="destructive" className="text-xs">Low Stock</Badge>
+                              <Badge variant="destructive" className="text-xs">
+                                Low Stock
+                              </Badge>
                             )}
                           </div>
                         </div>
@@ -493,7 +573,12 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => addLineItem(med, Math.max(1, Math.round(aiInsights[med.med_id].suggested_quantity)))}
+                              onClick={() =>
+                                addLineItem(
+                                  med,
+                                  Math.max(1, Math.round(aiInsights[med.med_id].suggested_quantity))
+                                )
+                              }
                               title="Use AI quantity"
                             >
                               AI
@@ -502,7 +587,9 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                           <Button
                             size="sm"
                             onClick={() => addLineItem(med)}
-                            disabled={formData.line_items.some(item => item.medication_id === med.med_id)}
+                            disabled={formData.line_items.some(
+                              item => item.medication_id === med.med_id
+                            )}
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
@@ -564,13 +651,21 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                     <div className="flex justify-between">
                       <span>Total Quantity:</span>
                       <span className="font-medium">
-                        {formData.line_items.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}
+                        {formData.line_items
+                          .reduce((sum, item) => sum + item.quantity, 0)
+                          .toLocaleString()}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total Amount:</span>
-                      <span>${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span>
+                        $
+                        {totalAmount.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
@@ -583,15 +678,24 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {formData.line_items.map((item) => (
-                      <div key={item.medication_id} className="flex justify-between items-center p-3 border rounded">
+                    {formData.line_items.map(item => (
+                      <div
+                        key={item.medication_id}
+                        className="flex justify-between items-center p-3 border rounded"
+                      >
                         <div className="flex-1">
                           <div className="font-medium">{item.medication_name}</div>
                           <div className="text-sm text-muted-foreground">
                             {item.quantity.toLocaleString()} × ${item.unit_price}
                           </div>
                         </div>
-                        <div className="font-medium">${item.total_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className="font-medium">
+                          $
+                          {item.total_price.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -608,14 +712,18 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                     <Checkbox
                       id="send-emails"
                       checked={formData.send_emails}
-                      onCheckedChange={(checked) => updateFormData({ send_emails: !!checked })}
+                      onCheckedChange={checked => updateFormData({ send_emails: !!checked })}
                     />
-                    <Label htmlFor="send-emails" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    <Label
+                      htmlFor="send-emails"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
                       Send email notifications to suppliers
                     </Label>
                   </div>
                   <div className="text-sm text-muted-foreground mt-2">
-                    When enabled, suppliers will receive email notifications about this purchase order request.
+                    When enabled, suppliers will receive email notifications about this purchase
+                    order request.
                   </div>
                 </CardContent>
               </Card>
@@ -628,25 +736,18 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
       <Card>
         <CardContent className="pt-6">
           <div className="flex justify-between">
-            <Button 
-              variant="outline" 
-              onClick={handlePrevious}
-              disabled={currentStep === 0}
-            >
+            <Button variant="outline" onClick={handlePrevious} disabled={currentStep === 0}>
               <ChevronLeft className="mr-2 h-4 w-4" />
               Previous
             </Button>
 
             {currentStep < STEPS.length - 1 ? (
-              <Button 
-                onClick={handleNext}
-                disabled={!canGoNext()}
-              >
+              <Button onClick={handleNext} disabled={!canGoNext()}>
                 Next
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
-              <Button 
+              <Button
                 onClick={handleSubmit}
                 disabled={createPOMutation.isPending || formData.line_items.length === 0}
                 className="bg-green-600 hover:bg-green-700"
@@ -668,5 +769,5 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

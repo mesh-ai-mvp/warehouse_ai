@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { apiClient } from "@/lib/api-client"
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiClient } from '@/lib/api-client'
 
 // Analytics hooks
 export function useAnalyticsKPIs(timeRange: string = '30d', filters: any = {}) {
@@ -58,7 +58,7 @@ export function useReportTemplates() {
 
 export function useCreateReportTemplate() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: (template: any) => apiClient.createReportTemplate(template),
     onSuccess: () => {
@@ -69,20 +69,24 @@ export function useCreateReportTemplate() {
 
 export function useRunReport() {
   return useMutation({
-    mutationFn: ({ templateId, parameters }: { templateId: string; parameters?: any }) => 
+    mutationFn: ({ templateId, parameters }: { templateId: string; parameters?: any }) =>
       apiClient.runReport(templateId, parameters),
   })
 }
 
 export function useExportReport() {
   return useMutation({
-    mutationFn: async ({ templateId, format, parameters }: { 
-      templateId: string; 
-      format: string; 
-      parameters?: any 
+    mutationFn: async ({
+      templateId,
+      format,
+      parameters,
+    }: {
+      templateId: string
+      format: string
+      parameters?: any
     }) => {
       const blob = await apiClient.exportReport(templateId, format, parameters)
-      
+
       // Create download link
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -92,7 +96,7 @@ export function useExportReport() {
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-      
+
       return blob
     },
   })
@@ -108,7 +112,7 @@ export function useReportHistory(filters: { limit?: number; offset?: number } = 
 
 export function useDeleteReportTemplate() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: (templateId: string) => apiClient.deleteReportTemplate(templateId),
     onSuccess: () => {
@@ -166,12 +170,24 @@ export function useAnalyticsDashboard(timeRange: string = '30d', filters: any = 
     stockTrends,
     forecast,
     timeline,
-    isLoading: kpis.isLoading || consumption.isLoading || suppliers.isLoading || 
-               categories.isLoading || alerts.isLoading || stockTrends.isLoading ||
-               forecast.isLoading || timeline.isLoading,
-    isError: kpis.isError || consumption.isError || suppliers.isError || 
-             categories.isError || alerts.isError || stockTrends.isError ||
-             forecast.isError || timeline.isError,
+    isLoading:
+      kpis.isLoading ||
+      consumption.isLoading ||
+      suppliers.isLoading ||
+      categories.isLoading ||
+      alerts.isLoading ||
+      stockTrends.isLoading ||
+      forecast.isLoading ||
+      timeline.isLoading,
+    isError:
+      kpis.isError ||
+      consumption.isError ||
+      suppliers.isError ||
+      categories.isError ||
+      alerts.isError ||
+      stockTrends.isError ||
+      forecast.isError ||
+      timeline.isError,
     refetchAll: () => {
       kpis.refetch()
       consumption.refetch()
@@ -181,6 +197,6 @@ export function useAnalyticsDashboard(timeRange: string = '30d', filters: any = 
       stockTrends.refetch()
       forecast.refetch()
       timeline.refetch()
-    }
+    },
   }
 }

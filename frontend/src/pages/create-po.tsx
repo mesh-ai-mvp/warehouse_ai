@@ -1,22 +1,22 @@
-import { useState, useCallback, useEffect } from "react"
-import { useSearchParams, useNavigate } from "react-router-dom"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { useState, useCallback, useEffect } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Progress } from '@/components/ui/progress'
+import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -24,7 +24,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from '@/components/ui/table'
 import {
   ArrowLeft,
   ArrowRight,
@@ -46,10 +46,10 @@ import {
   Zap,
   FileText,
   User,
-} from "lucide-react"
+} from 'lucide-react'
 
-import { useSuppliers, useMedication, useInventory, useCreatePurchaseOrder } from "@/hooks/use-api"
-import type { PurchaseOrderCreate, LineItem } from "@/types/api"
+import { useSuppliers, useMedication, useInventory, useCreatePurchaseOrder } from '@/hooks/use-api'
+import type { PurchaseOrderCreate, LineItem } from '@/types/api'
 
 interface POStep {
   id: string
@@ -82,56 +82,59 @@ interface POGenerationState {
 
 const steps: POStep[] = [
   {
-    id: "selection",
-    title: "Item Selection",
-    description: "Choose medications or use AI recommendations",
+    id: 'selection',
+    title: 'Item Selection',
+    description: 'Choose medications or use AI recommendations',
     completed: false,
   },
   {
-    id: "ai-analysis",
-    title: "AI Analysis",
-    description: "Generate intelligent purchase recommendations",
+    id: 'ai-analysis',
+    title: 'AI Analysis',
+    description: 'Generate intelligent purchase recommendations',
     completed: false,
   },
   {
-    id: "review",
-    title: "Review & Adjust",
-    description: "Review AI suggestions and make adjustments",
+    id: 'review',
+    title: 'Review & Adjust',
+    description: 'Review AI suggestions and make adjustments',
     completed: false,
   },
   {
-    id: "supplier",
-    title: "Supplier & Terms",
-    description: "Select supplier and delivery details",
+    id: 'supplier',
+    title: 'Supplier & Terms',
+    description: 'Select supplier and delivery details',
     completed: false,
   },
   {
-    id: "finalize",
-    title: "Finalize Order",
-    description: "Review final order and submit",
+    id: 'finalize',
+    title: 'Finalize Order',
+    description: 'Review final order and submit',
     completed: false,
-  }
+  },
 ]
 
 export function CreatePO() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const preselectedMedication = searchParams.get('medication')
-  
+
   const [state, setState] = useState<POGenerationState>({
     step: 0,
     isAiGenerating: false,
     aiProgress: 0,
     selectedMedications: preselectedMedication ? [preselectedMedication] : [],
-    supplier: "",
-    deliveryDate: "",
-    notes: "",
+    supplier: '',
+    deliveryDate: '',
+    notes: '',
     lineItems: [],
   })
 
   const { data: suppliers } = useSuppliers()
   const { data: inventory } = useInventory()
-  const { data: medicationDetail } = useMedication(preselectedMedication || "", !!preselectedMedication)
+  const { data: medicationDetail } = useMedication(
+    preselectedMedication || '',
+    !!preselectedMedication
+  )
   const createPOMutation = useCreatePurchaseOrder()
 
   // Auto-advance to AI analysis if medication is preselected
@@ -140,21 +143,21 @@ export function CreatePO() {
       setState(prev => ({
         ...prev,
         step: 1,
-        selectedMedications: [preselectedMedication]
+        selectedMedications: [preselectedMedication],
       }))
     }
   }, [preselectedMedication, medicationDetail, state.step])
 
   const simulateAIGeneration = useCallback(async () => {
     setState(prev => ({ ...prev, isAiGenerating: true, aiProgress: 0 }))
-    
+
     // Simulate AI processing steps
     const steps = [
-      { progress: 20, message: "Analyzing inventory levels..." },
-      { progress: 40, message: "Forecasting demand patterns..." },
-      { progress: 60, message: "Optimizing quantities..." },
-      { progress: 80, message: "Selecting best suppliers..." },
-      { progress: 100, message: "Generating recommendations..." },
+      { progress: 20, message: 'Analyzing inventory levels...' },
+      { progress: 40, message: 'Forecasting demand patterns...' },
+      { progress: 60, message: 'Optimizing quantities...' },
+      { progress: 80, message: 'Selecting best suppliers...' },
+      { progress: 100, message: 'Generating recommendations...' },
     ]
 
     for (const step of steps) {
@@ -170,20 +173,22 @@ export function CreatePO() {
           medication_id: medId,
           medication_name: med?.name || `Medication ${medId}`,
           suggested_quantity: Math.max(med?.reorder_point || 100, med?.current_stock || 0) * 2,
-          reason: med?.current_stock && med?.current_stock <= med?.reorder_point 
-            ? "Critical stock level - immediate reorder needed"
-            : "Preventive restocking based on consumption patterns",
-          priority: (med?.current_stock && med?.current_stock <= med?.reorder_point * 0.5 
-            ? 'high' : 'medium') as 'high' | 'medium' | 'low'
+          reason:
+            med?.current_stock && med?.current_stock <= med?.reorder_point
+              ? 'Critical stock level - immediate reorder needed'
+              : 'Preventive restocking based on consumption patterns',
+          priority: (med?.current_stock && med?.current_stock <= med?.reorder_point * 0.5
+            ? 'high'
+            : 'medium') as 'high' | 'medium' | 'low',
         }
       }),
-      supplier_suggestion: suppliers?.[0]?.name || "PharmaCorp Supply",
-      estimated_total: 0
+      supplier_suggestion: suppliers?.[0]?.name || 'PharmaCorp Supply',
+      estimated_total: 0,
     }
 
     mockRecommendations.estimated_total = mockRecommendations.items.reduce((total, item) => {
       const med = inventory?.items?.find(m => m.id === item.medication_id)
-      return total + (item.suggested_quantity * (med?.unit_cost || 10))
+      return total + item.suggested_quantity * (med?.unit_cost || 10)
     }, 0)
 
     setState(prev => ({
@@ -195,9 +200,11 @@ export function CreatePO() {
         medication_id: item.medication_id,
         quantity: item.suggested_quantity,
         unit_price: inventory?.items?.find(m => m.id === item.medication_id)?.unit_cost || 10,
-        total: item.suggested_quantity * (inventory?.items?.find(m => m.id === item.medication_id)?.unit_cost || 10)
+        total:
+          item.suggested_quantity *
+          (inventory?.items?.find(m => m.id === item.medication_id)?.unit_cost || 10),
       })),
-      supplier: mockRecommendations.supplier_suggestion
+      supplier: mockRecommendations.supplier_suggestion,
     }))
   }, [state.selectedMedications, inventory, suppliers])
 
@@ -219,9 +226,9 @@ export function CreatePO() {
         line_items: state.lineItems,
         notes: state.notes,
         delivery_date: state.deliveryDate || undefined,
-        ai_generated: true
+        ai_generated: true,
       }
-      
+
       const result = await createPOMutation.mutateAsync(poData)
       navigate(`/purchase-orders/${result.id}`)
     } catch (error) {
@@ -232,17 +239,19 @@ export function CreatePO() {
   const updateLineItem = (index: number, field: keyof LineItem, value: number) => {
     setState(prev => ({
       ...prev,
-      lineItems: prev.lineItems.map((item, i) => 
-        i === index 
-          ? { 
-              ...item, 
+      lineItems: prev.lineItems.map((item, i) =>
+        i === index
+          ? {
+              ...item,
               [field]: value,
-              total_price: field === 'quantity' || field === 'unit_price' 
-                ? (field === 'quantity' ? value : item.quantity) * (field === 'unit_price' ? value : item.unit_price)
-                : item.total_price
+              total_price:
+                field === 'quantity' || field === 'unit_price'
+                  ? (field === 'quantity' ? value : item.quantity) *
+                    (field === 'unit_price' ? value : item.unit_price)
+                  : item.total_price,
             }
           : item
-      )
+      ),
     }))
   }
 
@@ -267,7 +276,7 @@ export function CreatePO() {
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-blue-600 border-blue-200">
             <Sparkles className="h-3 w-3 mr-1" />
@@ -285,11 +294,15 @@ export function CreatePO() {
         <CardContent className="pt-6">
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Step {state.step + 1} of {steps.length}</span>
-              <span className="text-sm text-muted-foreground">{Math.round(progressPercent)}% Complete</span>
+              <span className="text-sm font-medium">
+                Step {state.step + 1} of {steps.length}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {Math.round(progressPercent)}% Complete
+              </span>
             </div>
             <Progress value={progressPercent} className="h-2" />
-            
+
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="font-semibold">{currentStep.title}</h3>
@@ -326,8 +339,16 @@ export function CreatePO() {
                       <div className="flex items-center gap-4 mt-2 text-sm">
                         <span>Current Stock: {medicationDetail.current_stock}</span>
                         <span>Reorder Point: {medicationDetail.reorder_point}</span>
-                        <Badge variant={medicationDetail.current_stock <= medicationDetail.reorder_point ? "destructive" : "secondary"}>
-                          {medicationDetail.current_stock <= medicationDetail.reorder_point ? "Low Stock" : "Normal"}
+                        <Badge
+                          variant={
+                            medicationDetail.current_stock <= medicationDetail.reorder_point
+                              ? 'destructive'
+                              : 'secondary'
+                          }
+                        >
+                          {medicationDetail.current_stock <= medicationDetail.reorder_point
+                            ? 'Low Stock'
+                            : 'Normal'}
                         </Badge>
                       </div>
                     </div>
@@ -340,10 +361,13 @@ export function CreatePO() {
                   Select medications for your purchase order, or let our AI analyze your inventory
                   and recommend items that need restocking.
                 </p>
-                
+
                 <div className="grid gap-2">
-                  {inventory?.items?.slice(0, 10).map((med) => (
-                    <div key={med.id || `med-${med.name}`} className="border rounded-lg p-3 hover:bg-muted/50 transition-colors">
+                  {inventory?.items?.slice(0, 10).map(med => (
+                    <div
+                      key={med.id || `med-${med.name}`}
+                      className="border rounded-lg p-3 hover:bg-muted/50 transition-colors"
+                    >
                       <div className="flex justify-between items-center">
                         <div>
                           <div className="font-medium">{med.name}</div>
@@ -353,35 +377,44 @@ export function CreatePO() {
                         </div>
                         <div className="flex items-center gap-2">
                           {med.current_stock <= med.reorder_point && (
-                            <Badge variant="destructive" size="sm">Low Stock</Badge>
+                            <Badge variant="destructive" size="sm">
+                              Low Stock
+                            </Badge>
                           )}
                           <Button
                             size="sm"
-                            variant={state.selectedMedications.includes(med.id) ? "default" : "outline"}
+                            variant={
+                              state.selectedMedications.includes(med.id) ? 'default' : 'outline'
+                            }
                             onClick={() => {
                               setState(prev => ({
                                 ...prev,
                                 selectedMedications: prev.selectedMedications.includes(med.id)
                                   ? prev.selectedMedications.filter(id => id !== med.id)
-                                  : [...prev.selectedMedications, med.id]
+                                  : [...prev.selectedMedications, med.id],
                               }))
                             }}
                           >
-                            {state.selectedMedications.includes(med.id) ? "Remove" : "Add"}
+                            {state.selectedMedications.includes(med.id) ? 'Remove' : 'Add'}
                           </Button>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
-                
-                <Button 
-                  className="w-full" 
-                  variant="outline" 
-                  onClick={() => setState(prev => ({ 
-                    ...prev, 
-                    selectedMedications: inventory?.items?.filter(med => med.current_stock <= med.reorder_point).map(med => med.id) || []
-                  }))}
+
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() =>
+                    setState(prev => ({
+                      ...prev,
+                      selectedMedications:
+                        inventory?.items
+                          ?.filter(med => med.current_stock <= med.reorder_point)
+                          .map(med => med.id) || [],
+                    }))
+                  }
                 >
                   <Zap className="h-4 w-4 mr-2" />
                   Auto-select Low Stock Items
@@ -423,7 +456,7 @@ export function CreatePO() {
                     AI has analyzed your inventory and generated smart recommendations
                   </AlertDescription>
                 </Alert>
-                
+
                 <div className="space-y-3">
                   {state.aiRecommendations.items.map((item, index) => (
                     <div key={item.medication_id} className="border rounded-lg p-4">
@@ -431,13 +464,22 @@ export function CreatePO() {
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <h4 className="font-medium">{item.medication_name}</h4>
-                            <Badge variant={item.priority === 'high' ? 'destructive' : item.priority === 'medium' ? 'secondary' : 'outline'}>
+                            <Badge
+                              variant={
+                                item.priority === 'high'
+                                  ? 'destructive'
+                                  : item.priority === 'medium'
+                                    ? 'secondary'
+                                    : 'outline'
+                              }
+                            >
                               {item.priority} priority
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">{item.reason}</p>
                           <div className="text-sm">
-                            Recommended quantity: <strong>{(item.suggested_quantity || 0).toLocaleString()}</strong>
+                            Recommended quantity:{' '}
+                            <strong>{(item.suggested_quantity || 0).toLocaleString()}</strong>
                           </div>
                         </div>
                       </div>
@@ -450,9 +492,14 @@ export function CreatePO() {
                     <Truck className="h-5 w-5 text-blue-600 mt-0.5" />
                     <div>
                       <h4 className="font-medium text-blue-900">Recommended Supplier</h4>
-                      <p className="text-sm text-blue-700">{state.aiRecommendations.supplier_suggestion}</p>
+                      <p className="text-sm text-blue-700">
+                        {state.aiRecommendations.supplier_suggestion}
+                      </p>
                       <p className="text-sm text-blue-600 mt-1">
-                        Estimated Total: <strong>${(state.aiRecommendations.estimated_total || 0).toLocaleString()}</strong>
+                        Estimated Total:{' '}
+                        <strong>
+                          ${(state.aiRecommendations.estimated_total || 0).toLocaleString()}
+                        </strong>
                       </p>
                     </div>
                   </div>
@@ -494,15 +541,21 @@ export function CreatePO() {
                     <TableRow key={item.medication_id || `row-${index}`}>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{medication?.name || `Item ${item.medication_id}`}</div>
-                          <div className="text-xs text-muted-foreground">{medication?.category}</div>
+                          <div className="font-medium">
+                            {medication?.name || `Item ${item.medication_id}`}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {medication?.category}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <Input
                           type="number"
                           value={item.quantity}
-                          onChange={(e) => updateLineItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                          onChange={e =>
+                            updateLineItem(index, 'quantity', parseInt(e.target.value) || 0)
+                          }
                           className="w-24"
                           min="1"
                         />
@@ -512,22 +565,24 @@ export function CreatePO() {
                           type="number"
                           step="0.01"
                           value={item.unit_price}
-                          onChange={(e) => updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                          onChange={e =>
+                            updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)
+                          }
                           className="w-24"
                           min="0"
                         />
                       </TableCell>
-                      <TableCell className="font-mono">
-                        ${item.total_price.toFixed(2)}
-                      </TableCell>
+                      <TableCell className="font-mono">${item.total_price.toFixed(2)}</TableCell>
                       <TableCell>
                         <Button
-                          variant="ghost" 
+                          variant="ghost"
                           size="sm"
-                          onClick={() => setState(prev => ({
-                            ...prev,
-                            lineItems: prev.lineItems.filter((_, i) => i !== index)
-                          }))}
+                          onClick={() =>
+                            setState(prev => ({
+                              ...prev,
+                              lineItems: prev.lineItems.filter((_, i) => i !== index),
+                            }))
+                          }
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -537,7 +592,7 @@ export function CreatePO() {
                 })}
               </TableBody>
             </Table>
-            
+
             <div className="mt-4 p-4 bg-muted rounded-lg">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Total Order Value:</span>
@@ -562,7 +617,10 @@ export function CreatePO() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="supplier">Supplier</Label>
-                <Select value={state.supplier} onValueChange={(value) => setState(prev => ({ ...prev, supplier: value }))}>
+                <Select
+                  value={state.supplier}
+                  onValueChange={value => setState(prev => ({ ...prev, supplier: value }))}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select supplier" />
                   </SelectTrigger>
@@ -575,25 +633,25 @@ export function CreatePO() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="delivery-date">Delivery Date (Optional)</Label>
                 <Input
                   id="delivery-date"
                   type="date"
                   value={state.deliveryDate}
-                  onChange={(e) => setState(prev => ({ ...prev, deliveryDate: e.target.value }))}
+                  onChange={e => setState(prev => ({ ...prev, deliveryDate: e.target.value }))}
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
               <Textarea
                 id="notes"
                 placeholder="Add any special instructions or notes for this order..."
                 value={state.notes}
-                onChange={(e) => setState(prev => ({ ...prev, notes: e.target.value }))}
+                onChange={e => setState(prev => ({ ...prev, notes: e.target.value }))}
                 rows={3}
               />
             </div>
@@ -622,7 +680,7 @@ export function CreatePO() {
                   <p className="font-medium">{state.supplier}</p>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -631,10 +689,10 @@ export function CreatePO() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="font-medium">{state.deliveryDate || "ASAP"}</p>
+                  <p className="font-medium">{state.deliveryDate || 'ASAP'}</p>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -656,9 +714,14 @@ export function CreatePO() {
                 {state.lineItems.map((item, index) => {
                   const medication = inventory?.items?.find(m => m.id === item.medication_id)
                   return (
-                    <div key={item.medication_id || `item-${index}`} className="flex justify-between items-center p-3 border rounded">
+                    <div
+                      key={item.medication_id || `item-${index}`}
+                      className="flex justify-between items-center p-3 border rounded"
+                    >
                       <div>
-                        <span className="font-medium">{medication?.name || `Item ${item.medication_id}`}</span>
+                        <span className="font-medium">
+                          {medication?.name || `Item ${item.medication_id}`}
+                        </span>
                         <span className="text-sm text-muted-foreground ml-2">
                           {item.quantity} × ${item.unit_price}
                         </span>
@@ -682,7 +745,8 @@ export function CreatePO() {
             <Alert>
               <Brain className="h-4 w-4" />
               <AlertDescription>
-                This purchase order was generated with AI assistance for optimal inventory management.
+                This purchase order was generated with AI assistance for optimal inventory
+                management.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -691,11 +755,7 @@ export function CreatePO() {
 
       {/* Navigation */}
       <div className="flex justify-between">
-        <Button
-          variant="outline"
-          onClick={handlePrevious}
-          disabled={state.step === 0}
-        >
+        <Button variant="outline" onClick={handlePrevious} disabled={state.step === 0}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Previous
         </Button>
@@ -705,11 +765,13 @@ export function CreatePO() {
             <Save className="h-4 w-4 mr-2" />
             Save Draft
           </Button>
-          
+
           {state.step === steps.length - 1 ? (
-            <Button 
+            <Button
               onClick={handleSubmit}
-              disabled={!state.supplier || state.lineItems.length === 0 || createPOMutation.isPending}
+              disabled={
+                !state.supplier || state.lineItems.length === 0 || createPOMutation.isPending
+              }
             >
               {createPOMutation.isPending ? (
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />

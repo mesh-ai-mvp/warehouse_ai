@@ -5,24 +5,30 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
-import { 
-  Filter, 
-  Download, 
-  Maximize2, 
-  Settings, 
+import {
+  Filter,
+  Download,
+  Maximize2,
+  Settings,
   Calendar as CalendarIcon,
   RefreshCw,
   BarChart3,
   LineChart,
   PieChart,
   TrendingUp,
-  X
+  X,
 } from 'lucide-react'
 
 interface ChartFilter {
@@ -69,13 +75,13 @@ const controlVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.3 }
+    transition: { duration: 0.3 },
   },
-  exit: { opacity: 0, y: -10, transition: { duration: 0.2 } }
+  exit: { opacity: 0, y: -10, transition: { duration: 0.2 } },
 }
 
 export function ChartControls({
-  title = "Chart Controls",
+  title = 'Chart Controls',
   filters = [],
   chartTypes = [],
   dateRange,
@@ -91,14 +97,14 @@ export function ChartControls({
   onExport,
   onRefresh,
   onFullscreen,
-  className
+  className,
 }: ChartControlsProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
 
   const handleFilterChange = (filterId: string, value: any) => {
     onFilterChange?.(filterId, value)
-    
+
     // Track active filters
     if (value && value !== '' && value !== null) {
       if (!activeFilters.includes(filterId)) {
@@ -120,12 +126,15 @@ export function ChartControls({
     switch (filter.type) {
       case 'select':
         return (
-          <Select value={filter.value || ''} onValueChange={(value) => handleFilterChange(filter.id, value)}>
+          <Select
+            value={filter.value || ''}
+            onValueChange={value => handleFilterChange(filter.id, value)}
+          >
             <SelectTrigger className="h-8">
               <SelectValue placeholder={filter.placeholder} />
             </SelectTrigger>
             <SelectContent>
-              {filter.options?.map((option) => (
+              {filter.options?.map(option => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -139,7 +148,7 @@ export function ChartControls({
           <Input
             placeholder={filter.placeholder}
             value={filter.value || ''}
-            onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+            onChange={e => handleFilterChange(filter.id, e.target.value)}
             className="h-8"
           />
         )
@@ -151,7 +160,9 @@ export function ChartControls({
               type="number"
               placeholder={filter.min?.toString()}
               value={filter.value?.min || ''}
-              onChange={(e) => handleFilterChange(filter.id, { ...filter.value, min: e.target.value })}
+              onChange={e =>
+                handleFilterChange(filter.id, { ...filter.value, min: e.target.value })
+              }
               className="h-8 w-20"
             />
             <span className="text-sm text-muted-foreground">to</span>
@@ -159,7 +170,9 @@ export function ChartControls({
               type="number"
               placeholder={filter.max?.toString()}
               value={filter.value?.max || ''}
-              onChange={(e) => handleFilterChange(filter.id, { ...filter.value, max: e.target.value })}
+              onChange={e =>
+                handleFilterChange(filter.id, { ...filter.value, max: e.target.value })
+              }
               className="h-8 w-20"
             />
           </div>
@@ -171,7 +184,7 @@ export function ChartControls({
             <Checkbox
               id={filter.id}
               checked={filter.value || false}
-              onCheckedChange={(checked) => handleFilterChange(filter.id, checked)}
+              onCheckedChange={checked => handleFilterChange(filter.id, checked)}
             />
             <Label htmlFor={filter.id} className="text-sm">
               {filter.label}
@@ -185,7 +198,7 @@ export function ChartControls({
   }
 
   return (
-    <Card className={cn("mb-6", className)}>
+    <Card className={cn('mb-6', className)}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
@@ -197,32 +210,22 @@ export function ChartControls({
               </Badge>
             )}
           </CardTitle>
-          
+
           <div className="flex items-center gap-2">
             {/* Quick actions */}
             <div className="flex items-center gap-1">
               {onRefresh && (
-                <Button
-                  onClick={onRefresh}
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                >
+                <Button onClick={onRefresh} variant="ghost" size="sm" className="h-8 w-8 p-0">
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               )}
-              
+
               {onFullscreen && (
-                <Button
-                  onClick={onFullscreen}
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                >
+                <Button onClick={onFullscreen} variant="ghost" size="sm" className="h-8 w-8 p-0">
                   <Maximize2 className="h-4 w-4" />
                 </Button>
               )}
-              
+
               {onExport && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -251,7 +254,7 @@ export function ChartControls({
                 </Popover>
               )}
             </div>
-            
+
             <Button
               onClick={() => setIsExpanded(!isExpanded)}
               variant="ghost"
@@ -267,12 +270,7 @@ export function ChartControls({
 
       <AnimatePresence>
         {isExpanded && (
-          <motion.div
-            variants={controlVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-          >
+          <motion.div variants={controlVariants} initial="hidden" animate="visible" exit="exit">
             <CardContent className="pt-0">
               <div className="space-y-6">
                 {/* Chart type selection */}
@@ -286,7 +284,7 @@ export function ChartControls({
                           <Button
                             key={type.id}
                             onClick={() => onChartTypeChange?.(type.id)}
-                            variant={type.active ? "default" : "outline"}
+                            variant={type.active ? 'default' : 'outline'}
                             size="sm"
                             className="h-8"
                           >
@@ -315,13 +313,13 @@ export function ChartControls({
                           <Calendar
                             mode="single"
                             selected={dateRange.start || undefined}
-                            onSelect={(date) => onDateRangeChange(date || null, dateRange.end)}
+                            onSelect={date => onDateRangeChange(date || null, dateRange.end)}
                           />
                         </PopoverContent>
                       </Popover>
-                      
+
                       <span className="text-sm text-muted-foreground">to</span>
-                      
+
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="outline" size="sm" className="h-8 w-32 justify-start">
@@ -333,7 +331,7 @@ export function ChartControls({
                           <Calendar
                             mode="single"
                             selected={dateRange.end || undefined}
-                            onSelect={(date) => onDateRangeChange(dateRange.start, date || null)}
+                            onSelect={date => onDateRangeChange(dateRange.start, date || null)}
                           />
                         </PopoverContent>
                       </Popover>
@@ -357,7 +355,7 @@ export function ChartControls({
                         </Label>
                       </div>
                     )}
-                    
+
                     {onToggleGrid && (
                       <div className="flex items-center space-x-2">
                         <Checkbox
@@ -370,7 +368,7 @@ export function ChartControls({
                         </Label>
                       </div>
                     )}
-                    
+
                     {onToggleTooltips && (
                       <div className="flex items-center space-x-2">
                         <Checkbox
@@ -403,13 +401,11 @@ export function ChartControls({
                         </Button>
                       )}
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {filters.map(filter => (
                         <div key={filter.id} className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            {filter.label}
-                          </Label>
+                          <Label className="text-xs text-muted-foreground">{filter.label}</Label>
                           {renderFilter(filter)}
                         </div>
                       ))}
@@ -425,7 +421,7 @@ export function ChartControls({
                       {activeFilters.map(filterId => {
                         const filter = filters.find(f => f.id === filterId)
                         if (!filter) return null
-                        
+
                         return (
                           <Badge key={filterId} variant="secondary" className="text-xs">
                             {filter.label}: {String(filter.value)}
@@ -466,8 +462,8 @@ export const PharmacyFilters = {
         { label: 'Pain Relief', value: 'pain-relief' },
         { label: 'Vaccines', value: 'vaccines' },
         { label: 'Cardiovascular', value: 'cardiovascular' },
-        { label: 'Diabetes', value: 'diabetes' }
-      ]
+        { label: 'Diabetes', value: 'diabetes' },
+      ],
     },
     {
       id: 'supplier',
@@ -478,8 +474,8 @@ export const PharmacyFilters = {
         { label: 'All Suppliers', value: '' },
         { label: 'PharmaCorp', value: 'pharmacorp' },
         { label: 'MediSupply', value: 'medisupply' },
-        { label: 'HealthSource', value: 'healthsource' }
-      ]
+        { label: 'HealthSource', value: 'healthsource' },
+      ],
     },
     {
       id: 'stock-level',
@@ -491,16 +487,16 @@ export const PharmacyFilters = {
         { label: 'In Stock', value: 'in-stock' },
         { label: 'Low Stock', value: 'low-stock' },
         { label: 'Critical', value: 'critical' },
-        { label: 'Out of Stock', value: 'out-of-stock' }
-      ]
+        { label: 'Out of Stock', value: 'out-of-stock' },
+      ],
     },
     {
       id: 'search',
       label: 'Search',
       type: 'text' as const,
       value: '',
-      placeholder: 'Search medications...'
-    }
+      placeholder: 'Search medications...',
+    },
   ],
 
   chartTypes: [
@@ -508,25 +504,25 @@ export const PharmacyFilters = {
       id: 'bar',
       label: 'Bar Chart',
       icon: BarChart3,
-      active: false
+      active: false,
     },
     {
       id: 'line',
       label: 'Line Chart',
       icon: LineChart,
-      active: true
+      active: true,
     },
     {
       id: 'area',
       label: 'Area Chart',
       icon: TrendingUp,
-      active: false
+      active: false,
     },
     {
       id: 'pie',
       label: 'Pie Chart',
       icon: PieChart,
-      active: false
-    }
-  ]
+      active: false,
+    },
+  ],
 }

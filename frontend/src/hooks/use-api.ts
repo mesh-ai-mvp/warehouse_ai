@@ -1,12 +1,7 @@
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  useInfiniteQuery,
-} from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
-import { apiClient } from '@/lib/api-client';
+import { apiClient } from '@/lib/api-client'
 import type {
   InventoryFilters,
   CreatePORequest,
@@ -14,7 +9,7 @@ import type {
   PurchaseOrderCreate,
   LineItem,
   AIGenerationRequest,
-} from '@/types/api';
+} from '@/types/api'
 
 // Query Keys
 export const queryKeys = {
@@ -30,7 +25,7 @@ export const queryKeys = {
   aiStatus: (sessionId: string) => ['ai-status', sessionId],
   aiResult: (sessionId: string) => ['ai-result', sessionId],
   aiConfig: ['ai-config'],
-} as const;
+} as const
 
 // Dashboard Hooks
 export function useDashboardStats() {
@@ -39,7 +34,7 @@ export function useDashboardStats() {
     queryFn: () => apiClient.getDashboardStats(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
-  });
+  })
 }
 
 // Inventory Hooks
@@ -49,8 +44,8 @@ export function useInventory(filters: InventoryFilters = {}) {
     queryFn: () => apiClient.getInventory(filters),
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // 1 minute auto-refresh
-    placeholderData: (previousData) => previousData, // Keep previous data while fetching
-  });
+    placeholderData: previousData => previousData, // Keep previous data while fetching
+  })
 }
 
 export function useMedication(id: string, enabled = true) {
@@ -59,7 +54,7 @@ export function useMedication(id: string, enabled = true) {
     queryFn: () => apiClient.getMedication(id),
     enabled: !!id && enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
-  });
+  })
 }
 
 export function useConsumptionHistory(medicationId: string, enabled = true) {
@@ -68,7 +63,7 @@ export function useConsumptionHistory(medicationId: string, enabled = true) {
     queryFn: () => apiClient.getConsumptionHistory(medicationId),
     enabled: !!medicationId && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  })
 }
 
 export function useSupplierPrices(medicationId: string, enabled = true) {
@@ -77,7 +72,7 @@ export function useSupplierPrices(medicationId: string, enabled = true) {
     queryFn: () => apiClient.getSupplierPrices(medicationId),
     enabled: !!medicationId && enabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
-  });
+  })
 }
 
 // Filter Options Hook
@@ -86,7 +81,7 @@ export function useFilterOptions() {
     queryKey: queryKeys.filterOptions,
     queryFn: () => apiClient.getFilterOptions(),
     staleTime: 10 * 60 * 1000, // 10 minutes
-  });
+  })
 }
 
 // Supplier Hooks
@@ -95,7 +90,7 @@ export function useSuppliers() {
     queryKey: queryKeys.suppliers,
     queryFn: () => apiClient.getSuppliers(),
     staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  })
 }
 
 // Purchase Order Hooks
@@ -105,7 +100,7 @@ export function usePurchaseOrders(filters: any = {}) {
     queryFn: () => apiClient.getPurchaseOrders(filters),
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 2 * 60 * 1000, // 2 minutes
-  });
+  })
 }
 
 export function usePurchaseOrder(id: string, enabled = true) {
@@ -114,57 +109,59 @@ export function usePurchaseOrder(id: string, enabled = true) {
     queryFn: () => apiClient.getPurchaseOrder(id),
     enabled: !!id && enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
-  });
+  })
 }
 
 // Purchase Order Mutations
 export function useCreatePurchaseOrder() {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (params: { data: CreatePORequest | PurchaseOrderCreate; options?: { sendEmails?: boolean } }) => 
-      apiClient.createPurchaseOrder(params.data, params.options),
-    onSuccess: (newPO) => {
+    mutationFn: (params: {
+      data: CreatePORequest | PurchaseOrderCreate
+      options?: { sendEmails?: boolean }
+    }) => apiClient.createPurchaseOrder(params.data, params.options),
+    onSuccess: newPO => {
       // Invalidate and refetch purchase orders
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-      
-      // Invalidate inventory data as it may have changed
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      
-      // Invalidate dashboard stats
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardStats });
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
 
-      toast.success(`Purchase Order ${newPO.id} created successfully!`);
+      // Invalidate inventory data as it may have changed
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+
+      // Invalidate dashboard stats
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardStats })
+
+      toast.success(`Purchase Order ${newPO.id} created successfully!`)
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create purchase order: ${error.message}`);
+      toast.error(`Failed to create purchase order: ${error.message}`)
     },
-  });
+  })
 }
 
 export function useSendPOEmails() {
   return useMutation({
     mutationFn: (request: CreatePOBackendRequest) => apiClient.sendPOEmails(request),
-    onSuccess: (result) => {
-      toast.success(`Sent emails to ${result.sent} suppliers`);
+    onSuccess: result => {
+      toast.success(`Sent emails to ${result.sent} suppliers`)
     },
     onError: (error: Error) => {
-      toast.error(`Failed to send emails: ${error.message}`);
+      toast.error(`Failed to send emails: ${error.message}`)
     },
-  });
+  })
 }
 
 // AI Generation Hooks
 export function useGenerateAIPO() {
   return useMutation({
     mutationFn: (request: AIGenerationRequest) => apiClient.generateAIPO(request),
-    onSuccess: (session) => {
-      toast.success('AI PO generation started! Check the progress below.');
+    onSuccess: session => {
+      toast.success('AI PO generation started! Check the progress below.')
     },
     onError: (error: Error) => {
-      toast.error(`Failed to start AI generation: ${error.message}`);
+      toast.error(`Failed to start AI generation: ${error.message}`)
     },
-  });
+  })
 }
 
 export function useAIStatus(sessionId: string, enabled = false) {
@@ -172,12 +169,12 @@ export function useAIStatus(sessionId: string, enabled = false) {
     queryKey: queryKeys.aiStatus(sessionId),
     queryFn: () => apiClient.getAIStatus(sessionId),
     enabled: !!sessionId && enabled,
-    refetchInterval: (data) => {
+    refetchInterval: data => {
       // Stop polling when completed or failed
-      return data?.status === 'processing' || data?.status === 'pending' ? 2000 : false;
+      return data?.status === 'processing' || data?.status === 'pending' ? 2000 : false
     },
     staleTime: 0, // Always fresh
-  });
+  })
 }
 
 export function useAIResult(sessionId: string, enabled = false) {
@@ -186,29 +183,29 @@ export function useAIResult(sessionId: string, enabled = false) {
     queryFn: () => apiClient.getAIResult(sessionId),
     enabled: !!sessionId && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  })
 }
 
 export function useCreateFromAI() {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: ({ sessionId, selectedPOs }: { sessionId: string; selectedPOs?: string[] }) =>
       apiClient.createFromAI(sessionId, selectedPOs),
-    onSuccess: (result) => {
+    onSuccess: result => {
       // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardStats });
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboardStats })
 
       toast.success(
         `Successfully created ${result.success_count} of ${result.total_count} purchase orders!`
-      );
+      )
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create purchase orders: ${error.message}`);
+      toast.error(`Failed to create purchase orders: ${error.message}`)
     },
-  });
+  })
 }
 
 // System Status Hooks
@@ -218,31 +215,30 @@ export function useAIConfig() {
     queryFn: () => apiClient.getAIConfigStatus(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: false, // Don't retry if AI is not configured
-  });
+  })
 }
 
 // Real-time data hook with WebSocket support (future enhancement)
 export function useRealTimeInventory(filters: InventoryFilters = {}) {
-  const query = useInventory(filters);
-  
+  const query = useInventory(filters)
+
   // TODO: Add WebSocket integration for real-time updates
   // This would listen for inventory changes and update the query data
-  
-  return query;
+
+  return query
 }
 
 // Infinite query for large datasets
 export function useInfiniteInventory(filters: InventoryFilters = {}) {
   return useInfiniteQuery({
     queryKey: ['infinite-inventory', filters],
-    queryFn: ({ pageParam = 1 }) => 
-      apiClient.getInventory({ ...filters, page: pageParam }),
-    getNextPageParam: (lastPage) => {
+    queryFn: ({ pageParam = 1 }) => apiClient.getInventory({ ...filters, page: pageParam }),
+    getNextPageParam: lastPage => {
       if (lastPage.page < lastPage.total_pages) {
-        return lastPage.page + 1;
+        return lastPage.page + 1
       }
-      return undefined;
+      return undefined
     },
     staleTime: 30 * 1000,
-  });
+  })
 }

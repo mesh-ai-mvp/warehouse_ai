@@ -1,5 +1,5 @@
-import { motion } from "framer-motion"
-import { useInView } from "react-intersection-observer"
+import { motion } from 'framer-motion'
+import { useInView } from 'react-intersection-observer'
 import {
   AreaChart,
   Area,
@@ -15,9 +15,9 @@ import {
   Cell,
   LineChart,
   Line,
-} from "recharts"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import "../../styles/chart-overrides.css"
+} from 'recharts'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import '../../styles/chart-overrides.css'
 
 interface AnimatedChartProps {
   type: 'area' | 'bar' | 'pie' | 'line'
@@ -34,10 +34,10 @@ interface AnimatedChartProps {
 }
 
 const chartVariants = {
-  hidden: { 
-    opacity: 0, 
+  hidden: {
+    opacity: 0,
     scale: 0.95,
-    y: 30
+    y: 30,
   },
   visible: (delay: number) => ({
     opacity: 1,
@@ -46,9 +46,9 @@ const chartVariants = {
     transition: {
       duration: 0.8,
       delay: delay * 0.15,
-      ease: [0.22, 1, 0.36, 1]
-    }
-  })
+      ease: [0.22, 1, 0.36, 1],
+    },
+  }),
 }
 
 const headerVariants = {
@@ -59,9 +59,9 @@ const headerVariants = {
     transition: {
       duration: 0.5,
       delay: 0.2,
-      ease: "easeOut"
-    }
-  }
+      ease: 'easeOut',
+    },
+  },
 }
 
 const DEFAULT_COLORS = [
@@ -87,7 +87,7 @@ const PHARMA_COLORS = [
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const entry = payload[0]
-    
+
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
@@ -133,22 +133,22 @@ export function AnimatedChart({
   subtitle,
   height = 300,
   delay = 0,
-  className = "",
+  className = '',
   colors = PHARMA_COLORS,
-  dataKey = "value",
-  xAxisKey = "name",
-  yAxisKey = "value"
+  dataKey = 'value',
+  xAxisKey = 'name',
+  yAxisKey = 'value',
 }: AnimatedChartProps) {
   const { ref, inView } = useInView({
     threshold: 0.1,
-    triggerOnce: true
+    triggerOnce: true,
   })
 
   const renderChart = () => {
     const commonProps = {
       data,
-      width: "100%",
-      height
+      width: '100%',
+      height,
     }
 
     switch (type) {
@@ -158,20 +158,17 @@ export function AnimatedChart({
             <AreaChart data={data}>
               <defs>
                 <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={colors[0]} stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor={colors[0]} stopOpacity={0.1}/>
+                  <stop offset="5%" stopColor={colors[0]} stopOpacity={0.8} />
+                  <stop offset="95%" stopColor={colors[0]} stopOpacity={0.1} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey={xAxisKey} 
+              <XAxis
+                dataKey={xAxisKey}
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
               />
-              <YAxis 
-                className="text-xs fill-muted-foreground"
-                tick={{ fontSize: 12 }}
-              />
+              <YAxis className="text-xs fill-muted-foreground" tick={{ fontSize: 12 }} />
               <Tooltip content={<CustomTooltip />} />
               <Area
                 type="monotone"
@@ -190,27 +187,27 @@ export function AnimatedChart({
       case 'bar':
         const maxValue = Math.max(...data.map((d: any) => d[dataKey] || 0))
         const yAxisDomain = [0, Math.ceil(maxValue * 1.1)] // Add 10% padding
-        
+
         return (
           <ResponsiveContainer {...commonProps}>
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey={xAxisKey} 
+              <XAxis
+                dataKey={xAxisKey}
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
                 angle={-45}
                 textAnchor="end"
                 height={80}
               />
-              <YAxis 
+              <YAxis
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
                 domain={yAxisDomain}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Bar 
-                dataKey={dataKey} 
+              <Bar
+                dataKey={dataKey}
                 radius={[4, 4, 0, 0]}
                 animationBegin={delay * 100}
                 animationDuration={1000}
@@ -221,20 +218,20 @@ export function AnimatedChart({
                   const stockLevel = entry[dataKey]
                   const reorderPoint = entry.reorder_point
                   let fillColor = colors[2] // Default green
-                  
+
                   if (stockLevel <= reorderPoint * 0.25) {
                     fillColor = colors[0] // Critical - red
                   } else if (stockLevel <= reorderPoint * 0.5) {
                     fillColor = colors[1] // Low - orange
                   }
-                  
+
                   return (
-                    <Cell 
-                      key={`cell-${index}`} 
+                    <Cell
+                      key={`cell-${index}`}
                       fill={fillColor}
                       style={{
                         filter: 'none',
-                        opacity: 1
+                        opacity: 1,
                       }}
                     />
                   )
@@ -274,15 +271,12 @@ export function AnimatedChart({
           <ResponsiveContainer {...commonProps}>
             <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey={xAxisKey} 
+              <XAxis
+                dataKey={xAxisKey}
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
               />
-              <YAxis 
-                className="text-xs fill-muted-foreground"
-                tick={{ fontSize: 12 }}
-              />
+              <YAxis className="text-xs fill-muted-foreground" tick={{ fontSize: 12 }} />
               <Tooltip content={<CustomTooltip />} />
               <Line
                 type="monotone"
@@ -309,7 +303,7 @@ export function AnimatedChart({
       custom={delay}
       variants={chartVariants}
       initial="hidden"
-      animate={inView ? "visible" : "hidden"}
+      animate={inView ? 'visible' : 'hidden'}
       className={className}
     >
       <Card className="overflow-hidden">
@@ -317,17 +311,15 @@ export function AnimatedChart({
           <motion.div
             variants={headerVariants}
             initial="hidden"
-            animate={inView ? "visible" : "hidden"}
+            animate={inView ? 'visible' : 'hidden'}
           >
             <CardHeader>
               {title && <CardTitle className="text-lg">{title}</CardTitle>}
-              {subtitle && (
-                <p className="text-sm text-muted-foreground">{subtitle}</p>
-              )}
+              {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
             </CardHeader>
           </motion.div>
         )}
-        <CardContent className={title || subtitle ? "" : "pt-6"}>
+        <CardContent className={title || subtitle ? '' : 'pt-6'}>
           <motion.div
             initial={{ opacity: 0 }}
             animate={inView ? { opacity: 1 } : { opacity: 0 }}
@@ -353,7 +345,7 @@ export const PharmaChartPresets = {
       dataKey="stock_level"
     />
   ),
-  
+
   categoryDistribution: (data: any[]) => (
     <AnimatedChart
       type="pie"
@@ -364,7 +356,7 @@ export const PharmaChartPresets = {
       dataKey="count"
     />
   ),
-  
+
   lowStockAlert: (data: any[]) => (
     <AnimatedChart
       type="bar"
@@ -376,7 +368,7 @@ export const PharmaChartPresets = {
       colors={['#EF4444', '#F59E0B', '#10B981']}
     />
   ),
-  
+
   consumptionPattern: (data: any[]) => (
     <AnimatedChart
       type="line"
@@ -386,5 +378,5 @@ export const PharmaChartPresets = {
       xAxisKey="date"
       dataKey="consumption"
     />
-  )
+  ),
 }

@@ -1,12 +1,12 @@
-import { useParams, Link, Navigate } from "react-router-dom"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useParams, Link, Navigate } from 'react-router-dom'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Progress } from '@/components/ui/progress'
+import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
   TableBody,
@@ -14,7 +14,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from '@/components/ui/table'
 import {
   ArrowLeft,
   Package,
@@ -34,18 +34,18 @@ import {
   CheckCircle,
   XCircle,
   Upload,
-} from "lucide-react"
+} from 'lucide-react'
 
-import { usePurchaseOrder } from "@/hooks/use-api"
-import { StatusTimeline } from "@/components/ui/status-timeline"
+import { usePurchaseOrder } from '@/hooks/use-api'
+import { StatusTimeline } from '@/components/ui/status-timeline'
 
 function getStatusBadge(status: string) {
   const variants = {
     pending: 'secondary',
-    approved: 'default', 
+    approved: 'default',
     completed: 'default',
     cancelled: 'destructive',
-    draft: 'outline'
+    draft: 'outline',
   } as const
 
   const colors = {
@@ -53,11 +53,11 @@ function getStatusBadge(status: string) {
     approved: 'text-blue-700 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30',
     completed: 'text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-900/30',
     cancelled: 'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30',
-    draft: 'text-gray-700 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30'
+    draft: 'text-gray-700 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30',
   } as const
 
   return (
-    <Badge 
+    <Badge
       variant={variants[status as keyof typeof variants] || 'outline'}
       className={colors[status as keyof typeof colors]}
     >
@@ -66,12 +66,12 @@ function getStatusBadge(status: string) {
   )
 }
 
-function StatCard({ 
-  title, 
-  value, 
-  icon: Icon, 
+function StatCard({
+  title,
+  value,
+  icon: Icon,
   subtitle,
-  className = ""
+  className = '',
 }: {
   title: string
   value: string | number
@@ -87,9 +87,7 @@ function StatCard({
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
-        {subtitle && (
-          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-        )}
+        {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
       </CardContent>
     </Card>
   )
@@ -97,7 +95,7 @@ function StatCard({
 
 export function PurchaseOrderDetail() {
   const { id } = useParams<{ id: string }>()
-  
+
   if (!id) {
     return <Navigate to="/purchase-orders" replace />
   }
@@ -108,55 +106,55 @@ export function PurchaseOrderDetail() {
   const getTimelineItems = (poData: any) => {
     const items = [
       {
-        id: "draft",
-        title: "Purchase Order Created",
-        status: "completed" as const,
+        id: 'draft',
+        title: 'Purchase Order Created',
+        status: 'completed' as const,
         timestamp: poData?.created_at || poData?.created_date,
-        description: `PO ${poData?.po_number} created by ${poData?.created_by || poData?.buyer_name || 'System'}`
-      }
+        description: `PO ${poData?.po_number} created by ${poData?.created_by || poData?.buyer_name || 'System'}`,
+      },
     ]
 
-    if (poData?.status === "draft") {
+    if (poData?.status === 'draft') {
       items.push({
-        id: "pending",
-        title: "Awaiting Approval",
-        status: "current" as const,
+        id: 'pending',
+        title: 'Awaiting Approval',
+        status: 'current' as const,
         timestamp: undefined,
-        description: "Purchase order is pending approval"
+        description: 'Purchase order is pending approval',
       })
-    } else if (poData?.status === "approved" || poData?.status === "completed") {
+    } else if (poData?.status === 'approved' || poData?.status === 'completed') {
       items.push({
-        id: "approved",
-        title: "Purchase Order Approved", 
-        status: "completed" as const,
+        id: 'approved',
+        title: 'Purchase Order Approved',
+        status: 'completed' as const,
         timestamp: undefined,
-        description: "Purchase order has been approved and sent to supplier"
+        description: 'Purchase order has been approved and sent to supplier',
       })
-      
-      if (poData?.status === "completed") {
+
+      if (poData?.status === 'completed') {
         items.push({
-          id: "completed",
-          title: "Order Delivered",
-          status: "completed" as const,
+          id: 'completed',
+          title: 'Order Delivered',
+          status: 'completed' as const,
           timestamp: poData?.actual_delivery_date,
-          description: "All items have been delivered and received"
+          description: 'All items have been delivered and received',
         })
       } else {
         items.push({
-          id: "delivery",
-          title: "Awaiting Delivery",
-          status: "current" as const,
+          id: 'delivery',
+          title: 'Awaiting Delivery',
+          status: 'current' as const,
           timestamp: undefined,
-          description: `Expected delivery: ${poData?.requested_delivery_date ? new Date(poData.requested_delivery_date).toLocaleDateString() : 'TBD'}`
+          description: `Expected delivery: ${poData?.requested_delivery_date ? new Date(poData.requested_delivery_date).toLocaleDateString() : 'TBD'}`,
         })
       }
-    } else if (poData?.status === "cancelled") {
+    } else if (poData?.status === 'cancelled') {
       items.push({
-        id: "cancelled",
-        title: "Purchase Order Cancelled",
-        status: "cancelled" as const,
+        id: 'cancelled',
+        title: 'Purchase Order Cancelled',
+        status: 'cancelled' as const,
         timestamp: undefined,
-        description: "Purchase order has been cancelled"
+        description: 'Purchase order has been cancelled',
       })
     }
 
@@ -174,17 +172,12 @@ export function PurchaseOrderDetail() {
             </Link>
           </Button>
         </div>
-        
+
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             Failed to load purchase order: {error.message}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => refetch()} 
-              className="ml-2"
-            >
+            <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-2">
               <RefreshCw className="h-4 w-4" />
               Retry
             </Button>
@@ -205,7 +198,7 @@ export function PurchaseOrderDetail() {
             </Link>
           </Button>
         </div>
-        
+
         <div className="space-y-4">
           <Skeleton className="h-8 w-64" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -236,18 +229,23 @@ export function PurchaseOrderDetail() {
             </Link>
           </Button>
         </div>
-        
+
         <Alert>
           <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Purchase order not found.
-          </AlertDescription>
+          <AlertDescription>Purchase order not found.</AlertDescription>
         </Alert>
       </div>
     )
   }
 
-  const deliveryProgress = po.status === 'completed' ? 100 : po.status === 'approved' ? 60 : po.status === 'pending' ? 30 : 10
+  const deliveryProgress =
+    po.status === 'completed'
+      ? 100
+      : po.status === 'approved'
+        ? 60
+        : po.status === 'pending'
+          ? 30
+          : 10
 
   return (
     <div className="space-y-6">
@@ -260,15 +258,13 @@ export function PurchaseOrderDetail() {
               Back to Purchase Orders
             </Link>
           </Button>
-          
+
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">
-              Purchase Order {po.po_number || po.id}
-            </h1>
+            <h1 className="text-2xl font-bold">Purchase Order {po.po_number || po.id}</h1>
             {getStatusBadge(po.status)}
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
             <Mail className="h-4 w-4 mr-2" />
@@ -307,7 +303,13 @@ export function PurchaseOrderDetail() {
         />
         <StatCard
           title="Created Date"
-          value={po.created_at ? new Date(po.created_at).toLocaleDateString() : po.created_date ? new Date(po.created_date).toLocaleDateString() : 'N/A'}
+          value={
+            po.created_at
+              ? new Date(po.created_at).toLocaleDateString()
+              : po.created_date
+                ? new Date(po.created_date).toLocaleDateString()
+                : 'N/A'
+          }
           icon={Calendar}
           subtitle="Order date"
         />
@@ -321,7 +323,7 @@ export function PurchaseOrderDetail() {
           <TabsTrigger value="history">Status History</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Supplier Information */}
@@ -371,13 +373,17 @@ export function PurchaseOrderDetail() {
                 </div>
                 <div>
                   <h4 className="font-medium text-sm text-muted-foreground">Expected Delivery</h4>
-                  <p>{po.requested_delivery_date ? new Date(po.requested_delivery_date).toLocaleDateString() : po.delivery_date ? new Date(po.delivery_date).toLocaleDateString() : 'Not specified'}</p>
+                  <p>
+                    {po.requested_delivery_date
+                      ? new Date(po.requested_delivery_date).toLocaleDateString()
+                      : po.delivery_date
+                        ? new Date(po.delivery_date).toLocaleDateString()
+                        : 'Not specified'}
+                  </p>
                 </div>
                 <div>
                   <h4 className="font-medium text-sm text-muted-foreground">Notes</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {po.notes || 'No notes provided'}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{po.notes || 'No notes provided'}</p>
                 </div>
               </CardContent>
             </Card>
@@ -409,7 +415,7 @@ export function PurchaseOrderDetail() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="items" className="space-y-4">
           <Card>
             <CardHeader>
@@ -448,26 +454,36 @@ export function PurchaseOrderDetail() {
                         ${item.unit_price?.toFixed(2) || '0.00'}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        ${Number((item.total_price ?? (item.quantity * item.unit_price) ?? 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        $
+                        {Number(
+                          item.total_price ?? item.quantity * item.unit_price ?? 0
+                        ).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              
+
               <Separator className="my-4" />
-              
+
               <div className="flex justify-end">
                 <div className="text-right space-y-2">
                   <div className="text-lg font-bold">
-                    Total: ${Number(po.total_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    Total: $
+                    {Number(po.total_amount ?? 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="history" className="space-y-4">
           <Card>
             <CardHeader>
@@ -481,7 +497,7 @@ export function PurchaseOrderDetail() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="documents" className="space-y-4">
           <Card>
             <CardHeader>

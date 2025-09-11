@@ -1,66 +1,95 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAIPOGeneration } from '@/hooks/use-ai-po';
-import { Bot, Sparkles, TrendingUp, Package, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { useAIPOGeneration } from '@/hooks/use-ai-po'
+import {
+  Bot,
+  Sparkles,
+  TrendingUp,
+  Package,
+  AlertTriangle,
+  CheckCircle,
+  Loader2,
+} from 'lucide-react'
+import { toast } from 'sonner'
 
 interface AIPOGenerationParams {
-  store_ids?: number[];
-  category_filter?: string;
-  days_forecast?: number;
-  urgency_threshold?: number;
+  store_ids?: number[]
+  category_filter?: string
+  days_forecast?: number
+  urgency_threshold?: number
 }
 
 export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => void }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false)
   const [params, setParams] = useState<AIPOGenerationParams>({
     days_forecast: 30,
     urgency_threshold: 0.5,
-  });
+  })
 
-  const { generatePO, isGenerating, progress, status, result, error, resetGeneration } = useAIPOGeneration();
+  const { generatePO, isGenerating, progress, status, result, error, resetGeneration } =
+    useAIPOGeneration()
 
   const handleGenerate = () => {
-    generatePO(params);
-  };
+    generatePO(params)
+  }
 
   const handleAcceptResult = () => {
     if (result && onGenerated) {
-      onGenerated(result);
-      setOpen(false);
-      resetGeneration();
-      toast.success('AI recommendations applied to your order');
+      onGenerated(result)
+      setOpen(false)
+      resetGeneration()
+      toast.success('AI recommendations applied to your order')
     }
-  };
+  }
 
   const getStatusIcon = () => {
     switch (status) {
       case 'generating':
-        return <Loader2 className="h-5 w-5 animate-spin text-blue-500" />;
+        return <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
       case 'completed':
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
+        return <CheckCircle className="h-5 w-5 text-green-500" />
       case 'error':
-        return <AlertTriangle className="h-5 w-5 text-red-500" />;
+        return <AlertTriangle className="h-5 w-5 text-red-500" />
       default:
-        return <Bot className="h-5 w-5 text-gray-500" />;
+        return <Bot className="h-5 w-5 text-gray-500" />
     }
-  };
+  }
 
   const getStatusMessage = () => {
-    if (progress < 25) return "Analyzing inventory levels...";
-    if (progress < 50) return "Calculating demand forecasts...";
-    if (progress < 75) return "Evaluating supplier options...";
-    if (progress < 100) return "Optimizing purchase recommendations...";
-    return "AI analysis complete!";
-  };
+    if (progress < 25) return 'Analyzing inventory levels...'
+    if (progress < 50) return 'Calculating demand forecasts...'
+    if (progress < 75) return 'Evaluating supplier options...'
+    if (progress < 100) return 'Optimizing purchase recommendations...'
+    return 'AI analysis complete!'
+  }
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
@@ -71,7 +100,7 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
           <Sparkles className="ml-2 h-4 w-4" />
         </Button>
       </DrawerTrigger>
-      
+
       <DrawerContent className="max-h-[80vh]">
         <DrawerHeader>
           <DrawerTitle className="flex items-center gap-2">
@@ -93,17 +122,21 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
                     id="forecast-days"
                     type="number"
                     value={params.days_forecast}
-                    onChange={(e) => setParams(prev => ({ ...prev, days_forecast: parseInt(e.target.value) }))}
+                    onChange={e =>
+                      setParams(prev => ({ ...prev, days_forecast: parseInt(e.target.value) }))
+                    }
                     min="7"
                     max="90"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="urgency">Urgency Threshold</Label>
                   <Select
                     value={params.urgency_threshold?.toString()}
-                    onValueChange={(value) => setParams(prev => ({ ...prev, urgency_threshold: parseFloat(value) }))}
+                    onValueChange={value =>
+                      setParams(prev => ({ ...prev, urgency_threshold: parseFloat(value) }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -120,16 +153,12 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
               <Alert>
                 <TrendingUp className="h-4 w-4" />
                 <AlertDescription>
-                  Our AI will analyze consumption patterns, supplier performance, and stock levels to generate optimal purchase recommendations.
+                  Our AI will analyze consumption patterns, supplier performance, and stock levels
+                  to generate optimal purchase recommendations.
                 </AlertDescription>
               </Alert>
 
-              <Button 
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                className="w-full"
-                size="lg"
-              >
+              <Button onClick={handleGenerate} disabled={isGenerating} className="w-full" size="lg">
                 <Bot className="mr-2 h-4 w-4" />
                 Generate AI Recommendations
               </Button>
@@ -155,7 +184,7 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
                   </div>
                   <Progress value={progress} className="w-full" />
                 </div>
-                
+
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   This usually takes 1-2 minutes
@@ -178,30 +207,48 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
                   <div>
                     <Label className="text-sm text-muted-foreground">Estimated Total</Label>
                     <div className="text-2xl font-bold text-green-600">
-                      ${result.estimated_total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      $
+                      {result.estimated_total.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </div>
                   </div>
                   <div>
                     <Label className="text-sm text-muted-foreground">Recommended Supplier</Label>
-                    <div className="text-lg font-medium">
-                      {result.supplier_suggestion}
-                    </div>
+                    <div className="text-lg font-medium">{result.supplier_suggestion}</div>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">Recommended Items ({result.items.length})</Label>
+                  <Label className="text-sm font-medium">
+                    Recommended Items ({result.items.length})
+                  </Label>
                   <div className="space-y-2 max-h-56 overflow-y-auto">
                     {result.items.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 border rounded">
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 border rounded"
+                      >
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">
                             {item.medication_name || `Medication ID: ${item.medication_id}`}
                           </div>
-                          <div className="text-sm text-muted-foreground truncate">{item.reason}</div>
+                          <div className="text-sm text-muted-foreground truncate">
+                            {item.reason}
+                          </div>
                         </div>
                         <div className="flex items-center gap-3 min-w-[160px] justify-end">
-                          <Badge variant={item.priority === 'high' ? 'destructive' : item.priority === 'medium' ? 'info' : 'secondary'} className="capitalize">
+                          <Badge
+                            variant={
+                              item.priority === 'high'
+                                ? 'destructive'
+                                : item.priority === 'medium'
+                                  ? 'info'
+                                  : 'secondary'
+                            }
+                            className="capitalize"
+                          >
                             {item.priority}
                           </Badge>
                           <div className="text-right">
@@ -239,5 +286,5 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
         </div>
       </DrawerContent>
     </Drawer>
-  );
+  )
 }

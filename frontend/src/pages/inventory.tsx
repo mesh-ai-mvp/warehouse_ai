@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react"
-import { Link, useSearchParams } from "react-router-dom"
+import { useState, useMemo } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   flexRender,
   getCoreRowModel,
@@ -7,16 +7,16 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-} from "@tanstack/react-table"
+} from '@tanstack/react-table'
 import type {
   ColumnDef,
   ColumnFiltersState,
   SortingState,
   VisibilityState,
-} from "@tanstack/react-table"
+} from '@tanstack/react-table'
 
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -25,8 +25,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuItem,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -34,19 +34,19 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Progress } from "@/components/ui/progress"
+} from '@/components/ui/select'
+import { Progress } from '@/components/ui/progress'
 import {
   ArrowUpDown,
   ChevronDown,
@@ -60,15 +60,15 @@ import {
   AlertTriangle,
   TrendingUp,
   TrendingDown,
-} from "lucide-react"
+} from 'lucide-react'
 
-import { useInventory, useFilterOptions } from "@/hooks/use-api"
-import type { Medication, InventoryFilters } from "@/types/api"
+import { useInventory, useFilterOptions } from '@/hooks/use-api'
+import type { Medication, InventoryFilters } from '@/types/api'
 
 function getStockLevelInfo(medication: Medication) {
   const { current_stock, reorder_point } = medication
   const percentage = (current_stock / reorder_point) * 100
-  
+
   if (current_stock <= reorder_point * 0.25) {
     return { level: 'critical', label: 'Critical', color: 'destructive', percentage }
   } else if (current_stock <= reorder_point * 0.5) {
@@ -88,25 +88,28 @@ export function Inventory() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = useState({})
-  
+
   // Extract filters from URL params
-  const filters: InventoryFilters = useMemo(() => ({
-    search: searchParams.get('search') || undefined,
-    category: searchParams.get('category') || undefined,
-    supplier: searchParams.get('supplier') || undefined,
-    stock_level: searchParams.get('filter') as any || undefined,
-    page: parseInt(searchParams.get('page') || '1'),
-    page_size: parseInt(searchParams.get('page_size') || '50'),
-    sort_by: searchParams.get('sort_by') || undefined,
-    sort_order: searchParams.get('sort_order') as any || undefined,
-  }), [searchParams])
+  const filters: InventoryFilters = useMemo(
+    () => ({
+      search: searchParams.get('search') || undefined,
+      category: searchParams.get('category') || undefined,
+      supplier: searchParams.get('supplier') || undefined,
+      stock_level: (searchParams.get('filter') as any) || undefined,
+      page: parseInt(searchParams.get('page') || '1'),
+      page_size: parseInt(searchParams.get('page_size') || '50'),
+      sort_by: searchParams.get('sort_by') || undefined,
+      sort_order: (searchParams.get('sort_order') as any) || undefined,
+    }),
+    [searchParams]
+  )
 
   const { data, isLoading, error, refetch } = useInventory(filters)
   const { data: filterOptions } = useFilterOptions()
 
   const updateFilters = (newFilters: Partial<InventoryFilters>) => {
     const params = new URLSearchParams(searchParams)
-    
+
     Object.entries(newFilters).forEach(([key, value]) => {
       if (value === undefined || value === null || value === '') {
         params.delete(key)
@@ -114,24 +117,24 @@ export function Inventory() {
         params.set(key, value.toString())
       }
     })
-    
+
     setSearchParams(params)
   }
 
   const columns: ColumnDef<Medication>[] = [
     {
-      id: "select",
+      id: 'select',
       header: ({ table }) => (
         <Checkbox
           checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          onCheckedChange={value => table.toggleAllPageRowsSelected(!!value)}
           aria-label="Select all"
         />
       ),
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          onCheckedChange={value => row.toggleSelected(!!value)}
           aria-label="Select row"
         />
       ),
@@ -139,11 +142,11 @@ export function Inventory() {
       enableHiding: false,
     },
     {
-      accessorKey: "name",
+      accessorKey: 'name',
       header: ({ column }) => (
         <Button
           variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Medication Name
           <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -154,7 +157,7 @@ export function Inventory() {
         return (
           <div className="space-y-1">
             <div className="font-medium">
-              <Link 
+              <Link
                 to={`/medication/${medication.med_id}`}
                 className="hover:underline flex items-center gap-2"
               >
@@ -163,27 +166,23 @@ export function Inventory() {
               </Link>
             </div>
             {medication.batch_number && (
-              <div className="text-xs text-muted-foreground">
-                Batch: {medication.batch_number}
-              </div>
+              <div className="text-xs text-muted-foreground">Batch: {medication.batch_number}</div>
             )}
           </div>
         )
       },
     },
     {
-      accessorKey: "category",
-      header: "Category",
-      cell: ({ row }) => (
-        <Badge variant="outline">{row.getValue("category")}</Badge>
-      ),
+      accessorKey: 'category',
+      header: 'Category',
+      cell: ({ row }) => <Badge variant="outline">{row.getValue('category')}</Badge>,
     },
     {
-      accessorKey: "current_stock",
+      accessorKey: 'current_stock',
       header: ({ column }) => (
         <Button
           variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Current Stock
           <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -191,9 +190,9 @@ export function Inventory() {
       ),
       cell: ({ row }) => {
         const medication = row.original
-        const stock = row.getValue("current_stock") as number
+        const stock = row.getValue('current_stock') as number
         const stockInfo = getStockLevelInfo(medication)
-        
+
         return (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -203,10 +202,7 @@ export function Inventory() {
               </Badge>
             </div>
             <div className="space-y-1">
-              <Progress 
-                value={Math.min(stockInfo.percentage, 100)} 
-                className="h-1"
-              />
+              <Progress value={Math.min(stockInfo.percentage, 100)} className="h-1" />
               <div className="text-xs text-muted-foreground">
                 Reorder at {medication.reorder_point}
               </div>
@@ -216,19 +212,19 @@ export function Inventory() {
       },
     },
     {
-      accessorKey: "days_until_stockout",
+      accessorKey: 'days_until_stockout',
       header: ({ column }) => (
         <Button
           variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Days Until Stockout
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => {
-        const days = row.getValue("days_until_stockout") as number
-        
+        const days = row.getValue('days_until_stockout') as number
+
         if (days <= 0) {
           return <Badge variant="destructive">Out of Stock</Badge>
         } else if (days <= 7) {
@@ -241,44 +237,44 @@ export function Inventory() {
       },
     },
     {
-      accessorKey: "supplier",
-      header: "Supplier",
+      accessorKey: 'supplier',
+      header: 'Supplier',
       cell: ({ row }) => (
-        <div className="max-w-32 truncate" title={row.getValue("supplier")}>
-          {row.getValue("supplier")}
+        <div className="max-w-32 truncate" title={row.getValue('supplier')}>
+          {row.getValue('supplier')}
         </div>
       ),
     },
     {
-      accessorKey: "total_value",
+      accessorKey: 'total_value',
       header: ({ column }) => (
         <Button
           variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Value
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
       cell: ({ row }) => {
-        const value = row.getValue("total_value") as number
+        const value = row.getValue('total_value') as number
         return <div className="font-mono">${(value || 0).toLocaleString()}</div>
       },
     },
     {
-      accessorKey: "storage_location",
-      header: "Location",
+      accessorKey: 'storage_location',
+      header: 'Location',
       cell: ({ row }) => (
         <Badge variant="outline" className="font-mono text-xs">
-          {row.getValue("storage_location")}
+          {row.getValue('storage_location')}
         </Badge>
       ),
     },
     {
-      accessorKey: "avg_daily_pick",
-      header: "Daily Usage",
+      accessorKey: 'avg_daily_pick',
+      header: 'Daily Usage',
       cell: ({ row }) => {
-        const usage = row.getValue("avg_daily_pick") as number
+        const usage = row.getValue('avg_daily_pick') as number
         return (
           <div className="flex items-center gap-1">
             <span className="font-mono">{(usage || 0).toFixed(1)}</span>
@@ -288,11 +284,11 @@ export function Inventory() {
       },
     },
     {
-      id: "actions",
+      id: 'actions',
       enableHiding: false,
       cell: ({ row }) => {
         const medication = row.original
-        
+
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -341,16 +337,16 @@ export function Inventory() {
 
   // Fixed widths for consistent alignment (prevents column shift)
   const columnClasses: Record<string, string> = {
-    select: "w-8",
-    name: "min-w-[220px]",
-    category: "w-36",
-    current_stock: "w-56",
-    days_until_stockout: "w-40 text-center",
-    supplier: "min-w-[220px]",
-    total_value: "w-32 text-right",
-    storage_location: "w-40",
-    avg_daily_pick: "w-28 text-right",
-    actions: "w-12",
+    select: 'w-8',
+    name: 'min-w-[220px]',
+    category: 'w-36',
+    current_stock: 'w-56',
+    days_until_stockout: 'w-40 text-center',
+    supplier: 'min-w-[220px]',
+    total_value: 'w-32 text-right',
+    storage_location: 'w-40',
+    avg_daily_pick: 'w-28 text-right',
+    actions: 'w-12',
   }
 
   if (error) {
@@ -358,18 +354,16 @@ export function Inventory() {
       <div className="space-y-6">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Inventory</h2>
-          <p className="text-muted-foreground">
-            Manage your pharmaceutical inventory
-          </p>
+          <p className="text-muted-foreground">Manage your pharmaceutical inventory</p>
         </div>
-        
+
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             Failed to load inventory data. Please check your connection and try again.
           </AlertDescription>
         </Alert>
-        
+
         <Button onClick={() => refetch()}>
           <RefreshCw className="mr-2 h-4 w-4" />
           Retry
@@ -387,7 +381,7 @@ export function Inventory() {
             Manage your pharmaceutical inventory ({(data?.total || 0).toLocaleString()} items)
           </p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button onClick={() => refetch()} variant="outline" size="sm">
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -416,15 +410,17 @@ export function Inventory() {
                 <Input
                   placeholder="Search medications..."
                   value={filters.search || ''}
-                  onChange={(e) => updateFilters({ search: e.target.value, page: 1 })}
+                  onChange={e => updateFilters({ search: e.target.value, page: 1 })}
                   className="pl-8"
                 />
               </div>
             </div>
-            
-            <Select 
-              value={filters.category || 'all'} 
-              onValueChange={(value) => updateFilters({ category: value === 'all' ? undefined : value, page: 1 })}
+
+            <Select
+              value={filters.category || 'all'}
+              onValueChange={value =>
+                updateFilters({ category: value === 'all' ? undefined : value, page: 1 })
+              }
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Category" />
@@ -432,14 +428,18 @@ export function Inventory() {
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {filterOptions?.categories.map(category => (
-                  <SelectItem key={category} value={category}>{category}</SelectItem>
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            
-            <Select 
-              value={filters.supplier || 'all'} 
-              onValueChange={(value) => updateFilters({ supplier: value === 'all' ? undefined : value, page: 1 })}
+
+            <Select
+              value={filters.supplier || 'all'}
+              onValueChange={value =>
+                updateFilters({ supplier: value === 'all' ? undefined : value, page: 1 })
+              }
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Supplier" />
@@ -447,14 +447,21 @@ export function Inventory() {
               <SelectContent>
                 <SelectItem value="all">All Suppliers</SelectItem>
                 {filterOptions?.suppliers.map(supplier => (
-                  <SelectItem key={supplier} value={supplier}>{supplier}</SelectItem>
+                  <SelectItem key={supplier} value={supplier}>
+                    {supplier}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            
-            <Select 
-              value={filters.stock_level || 'all'} 
-              onValueChange={(value) => updateFilters({ stock_level: value === 'all' ? undefined : value as any, page: 1 })}
+
+            <Select
+              value={filters.stock_level || 'all'}
+              onValueChange={value =>
+                updateFilters({
+                  stock_level: value === 'all' ? undefined : (value as any),
+                  page: 1,
+                })
+              }
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Stock Level" />
@@ -501,13 +508,13 @@ export function Inventory() {
                 <p className="text-sm font-medium">Show</p>
                 <Select
                   value={filters.page_size?.toString() || '50'}
-                  onValueChange={(value) => updateFilters({ page_size: parseInt(value), page: 1 })}
+                  onValueChange={value => updateFilters({ page_size: parseInt(value), page: 1 })}
                 >
                   <SelectTrigger className="h-8 w-20">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent side="top">
-                    {[10, 20, 50, 100].map((pageSize) => (
+                    {[10, 20, 50, 100].map(pageSize => (
                       <SelectItem key={pageSize} value={pageSize.toString()}>
                         {pageSize}
                       </SelectItem>
@@ -516,7 +523,7 @@ export function Inventory() {
                 </Select>
               </div>
             </div>
-            
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="ml-auto">
@@ -526,13 +533,13 @@ export function Inventory() {
               <DropdownMenuContent align="end">
                 {table
                   .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => (
+                  .filter(column => column.getCanHide())
+                  .map(column => (
                     <DropdownMenuCheckboxItem
                       key={column.id}
                       className="capitalize"
                       checked={column.getIsVisible()}
-                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                      onCheckedChange={value => column.toggleVisibility(!!value)}
                     >
                       {column.id}
                     </DropdownMenuCheckboxItem>
@@ -540,20 +547,20 @@ export function Inventory() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          
+
           <div className="rounded-md">
             <Table>
               <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
+                {table.getHeaderGroups().map(headerGroup => (
                   <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id} className={columnClasses[header.column.id as string] || ""}>
+                    {headerGroup.headers.map(header => (
+                      <TableHead
+                        key={header.id}
+                        className={columnClasses[header.column.id as string] || ''}
+                      >
                         {header.isPlaceholder
                           ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
+                          : flexRender(header.column.columnDef.header, header.getContext())}
                       </TableHead>
                     ))}
                   </TableRow>
@@ -571,28 +578,25 @@ export function Inventory() {
                     </TableRow>
                   ))
                 ) : table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
+                  table.getRowModel().rows.map(row => (
                     <TableRow
                       key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
+                      data-state={row.getIsSelected() && 'selected'}
                       className="hover:bg-muted/50 transition-colors"
                     >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className={columnClasses[cell.column.id as string] || ""}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
+                      {row.getVisibleCells().map(cell => (
+                        <TableCell
+                          key={cell.id}
+                          className={columnClasses[cell.column.id as string] || ''}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
                       No medications found.
                     </TableCell>
                   </TableRow>
@@ -600,11 +604,11 @@ export function Inventory() {
               </TableBody>
             </Table>
           </div>
-          
+
           {/* Pagination */}
           <div className="flex items-center justify-between px-6 py-4 border-t">
             <div className="flex-1 text-sm text-muted-foreground">
-              {table.getFilteredSelectedRowModel().rows.length} of{" "}
+              {table.getFilteredSelectedRowModel().rows.length} of{' '}
               {table.getFilteredRowModel().rows.length} row(s) selected.
             </div>
             <div className="flex items-center space-x-6 lg:space-x-8">

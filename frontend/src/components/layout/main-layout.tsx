@@ -1,7 +1,7 @@
-import { Outlet } from "react-router-dom"
-import { AppSidebar } from "./app-sidebar"
-import { Header } from "./header"
-import { SidebarProvider, SidebarInset, SidebarRail } from "@/components/ui/sidebar"
+import { Outlet } from 'react-router-dom'
+import { AppSidebar } from './app-sidebar'
+import { Header } from './header'
+import { SidebarProvider, SidebarInset, SidebarRail } from '@/components/ui/sidebar'
 
 export function MainLayout() {
   return (

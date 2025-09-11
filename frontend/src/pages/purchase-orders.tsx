@@ -1,18 +1,18 @@
-import { useState, useMemo } from "react"
-import { Link, useSearchParams } from "react-router-dom"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Input } from "@/components/ui/input"
+import { useState, useMemo } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -20,7 +20,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from '@/components/ui/table'
 import {
   ShoppingCart,
   Search,
@@ -35,17 +35,17 @@ import {
   Truck,
   Plus,
   Clock,
-} from "lucide-react"
+} from 'lucide-react'
 
-import { usePurchaseOrders, useSuppliers } from "@/hooks/use-api"
+import { usePurchaseOrders, useSuppliers } from '@/hooks/use-api'
 
 function getStatusBadge(status: string) {
   const variants = {
     pending: 'secondary',
-    approved: 'default', 
+    approved: 'default',
     completed: 'default',
     cancelled: 'destructive',
-    draft: 'outline'
+    draft: 'outline',
   } as const
 
   const colors = {
@@ -53,11 +53,11 @@ function getStatusBadge(status: string) {
     approved: 'text-blue-700 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30',
     completed: 'text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-900/30',
     cancelled: 'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30',
-    draft: 'text-gray-700 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30'
+    draft: 'text-gray-700 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30',
   } as const
 
   return (
-    <Badge 
+    <Badge
       variant={variants[status as keyof typeof variants] || 'outline'}
       className={colors[status as keyof typeof colors]}
     >
@@ -68,22 +68,25 @@ function getStatusBadge(status: string) {
 
 export function PurchaseOrders() {
   const [searchParams, setSearchParams] = useSearchParams()
-  
+
   // Extract filters from URL params
-  const filters = useMemo(() => ({
-    search: searchParams.get('search') || undefined,
-    status: searchParams.get('status') || undefined,
-    supplier: searchParams.get('supplier') || undefined,
-    page: parseInt(searchParams.get('page') || '1'),
-    page_size: parseInt(searchParams.get('page_size') || '20'),
-  }), [searchParams])
+  const filters = useMemo(
+    () => ({
+      search: searchParams.get('search') || undefined,
+      status: searchParams.get('status') || undefined,
+      supplier: searchParams.get('supplier') || undefined,
+      page: parseInt(searchParams.get('page') || '1'),
+      page_size: parseInt(searchParams.get('page_size') || '20'),
+    }),
+    [searchParams]
+  )
 
   const { data, isLoading, error, refetch } = usePurchaseOrders(filters)
   const { data: suppliers } = useSuppliers()
 
   const updateFilters = (newFilters: Partial<typeof filters>) => {
     const params = new URLSearchParams(searchParams)
-    
+
     Object.entries(newFilters).forEach(([key, value]) => {
       if (value === undefined || value === null || value === '') {
         params.delete(key)
@@ -91,7 +94,7 @@ export function PurchaseOrders() {
         params.set(key, value.toString())
       }
     })
-    
+
     setSearchParams(params)
   }
 
@@ -102,14 +105,14 @@ export function PurchaseOrders() {
           <h2 className="text-3xl font-bold tracking-tight">Purchase Orders</h2>
           <p className="text-muted-foreground">Manage your purchase orders</p>
         </div>
-        
+
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             Failed to load purchase orders. Please check your connection and try again.
           </AlertDescription>
         </Alert>
-        
+
         <Button onClick={() => refetch()}>
           <RefreshCw className="mr-2 h-4 w-4" />
           Retry
@@ -129,7 +132,7 @@ export function PurchaseOrders() {
             Manage your purchase orders ({(data?.total || 0).toLocaleString()} total)
           </p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button onClick={() => refetch()} variant="outline" size="sm">
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -161,7 +164,7 @@ export function PurchaseOrders() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Value</CardTitle>
@@ -173,7 +176,7 @@ export function PurchaseOrders() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
@@ -181,11 +184,15 @@ export function PurchaseOrders() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading ? <Skeleton className="h-8 w-12" /> : data?.items?.filter(po => po.status === 'pending').length || '0'}
+              {isLoading ? (
+                <Skeleton className="h-8 w-12" />
+              ) : (
+                data?.items?.filter(po => po.status === 'pending').length || '0'
+              )}
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">This Month</CardTitle>
@@ -193,12 +200,18 @@ export function PurchaseOrders() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading ? <Skeleton className="h-8 w-12" /> : 
-               data?.items?.filter(po => {
-                 const poDate = new Date(po.created_date)
-                 const now = new Date()
-                 return poDate.getMonth() === now.getMonth() && poDate.getFullYear() === now.getFullYear()
-               }).length || '0'}
+              {isLoading ? (
+                <Skeleton className="h-8 w-12" />
+              ) : (
+                data?.items?.filter(po => {
+                  const poDate = new Date(po.created_date)
+                  const now = new Date()
+                  return (
+                    poDate.getMonth() === now.getMonth() &&
+                    poDate.getFullYear() === now.getFullYear()
+                  )
+                }).length || '0'
+              )}
             </div>
           </CardContent>
         </Card>
@@ -220,15 +233,17 @@ export function PurchaseOrders() {
                 <Input
                   placeholder="Search purchase orders..."
                   value={filters.search || ''}
-                  onChange={(e) => updateFilters({ search: e.target.value, page: 1 })}
+                  onChange={e => updateFilters({ search: e.target.value, page: 1 })}
                   className="pl-8"
                 />
               </div>
             </div>
-            
-            <Select 
-              value={filters.status || 'all'} 
-              onValueChange={(value) => updateFilters({ status: value === 'all' ? undefined : value, page: 1 })}
+
+            <Select
+              value={filters.status || 'all'}
+              onValueChange={value =>
+                updateFilters({ status: value === 'all' ? undefined : value, page: 1 })
+              }
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Status" />
@@ -242,10 +257,12 @@ export function PurchaseOrders() {
                 <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
-            
-            <Select 
-              value={filters.supplier || 'all'} 
-              onValueChange={(value) => updateFilters({ supplier: value === 'all' ? undefined : value, page: 1 })}
+
+            <Select
+              value={filters.supplier || 'all'}
+              onValueChange={value =>
+                updateFilters({ supplier: value === 'all' ? undefined : value, page: 1 })
+              }
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Supplier" />
@@ -253,7 +270,9 @@ export function PurchaseOrders() {
               <SelectContent>
                 <SelectItem value="all">All Suppliers</SelectItem>
                 {suppliers?.map(supplier => (
-                  <SelectItem key={supplier.supplier_id} value={supplier.name}>{supplier.name}</SelectItem>
+                  <SelectItem key={supplier.supplier_id} value={supplier.name}>
+                    {supplier.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -281,22 +300,38 @@ export function PurchaseOrders() {
               {isLoading ? (
                 Array.from({ length: 10 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-16" /></TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-32" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-20" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-20" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-12" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-20" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-8 w-16" />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : data?.items?.length ? (
-                data.items.map((po) => (
+                data.items.map(po => (
                   <TableRow key={po.id} className="hover:bg-muted/50 transition-colors">
                     <TableCell>
                       <div className="font-medium">
-                        <Link 
+                        <Link
                           to={`/purchase-orders/${po.id}`}
                           className="hover:underline flex items-center gap-2"
                         >
@@ -304,9 +339,7 @@ export function PurchaseOrders() {
                           <ExternalLink className="h-3 w-3" />
                         </Link>
                       </div>
-                      {po.ai_generated && (
-                        <div className="text-xs text-blue-600">AI Generated</div>
-                      )}
+                      {po.ai_generated && <div className="text-xs text-blue-600">AI Generated</div>}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -342,9 +375,7 @@ export function PurchaseOrders() {
                     </TableCell>
                     <TableCell>
                       <Button variant="outline" size="sm" asChild>
-                        <Link to={`/purchase-orders/${po.id}`}>
-                          View Details
-                        </Link>
+                        <Link to={`/purchase-orders/${po.id}`}>View Details</Link>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -358,12 +389,13 @@ export function PurchaseOrders() {
               )}
             </TableBody>
           </Table>
-          
+
           {/* Pagination */}
           {data && data.total > 0 && (
             <div className="flex items-center justify-between px-6 py-4 border-t">
               <div className="text-sm text-muted-foreground">
-                Showing {((data.page - 1) * filters.page_size) + 1} to {Math.min(data.page * filters.page_size, data.total)} of {data.total} orders
+                Showing {(data.page - 1) * filters.page_size + 1} to{' '}
+                {Math.min(data.page * filters.page_size, data.total)} of {data.total} orders
               </div>
               <div className="flex items-center space-x-2">
                 <Button

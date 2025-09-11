@@ -1,13 +1,19 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardToolbar } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip } from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingDown, TrendingUp } from 'lucide-react';
-import { CartesianGrid, ComposedChart, Line, XAxis, YAxis } from 'recharts';
+import { useState } from 'react'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle, CardToolbar } from '@/components/ui/card'
+import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
+import type { ChartConfig } from '@/components/ui/chart'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { TrendingDown, TrendingUp } from 'lucide-react'
+import { CartesianGrid, ComposedChart, Line, XAxis, YAxis } from 'recharts'
 
 // E-commerce data for different periods with balanced patterns
 const salesViewsData = {
@@ -47,7 +53,7 @@ const salesViewsData = {
     { period: 'Q3 24', sales: 96000, views: 81000 },
     { period: 'Q4 24', sales: 108000, views: 90000 },
   ],
-};
+}
 
 // Use custom or Tailwind standard colors: https://tailwindcss.com/docs/colors
 const chartConfig = {
@@ -59,17 +65,17 @@ const chartConfig = {
     label: 'Views',
     color: 'var(--color-purple-500)',
   },
-} satisfies ChartConfig;
+} satisfies ChartConfig
 
 // Custom Tooltip
 interface TooltipProps {
-  active?: boolean;
+  active?: boolean
   payload?: Array<{
-    dataKey: string;
-    value: number;
-    color: string;
-  }>;
-  label?: string;
+    dataKey: string
+    value: number
+    color: string
+  }>
+  label?: string
 }
 
 const ChartLabel = ({ label, color }: { label: string; color: string }) => {
@@ -78,17 +84,19 @@ const ChartLabel = ({ label, color }: { label: string; color: string }) => {
       <div className="w-1 h-3 rounded-full" style={{ backgroundColor: color }}></div>
       <span className="text-muted-foreground">{label}</span>
     </div>
-  );
-};
+  )
+}
 
 const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className="rounded-lg border bg-popover p-3 shadow-sm shadow-black/5 min-w-[150px]">
-        <div className="text-xs font-medium text-muted-foreground tracking-wide mb-2.5">{label}</div>
+        <div className="text-xs font-medium text-muted-foreground tracking-wide mb-2.5">
+          {label}
+        </div>
         <div className="space-y-2">
           {payload.map((entry, index) => {
-            const config = chartConfig[entry.dataKey as keyof typeof chartConfig];
+            const config = chartConfig[entry.dataKey as keyof typeof chartConfig]
             return (
               <div key={index} className="flex items-center gap-2 text-xs">
                 <ChartLabel label={config?.label + ':'} color={entry.color} />
@@ -100,14 +108,14 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
                       : entry.value.toLocaleString()}
                 </span>
               </div>
-            );
+            )
           })}
         </div>
       </div>
-    );
+    )
   }
-  return null;
-};
+  return null
+}
 
 // Period configuration
 const PERIODS = {
@@ -115,22 +123,24 @@ const PERIODS = {
   '30d': { key: '30d', label: 'Last 30 days' },
   '90d': { key: '90d', label: 'Last 90 days' },
   '12m': { key: '12m', label: 'Last 12 months' },
-} as const;
+} as const
 
-type PeriodKey = keyof typeof PERIODS;
+type PeriodKey = keyof typeof PERIODS
 
 export default function LineChart5() {
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>('30d');
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>('30d')
 
   // Get data for selected period
-  const currentData = salesViewsData[selectedPeriod];
+  const currentData = salesViewsData[selectedPeriod]
 
   // Calculate totals and percentages
-  const totalSales = currentData.reduce((sum, item) => sum + item.sales, 0);
-  const totalViews = currentData.reduce((sum, item) => sum + item.views, 0);
+  const totalSales = currentData.reduce((sum, item) => sum + item.sales, 0)
+  const totalViews = currentData.reduce((sum, item) => sum + item.views, 0)
   // Calculate percentage changes (simulated)
-  const salesChange = selectedPeriod === '7d' ? 12 : selectedPeriod === '30d' ? 8 : selectedPeriod === '90d' ? -3 : 15;
-  const viewsChange = selectedPeriod === '7d' ? -3 : selectedPeriod === '30d' ? 5 : selectedPeriod === '90d' ? -8 : 12;
+  const salesChange =
+    selectedPeriod === '7d' ? 12 : selectedPeriod === '30d' ? 8 : selectedPeriod === '90d' ? -3 : 15
+  const viewsChange =
+    selectedPeriod === '7d' ? -3 : selectedPeriod === '30d' ? 5 : selectedPeriod === '90d' ? -8 : 12
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 lg:p-8">
@@ -139,12 +149,15 @@ export default function LineChart5() {
           <CardTitle className="text-lg font-semibold">E-commerce Sales</CardTitle>
           <CardToolbar>
             {/* Period Selector */}
-            <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as PeriodKey)}>
+            <Select
+              value={selectedPeriod}
+              onValueChange={value => setSelectedPeriod(value as PeriodKey)}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent align="end">
-                {Object.values(PERIODS).map((period) => (
+                {Object.values(PERIODS).map(period => (
                   <SelectItem key={period.key} value={period.key}>
                     {period.label}
                   </SelectItem>
@@ -162,7 +175,11 @@ export default function LineChart5() {
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold">£{totalSales.toLocaleString()}</span>
                 <Badge variant={salesChange >= 0 ? 'success' : 'destructive'} appearance="light">
-                  {salesChange >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                  {salesChange >= 0 ? (
+                    <TrendingUp className="size-3" />
+                  ) : (
+                    <TrendingDown className="size-3" />
+                  )}
                   {Math.abs(salesChange)}%
                 </Badge>
               </div>
@@ -172,7 +189,11 @@ export default function LineChart5() {
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold">{totalViews.toLocaleString()}</span>
                 <Badge variant={salesChange <= 0 ? 'success' : 'destructive'} appearance="light">
-                  {viewsChange <= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                  {viewsChange <= 0 ? (
+                    <TrendingUp className="size-3" />
+                  ) : (
+                    <TrendingDown className="size-3" />
+                  )}
                   {Math.abs(viewsChange)}%
                 </Badge>
               </div>
@@ -236,7 +257,9 @@ export default function LineChart5() {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
-                tickFormatter={(value) => (selectedPeriod === '7d' ? `£${value}` : `£${(value / 1000).toFixed(0)}k`)}
+                tickFormatter={value =>
+                  selectedPeriod === '7d' ? `£${value}` : `£${(value / 1000).toFixed(0)}k`
+                }
                 tickMargin={10}
               />
               {/* Right Y Axis for Views */}
@@ -246,11 +269,13 @@ export default function LineChart5() {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
-                tickFormatter={(value) => {
+                tickFormatter={value => {
                   if (selectedPeriod === '7d') {
-                    return value >= 0 ? `+${value}` : value.toString();
+                    return value >= 0 ? `+${value}` : value.toString()
                   }
-                  return value >= 0 ? `+${(value / 1000).toFixed(0)}k` : `${(value / 1000).toFixed(0)}k`;
+                  return value >= 0
+                    ? `+${(value / 1000).toFixed(0)}k`
+                    : `${(value / 1000).toFixed(0)}k`
                 }}
                 tickMargin={8}
                 domain={['dataMin - 100', 'dataMax + 100']}
@@ -258,7 +283,11 @@ export default function LineChart5() {
 
               <ChartTooltip
                 content={<CustomTooltip />}
-                cursor={{ strokeDasharray: '3 3', stroke: 'var(--muted-foreground)', strokeOpacity: 0.5 }}
+                cursor={{
+                  strokeDasharray: '3 3',
+                  stroke: 'var(--muted-foreground)',
+                  strokeOpacity: 0.5,
+                }}
               />
 
               {/* Sales Line (Linear) */}
@@ -296,5 +325,5 @@ export default function LineChart5() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
