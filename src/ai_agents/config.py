@@ -1,8 +1,9 @@
 """Configuration management for AI agents"""
 
-import os
 import configparser
+import os
 from typing import Dict, Optional
+
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 

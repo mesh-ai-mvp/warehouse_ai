@@ -1,7 +1,8 @@
 """State management for multi-agent PO generation workflow"""
 
-from typing import TypedDict, Dict, List, Any, Optional
 from datetime import datetime
+from typing import Any, Dict, List, Optional, TypedDict
+
 from pydantic import BaseModel, Field
 
 

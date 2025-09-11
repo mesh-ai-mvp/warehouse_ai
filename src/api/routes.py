@@ -2,22 +2,23 @@
 API routes for inventory management
 """
 
-from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
-from typing import Optional, Dict, Any, List
-import sys
 import os
-from datetime import datetime
-from uuid import uuid4
 import smtplib
 import ssl
+import sys
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Any, Dict, List, Optional
+from uuid import uuid4
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from loguru import logger
 
 # Add parent directory to path to import data_loader
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from data_loader import DataLoader
 from ai_agents.api_handler import AIPoHandler
+from data_loader import DataLoader
 
 # Initialize router
 router = APIRouter()
@@ -265,8 +266,10 @@ async def create_purchase_orders(payload: dict):
         if send_emails and supplier_to_lines:
             fallback_to = os.getenv("SUPPLIER_FALLBACK_EMAIL")
             bcc = os.getenv("EMAIL_BCC")
-            email_logger.info(f"PO creation email flow start | suppliers={len(supplier_to_lines)}")
-            
+            email_logger.info(
+                f"PO creation email flow start | suppliers={len(supplier_to_lines)}"
+            )
+
             for supplier_id, lines in supplier_to_lines.items():
                 supplier = data_loader.suppliers.get(supplier_id, {})
                 supplier_name = supplier.get("name", f"Supplier {supplier_id}")
@@ -281,8 +284,10 @@ async def create_purchase_orders(payload: dict):
                 )
                 html_body = _render_supplier_email_html(supplier_name, lines, meta)
                 _send_email_via_smtp(subject, html_body, to_email, bcc=bcc)
-            
-            email_logger.info(f"PO creation email flow success | suppliers_notified={len(supplier_to_lines)}")
+
+            email_logger.info(
+                f"PO creation email flow success | suppliers_notified={len(supplier_to_lines)}"
+            )
 
         return {"created": [po["po_id"] for po in created_pos]}
     except Exception as e:

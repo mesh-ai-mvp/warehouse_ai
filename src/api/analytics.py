@@ -2,12 +2,13 @@
 Analytics API endpoints for KPIs, trends, and performance metrics
 """
 
-from fastapi import APIRouter, Query, HTTPException
-from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta, date
 import json
-import sys
 import os
+import sys
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException, Query
 from loguru import logger
 
 # Add parent directory to path

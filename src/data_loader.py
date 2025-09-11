@@ -3,12 +3,13 @@ Data loader module for inventory management system
 Now uses SQLite database instead of CSV files
 """
 
-import pandas as pd
 import os
-import numpy as np
 import sqlite3
-from typing import Dict, List, Any, Optional
 from datetime import timedelta
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
 from loguru import logger
 
 
@@ -663,7 +664,7 @@ class DataLoader:
     def get_purchase_order(self, po_id: str) -> Optional[Dict[str, Any]]:
         """Get a purchase order by ID"""
         conn = self.get_connection()
-        
+
         try:
             # Query PO with items
             po_query = """

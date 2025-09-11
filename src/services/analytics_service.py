@@ -3,14 +3,15 @@ Analytics Service Layer
 Business logic for complex analytics calculations, caching, and data processing
 """
 
-from typing import Dict, Any, Optional
-from datetime import datetime, timedelta, date
-import json
-import sqlite3
 import hashlib
-from loguru import logger
-import sys
+import json
 import os
+import sqlite3
+import sys
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, Optional
+
+from loguru import logger
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

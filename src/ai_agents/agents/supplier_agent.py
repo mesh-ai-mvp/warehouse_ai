@@ -1,14 +1,15 @@
 """Supplier Optimization Agent for PO Generation"""
 
 import json
-from typing import Dict, Any, List
 from datetime import datetime
-from langchain_openai import ChatOpenAI
+from typing import Any, Dict, List
+
 from langchain.schema import HumanMessage
+from langchain_openai import ChatOpenAI
 
 from ..config import get_config
-from ..state import POGenerationState, AgentReasoning, update_progress, add_reasoning
 from ..logger import supplier_logger as logger
+from ..state import AgentReasoning, POGenerationState, add_reasoning, update_progress
 
 
 class SupplierAgent:

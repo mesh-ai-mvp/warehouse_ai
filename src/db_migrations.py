@@ -3,9 +3,10 @@
 Database migration script to add purchase order tables and import supplier prices
 """
 
-import sqlite3
-import pandas as pd
 import os
+import sqlite3
+
+import pandas as pd
 
 
 def get_db_path():

@@ -2,15 +2,16 @@
 
 import json
 import re
-import numpy as np
-from typing import Dict, Any
 from datetime import datetime
-from langchain_openai import ChatOpenAI
+from typing import Any, Dict
+
+import numpy as np
 from langchain.schema import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 
 from ..config import get_config
-from ..state import POGenerationState, AgentReasoning, update_progress, add_reasoning
 from ..logger import forecast_logger as logger
+from ..state import AgentReasoning, POGenerationState, add_reasoning, update_progress
 
 
 class ForecastAgent:

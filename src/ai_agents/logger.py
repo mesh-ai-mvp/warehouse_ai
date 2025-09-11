@@ -1,6 +1,7 @@
 """Logging configuration for AI agents"""
 
 import sys
+
 from loguru import logger
 
 
