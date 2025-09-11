@@ -149,6 +149,25 @@ export interface CreatePORequest {
   }>;
 }
 
+// Backend API format for PO creation
+export interface CreatePOBackendRequest {
+  items: Array<{
+    med_id: number;
+    total_quantity: number;
+    allocations: Array<{
+      supplier_id: number;
+      quantity: number;
+      unit_price: number;
+    }>;
+  }>;
+  meta: {
+    requested_delivery_date?: string;
+    notes?: string;
+    buyer?: string;
+  };
+  send_emails?: boolean;
+}
+
 // Alternative interface for simplified PO creation (matches frontend usage)
 export interface PurchaseOrderCreate {
   supplier: string;
@@ -171,4 +190,10 @@ export interface AIGenerationRequest {
   };
   include_forecasting?: boolean;
   confidence_threshold?: number;
+  // Extended fields used by AI PO UI and backend
+  days_forecast?: number;
+  urgency_threshold?: number; // 0..1 fraction of reorder point
+  category_filter?: string;
+  store_ids?: number[];
+  medication_ids?: number[];
 }

@@ -6,8 +6,11 @@ import { Dashboard } from "./pages/dashboard"
 import { Inventory } from "./pages/inventory"
 import { MedicationDetail } from "./pages/medication-detail"
 import { PurchaseOrders } from "./pages/purchase-orders"
+import { PurchaseOrderDetail } from "./pages/purchase-order-detail"
 import { CreatePO } from "./pages/create-po"
 import { CreatePOEnhanced } from "./pages/create-po-enhanced"
+import { Analytics } from "./pages/analytics"
+import { Reports } from "./pages/reports"
 import { Toaster } from "@/components/ui/sonner"
 import "./App.css"
 
@@ -33,10 +36,11 @@ function App() {
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/medication/:id" element={<MedicationDetail />} />
                 <Route path="/purchase-orders" element={<PurchaseOrders />} />
-                <Route path="/purchase-orders/:id" element={<div className="p-4">PO Detail Page Coming Soon</div>} />
+                <Route path="/purchase-orders/:id" element={<PurchaseOrderDetail />} />
                 <Route path="/create-po" element={<CreatePOEnhanced />} />
                 <Route path="/create-po-legacy" element={<CreatePO />} />
-                <Route path="/analytics" element={<div className="p-4">Analytics Page Coming Soon</div>} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/reports" element={<Reports />} />
                 <Route path="/settings" element={<div className="p-4">Settings Page Coming Soon</div>} />
               </Route>
             </Routes>

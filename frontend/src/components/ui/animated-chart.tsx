@@ -17,6 +17,7 @@ import {
   Line,
 } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import "../../styles/chart-overrides.css"
 
 interface AnimatedChartProps {
   type: 'area' | 'bar' | 'pie' | 'line'
@@ -85,18 +86,40 @@ const PHARMA_COLORS = [
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
+    const entry = payload[0]
+    
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border rounded-lg shadow-lg p-3"
       >
-        <p className="font-medium text-sm">{`${label}`}</p>
-        {payload.map((entry: any, index: number) => (
-          <p key={index} className="text-xs" style={{ color: entry.color }}>
-            {`${entry.name}: ${typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}`}
-          </p>
-        ))}
+        {/* For pie charts, use payload[0].payload which contains the original data */}
+        {entry.payload && entry.payload.category ? (
+          // Pie chart tooltip
+          <div className="space-y-1">
+            <p className="font-medium text-sm">{entry.payload.category}</p>
+            <p className="text-xs" style={{ color: entry.color }}>
+              {`Value: ${typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}`}
+            </p>
+            {/* Use percent from Recharts which is automatically calculated */}
+            {entry.percent !== undefined && (
+              <p className="text-xs text-muted-foreground">
+                {`${(entry.percent * 100).toFixed(1)}%`}
+              </p>
+            )}
+          </div>
+        ) : (
+          // Other chart types tooltip
+          <div className="space-y-1">
+            {label && <p className="font-medium text-sm">{`${label}`}</p>}
+            {payload.map((entry: any, index: number) => (
+              <p key={index} className="text-xs" style={{ color: entry.color }}>
+                {`${entry.name || entry.dataKey}: ${typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}`}
+              </p>
+            ))}
+          </div>
+        )}
       </motion.div>
     )
   }
@@ -165,6 +188,9 @@ export function AnimatedChart({
         )
 
       case 'bar':
+        const maxValue = Math.max(...data.map((d: any) => d[dataKey] || 0))
+        const yAxisDomain = [0, Math.ceil(maxValue * 1.1)] // Add 10% padding
+        
         return (
           <ResponsiveContainer {...commonProps}>
             <BarChart data={data}>
@@ -173,19 +199,47 @@ export function AnimatedChart({
                 dataKey={xAxisKey} 
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
+                angle={-45}
+                textAnchor="end"
+                height={80}
               />
               <YAxis 
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
+                domain={yAxisDomain}
               />
               <Tooltip content={<CustomTooltip />} />
               <Bar 
                 dataKey={dataKey} 
-                fill={colors[0]}
                 radius={[4, 4, 0, 0]}
                 animationBegin={delay * 100}
                 animationDuration={1000}
-              />
+                style={{ cursor: 'pointer' }}
+              >
+                {/* Color bars based on stock level criticality */}
+                {data.map((entry: any, index: number) => {
+                  const stockLevel = entry[dataKey]
+                  const reorderPoint = entry.reorder_point
+                  let fillColor = colors[2] // Default green
+                  
+                  if (stockLevel <= reorderPoint * 0.25) {
+                    fillColor = colors[0] // Critical - red
+                  } else if (stockLevel <= reorderPoint * 0.5) {
+                    fillColor = colors[1] // Low - orange
+                  }
+                  
+                  return (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={fillColor}
+                      style={{
+                        filter: 'none',
+                        opacity: 1
+                      }}
+                    />
+                  )
+                })}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )

@@ -47,6 +47,11 @@ const menuItems = [
     icon: BarChart3,
   },
   {
+    title: "Reports",
+    url: "/reports",
+    icon: FileText,
+  },
+  {
     title: "Settings",
     url: "/settings",
     icon: Settings,
@@ -57,11 +62,11 @@ export function AppSidebar() {
   const location = useLocation()
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-4 py-4">
           <Package className="h-6 w-6 text-sidebar-primary" />
-          <div>
+          <div className="group-data-[collapsible=icon]:hidden">
             <h2 className="text-lg font-semibold text-sidebar-foreground">PharmaWMS</h2>
             <p className="text-xs text-sidebar-foreground/60">Warehouse Management</p>
           </div>

@@ -231,6 +231,107 @@ def create_tables(conn):
         FOREIGN KEY (po_id) REFERENCES purchase_orders(po_id) ON DELETE CASCADE,
         FOREIGN KEY (session_id) REFERENCES ai_po_sessions(session_id)
     );
+
+    -- ========== ANALYTICS AND REPORTS TABLES ==========
+    -- Pre-calculated analytics metrics cache
+    CREATE TABLE IF NOT EXISTS analytics_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        metric_key TEXT NOT NULL UNIQUE,
+        metric_value TEXT NOT NULL, -- JSON data
+        time_range TEXT NOT NULL,
+        filters TEXT, -- JSON filters applied
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL
+    );
+
+    -- Analytics metrics for dashboard KPIs
+    CREATE TABLE IF NOT EXISTS analytics_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        metric_name TEXT NOT NULL,
+        metric_value REAL NOT NULL,
+        metric_date DATE NOT NULL,
+        category TEXT,
+        metadata TEXT, -- JSON additional data
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Report templates
+    CREATE TABLE IF NOT EXISTS report_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        type TEXT NOT NULL CHECK(type IN ('inventory', 'financial', 'supplier', 'consumption', 'custom')),
+        template_data TEXT NOT NULL, -- JSON configuration
+        fields_config TEXT NOT NULL, -- JSON field configuration
+        chart_config TEXT, -- JSON chart settings
+        format TEXT NOT NULL DEFAULT 'pdf' CHECK(format IN ('pdf', 'excel', 'csv')),
+        frequency TEXT DEFAULT 'manual' CHECK(frequency IN ('manual', 'daily', 'weekly', 'monthly')),
+        recipients TEXT, -- JSON array of email addresses
+        parameters TEXT, -- JSON default parameters
+        created_by TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_active BOOLEAN DEFAULT 1
+    );
+
+    -- Report execution history
+    CREATE TABLE IF NOT EXISTS report_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        template_id INTEGER NOT NULL,
+        executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        parameters TEXT, -- JSON parameters used
+        status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed')),
+        file_path TEXT, -- Path to generated file
+        file_size INTEGER,
+        execution_time_ms INTEGER,
+        error_message TEXT,
+        executed_by TEXT,
+        FOREIGN KEY (template_id) REFERENCES report_templates(id)
+    );
+
+    -- Report schedules
+    CREATE TABLE IF NOT EXISTS report_schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        template_id INTEGER NOT NULL,
+        cron_expression TEXT NOT NULL, -- Cron format for scheduling
+        next_run TIMESTAMP,
+        last_run TIMESTAMP,
+        is_active BOOLEAN DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (template_id) REFERENCES report_templates(id)
+    );
+
+    -- Supplier performance metrics
+    CREATE TABLE IF NOT EXISTS supplier_performance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        supplier_id INTEGER NOT NULL,
+        period_start DATE NOT NULL,
+        period_end DATE NOT NULL,
+        total_orders INTEGER DEFAULT 0,
+        on_time_deliveries INTEGER DEFAULT 0,
+        late_deliveries INTEGER DEFAULT 0,
+        avg_delay_days REAL DEFAULT 0,
+        total_value REAL DEFAULT 0,
+        quality_score REAL DEFAULT 0,
+        rating REAL DEFAULT 0,
+        calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id)
+    );
+
+    -- Category performance tracking
+    CREATE TABLE IF NOT EXISTS category_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL,
+        period_start DATE NOT NULL,
+        period_end DATE NOT NULL,
+        total_medications INTEGER DEFAULT 0,
+        total_consumption INTEGER DEFAULT 0,
+        total_value REAL DEFAULT 0,
+        avg_turnover REAL DEFAULT 0,
+        low_stock_count INTEGER DEFAULT 0,
+        critical_stock_count INTEGER DEFAULT 0,
+        calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
     """)
 
     # Create indexes for better query performance
@@ -260,6 +361,35 @@ def create_tables(conn):
     )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_ai_po_metadata_session_id ON ai_po_metadata(session_id)"
+    )
+
+    # Analytics and reports indexes
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_analytics_cache_metric_key ON analytics_cache(metric_key)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_analytics_cache_expires ON analytics_cache(expires_at)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_analytics_metrics_name_date ON analytics_metrics(metric_name, metric_date)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_report_templates_type ON report_templates(type)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_report_history_template ON report_history(template_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_report_history_status ON report_history(status)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_report_schedules_next_run ON report_schedules(next_run)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_supplier_performance_supplier_period ON supplier_performance(supplier_id, period_start, period_end)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_category_metrics_category_period ON category_metrics(category, period_start, period_end)"
     )
 
     # Ensure new supplier contact columns exist on older DBs
@@ -1897,8 +2027,44 @@ def generate_all(
     current_inventory = generate_current_inventory_levels(
         meds, all_history_rows, sku_rows, suppliers, seed=seed + 40
     )
+    # Enrich with supplier name and valuation
+    supplier_lookup = {s["supplier_id"]: s for s in suppliers}
+    latest_price_lookup = {}
+    # Build latest price by med
+    for row in all_price_rows:
+        latest_price_lookup[row["med_id"]] = row["price_per_unit"]
+    valuation_rows = []
+    for inv in current_inventory:
+        med = next((m for m in meds if m["med_id"] == inv["med_id"]), None)
+        if not med:
+            continue
+        supplier_name = supplier_lookup.get(med["supplier_id"], {}).get(
+            "name", "Unknown"
+        )
+        price = float(latest_price_lookup.get(inv["med_id"], 0) or 0)
+        total_value = float(price * inv.get("current_stock", 0))
+        inv["supplier_name"] = supplier_name
+        inv["current_price"] = price
+        inv["total_value"] = total_value
+        # Ensure days_until_stockout exists
+        if not inv.get("days_until_stockout"):
+            avg_daily = max(0.1, inv.get("safety_stock", 1) / 7)
+            inv["days_until_stockout"] = int(inv.get("current_stock", 0) / avg_daily)
+        valuation_rows.append(
+            {
+                "med_id": inv["med_id"],
+                "current_stock": inv["current_stock"],
+                "current_price": price,
+                "total_value": total_value,
+                "supplier_name": supplier_name,
+            }
+        )
     pd.DataFrame(current_inventory).to_csv(
         os.path.join(output_dir, "current_inventory.csv"), index=False
+    )
+    # Write valuation view for quick diagnostics
+    pd.DataFrame(valuation_rows).to_csv(
+        os.path.join(output_dir, "inventory_valuation.csv"), index=False
     )
 
     print("Generating batch information…")

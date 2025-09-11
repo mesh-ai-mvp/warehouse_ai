@@ -1,5 +1,6 @@
 import { motion } from "framer-motion"
 import { useInView } from "react-intersection-observer"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -7,8 +8,9 @@ import { AnimatedStatCard } from "@/components/ui/animated-card"
 import { AnimatedChart } from "@/components/ui/animated-chart"
 import { ReUIStatCard, PharmacyStatPresets } from "@/components/ui/reui-stats"
 import { GanttChart, PharmaGanttPresets } from "@/components/charts/gantt-chart"
-import { PlotlyChart, PharmaPlotlyPresets } from "@/components/charts/plotly-chart"
-import { ChartControls, PharmacyFilters } from "@/components/charts/chart-controls"
+import ConsumptionForecastChart from "@/components/consumption-forecast-chart"
+import StockLevelChart from "@/components/stock-level-chart"
+import DeliveryTimeline from "@/components/delivery-timeline"
 import {
   Package,
   AlertTriangle,
@@ -23,6 +25,7 @@ import {
   RefreshCw
 } from "lucide-react"
 import { useDashboardStats, useInventory, usePurchaseOrders } from "@/hooks/use-api"
+import { useCategoryBreakdown, useConsumptionForecast, useStockLevelTrends, useDeliveryTimeline, useStockAlerts } from "@/hooks/useAnalytics"
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -65,31 +68,28 @@ export function Dashboard() {
     triggerOnce: true
   })
 
+
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useDashboardStats()
   const { data: inventory } = useInventory({ page_size: 100 })
   const { data: purchaseOrders } = usePurchaseOrders({ page_size: 20 })
 
-  // Mock data for charts (in real implementation, this would come from API)
-  const inventoryTrendData = [
-    { date: '2024-01-01', stock_level: 2450 },
-    { date: '2024-01-02', stock_level: 2380 },
-    { date: '2024-01-03', stock_level: 2290 },
-    { date: '2024-01-04', stock_level: 2420 },
-    { date: '2024-01-05', stock_level: 2510 },
-    { date: '2024-01-06', stock_level: 2480 },
-    { date: '2024-01-07', stock_level: 2560 },
-  ]
+  // Real data from analytics API - using monthly timeline data
+  const { data: categoryBreakdown, isLoading: categoryLoading } = useCategoryBreakdown()
+  const { data: consumptionForecast, isLoading: forecastLoading } = useConsumptionForecast(undefined, 30) // 30 days forecast
+  const { data: stockTrends, isLoading: stockTrendsLoading } = useStockLevelTrends(undefined, '30d') // 30 days trend
+  const { data: timelineTasks, isLoading: timelineLoading } = useDeliveryTimeline()
+  const { data: stockAlerts, isLoading: alertsLoading } = useStockAlerts()
 
-  const categoryData = [
-    { category: 'Antibiotics', count: 450, value: 450 },
-    { category: 'Pain Relief', count: 320, value: 320 },
-    { category: 'Vaccines', count: 180, value: 180 },
-    { category: 'Cardiovascular', count: 280, value: 280 },
-    { category: 'Diabetes', count: 150, value: 150 },
-    { category: 'Others', count: 620, value: 620 },
-  ]
+  // Transform category data for charts
+  const categoryData = categoryBreakdown || []
 
-  const lowStockData = inventory?.items
+  // Transform stock alerts for low stock data
+  const lowStockData = stockAlerts?.slice(0, 8)?.map(alert => ({
+    medication: alert.medication?.substring(0, 15) + (alert.medication?.length > 15 ? '...' : ''),
+    current_stock: alert.current,
+    reorder_point: alert.reorder,
+    value: alert.current
+  })) || inventory?.items
     ?.filter(med => med.current_stock <= med.reorder_point)
     ?.slice(0, 8)
     ?.map(med => ({
@@ -264,7 +264,15 @@ export function Dashboard() {
         <div className="grid gap-6 md:grid-cols-2">
           <AnimatedChart
             type="area"
-            data={inventoryTrendData}
+            data={stockTrends?.data || [
+              { date: '2024-01-01', stock_level: 2450 },
+              { date: '2024-01-02', stock_level: 2380 },
+              { date: '2024-01-03', stock_level: 2290 },
+              { date: '2024-01-04', stock_level: 2420 },
+              { date: '2024-01-05', stock_level: 2510 },
+              { date: '2024-01-06', stock_level: 2480 },
+              { date: '2024-01-07', stock_level: 2560 },
+            ]}
             title="Inventory Levels Trend"
             subtitle="Stock levels over the past week"
             xAxisKey="date"
@@ -319,111 +327,41 @@ export function Dashboard() {
                 Enhanced pharmaceutical analytics with interactive controls
               </p>
             </div>
-            <Badge variant="outline" className="text-blue-600 border-blue-200">
-              Phase 4 Complete
-            </Badge>
           </div>
 
-          {/* Chart Controls */}
-          <ChartControls
-            title="Analytics Controls"
-            filters={PharmacyFilters.inventoryFilters}
-            chartTypes={PharmacyFilters.chartTypes}
-            dateRange={{
-              start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-              end: new Date()
-            }}
-            onFilterChange={(filterId, value) => console.log('Filter changed:', filterId, value)}
-            onChartTypeChange={(typeId) => console.log('Chart type changed:', typeId)}
-            onDateRangeChange={(start, end) => console.log('Date range changed:', start, end)}
-            onExport={(format) => console.log('Export as:', format)}
-            onRefresh={() => console.log('Refresh data')}
-            onFullscreen={() => console.log('Toggle fullscreen')}
-          />
 
-          {/* ReUI Statistics Grid */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <ReUIStatCard
-              {...PharmacyStatPresets.totalMedications(stats?.total_medications || 2456)}
-              icon={Package}
-              delay={0}
-            />
-            <ReUIStatCard
-              {...PharmacyStatPresets.lowStockAlerts(stats?.low_stock_count || 15, stats?.critical_stock_count || 3)}
-              icon={AlertTriangle}
-              delay={1}
-            />
-            <ReUIStatCard
-              {...PharmacyStatPresets.inventoryValue(stats?.total_value || 1850000)}
-              icon={DollarSign}
-              delay={2}
-            />
-            <ReUIStatCard
-              {...PharmacyStatPresets.ordersToday(stats?.orders_today || 8)}
-              icon={ShoppingCart}
-              delay={3}
-            />
-          </div>
 
-          {/* Plotly.js Advanced Analytics */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <PlotlyChart
-              title="Consumption Forecast with AI"
-              subtitle="Historical data with predictive analytics"
-              {...PharmaPlotlyPresets.consumptionForecast(
-                [
-                  { date: '2024-01-01', consumption: 145 },
-                  { date: '2024-01-02', consumption: 168 },
-                  { date: '2024-01-03', consumption: 142 },
-                  { date: '2024-01-04', consumption: 189 },
-                  { date: '2024-01-05', consumption: 176 }
-                ],
-                [
-                  { date: '2024-01-06', predicted: 185, upper_bound: 210, lower_bound: 160 },
-                  { date: '2024-01-07', predicted: 195, upper_bound: 220, lower_bound: 170 },
-                  { date: '2024-01-08', predicted: 188, upper_bound: 215, lower_bound: 165 }
-                ]
-              )}
+          {/* Enhanced Analytics Charts */}
+          <div className="grid gap-6">
+            <ConsumptionForecastChart
+              historicalData={consumptionForecast?.historical_data || []}
+              forecastData={consumptionForecast?.forecast_data || []}
               height={350}
-              showControls={true}
             />
             
-            <PlotlyChart
-              title="Stock Level Monitoring"
-              subtitle="Real-time stock tracking with alerts"
-              {...PharmaPlotlyPresets.stockLevelTrends(
-                [
-                  { date: '2024-01-01', stock_level: 450 },
-                  { date: '2024-01-02', stock_level: 420 },
-                  { date: '2024-01-03', stock_level: 390 },
-                  { date: '2024-01-04', stock_level: 360 },
-                  { date: '2024-01-05', stock_level: 335 },
-                  { date: '2024-01-06', stock_level: 310 }
-                ],
-                400 // reorder point
-              )}
+            <StockLevelChart
+              data={stockTrends?.data || [
+                { date: '2024-01-01', stock_level: 450 },
+                { date: '2024-01-02', stock_level: 420 },
+                { date: '2024-01-03', stock_level: 390 },
+                { date: '2024-01-04', stock_level: 360 },
+                { date: '2024-01-05', stock_level: 335 },
+                { date: '2024-01-06', stock_level: 310 }
+              ]}
+              reorderPoint={stockTrends?.reorder_point || 400}
               height={350}
-              showControls={true}
             />
           </div>
 
-          {/* Gantt Chart for Delivery Timeline */}
-          <GanttChart
-            title="Delivery & Manufacturing Timeline"
-            subtitle="Track purchase orders and production schedules"
-            tasks={[
-              ...PharmaGanttPresets.generateDeliveryTimeline(
-                purchaseOrders?.items?.slice(0, 4).map(order => ({
-                  ...order,
-                  order_date: new Date(Date.now() - Math.random() * 5 * 24 * 60 * 60 * 1000),
-                  delivery_date: new Date(Date.now() + Math.random() * 10 * 24 * 60 * 60 * 1000)
-                })) || []
-              ),
-              ...PharmaGanttPresets.generateManufacturingSchedule()
-            ]}
+          {/* Delivery Timeline */}
+          <DeliveryTimeline
+            tasks={(timelineTasks || []).map(task => ({
+              ...task,
+              startDate: new Date(task.startDate),
+              endDate: new Date(task.endDate)
+            }))}
             showToday={true}
-            height={300}
-            onTaskClick={(task) => console.log('Task clicked:', task)}
+            height={400}
           />
         </div>
       </motion.section>

@@ -10,6 +10,7 @@ import { apiClient } from '@/lib/api-client';
 import type {
   InventoryFilters,
   CreatePORequest,
+  CreatePOBackendRequest,
   PurchaseOrderCreate,
   LineItem,
   AIGenerationRequest,
@@ -121,7 +122,8 @@ export function useCreatePurchaseOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CreatePORequest | PurchaseOrderCreate) => apiClient.createPurchaseOrder(data),
+    mutationFn: (params: { data: CreatePORequest | PurchaseOrderCreate; options?: { sendEmails?: boolean } }) => 
+      apiClient.createPurchaseOrder(params.data, params.options),
     onSuccess: (newPO) => {
       // Invalidate and refetch purchase orders
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
@@ -142,9 +144,9 @@ export function useCreatePurchaseOrder() {
 
 export function useSendPOEmails() {
   return useMutation({
-    mutationFn: (poIds: string[]) => apiClient.sendPOEmails(poIds),
+    mutationFn: (request: CreatePOBackendRequest) => apiClient.sendPOEmails(request),
     onSuccess: (result) => {
-      toast.success(result.message);
+      toast.success(`Sent emails to ${result.sent} suppliers`);
     },
     onError: (error: Error) => {
       toast.error(`Failed to send emails: ${error.message}`);

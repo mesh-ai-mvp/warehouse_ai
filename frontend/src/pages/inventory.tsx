@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import {
@@ -304,10 +305,10 @@ export function Inventory() {
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <Link to={`/medication/${medication.med_id}`}>
-                <DropdownMenuCheckboxItem>View Details</DropdownMenuCheckboxItem>
+                <DropdownMenuItem>View Details</DropdownMenuItem>
               </Link>
               <Link to={`/create-po?medication=${medication.med_id}`}>
-                <DropdownMenuCheckboxItem>Create PO</DropdownMenuCheckboxItem>
+                <DropdownMenuItem>Create PO</DropdownMenuItem>
               </Link>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -337,6 +338,20 @@ export function Inventory() {
 
   const selectedRows = table.getFilteredSelectedRowModel().rows
   const selectedMedications = selectedRows.map(row => row.original)
+
+  // Fixed widths for consistent alignment (prevents column shift)
+  const columnClasses: Record<string, string> = {
+    select: "w-8",
+    name: "min-w-[220px]",
+    category: "w-36",
+    current_stock: "w-56",
+    days_until_stockout: "w-40 text-center",
+    supplier: "min-w-[220px]",
+    total_value: "w-32 text-right",
+    storage_location: "w-40",
+    avg_daily_pick: "w-28 text-right",
+    actions: "w-12",
+  }
 
   if (error) {
     return (
@@ -532,7 +547,7 @@ export function Inventory() {
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id}>
+                      <TableHead key={header.id} className={columnClasses[header.column.id as string] || ""}>
                         {header.isPlaceholder
                           ? null
                           : flexRender(
@@ -563,7 +578,7 @@ export function Inventory() {
                       className="hover:bg-muted/50 transition-colors"
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
+                        <TableCell key={cell.id} className={columnClasses[cell.column.id as string] || ""}>
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext()
@@ -612,7 +627,7 @@ export function Inventory() {
                   variant="outline"
                   size="sm"
                   onClick={() => updateFilters({ page: (data?.page || 1) + 1 })}
-                  disabled={!data?.page || data.page >= (data.total_pages || 1)}
+                  disabled={!data?.page || data.page >= (data?.total_pages || 1)}
                 >
                   Next
                 </Button>

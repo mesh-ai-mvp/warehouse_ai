@@ -14,8 +14,6 @@ export function Header() {
 
   return (
     <header className="flex h-16 items-center gap-4 border-b bg-background px-6">
-      <SidebarTrigger className="md:hidden" />
-      
       <div className="flex-1">
         <h1 className="text-xl font-semibold text-foreground">
           Pharmaceutical Warehouse Management
@@ -23,6 +21,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-4">
+        <SidebarTrigger className="h-8 w-8" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon">

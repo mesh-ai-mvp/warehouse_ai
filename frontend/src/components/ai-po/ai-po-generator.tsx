@@ -144,7 +144,7 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
                   AI Analysis in Progress
                 </CardTitle>
                 <CardDescription>
-                  {getStatusMessage()}
+                  {status === 'generating' ? getStatusMessage() : 'Working...'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -158,7 +158,7 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
                 
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  This usually takes 10-30 seconds
+                  This usually takes 1-2 minutes
                 </div>
               </CardContent>
             </Card>
@@ -171,16 +171,14 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
                   <CheckCircle className="h-5 w-5 text-green-500" />
                   AI Recommendations Ready
                 </CardTitle>
-                <CardDescription>
-                  {result.reasoning}
-                </CardDescription>
+                <CardDescription>Review and apply to the form below.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm text-muted-foreground">Estimated Total</Label>
                     <div className="text-2xl font-bold text-green-600">
-                      ${result.estimated_total.toLocaleString()}
+                      ${result.estimated_total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
                   <div>
@@ -193,15 +191,17 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
 
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">Recommended Items ({result.items.length})</Label>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {result.items.slice(0, 5).map((item, index) => (
+                  <div className="space-y-2 max-h-56 overflow-y-auto">
+                    {result.items.map((item, index) => (
                       <div key={index} className="flex items-center justify-between p-3 border rounded">
-                        <div className="flex-1">
-                          <div className="font-medium">Medication ID: {item.medication_id}</div>
-                          <div className="text-sm text-muted-foreground">{item.reason}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">
+                            {item.medication_name || `Medication ID: ${item.medication_id}`}
+                          </div>
+                          <div className="text-sm text-muted-foreground truncate">{item.reason}</div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={item.priority === 'high' ? 'destructive' : item.priority === 'medium' ? 'default' : 'secondary'}>
+                        <div className="flex items-center gap-3 min-w-[160px] justify-end">
+                          <Badge variant={item.priority === 'high' ? 'destructive' : item.priority === 'medium' ? 'info' : 'secondary'} className="capitalize">
                             {item.priority}
                           </Badge>
                           <div className="text-right">
@@ -213,11 +213,6 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
                         </div>
                       </div>
                     ))}
-                    {result.items.length > 5 && (
-                      <div className="text-center text-sm text-muted-foreground py-2">
-                        +{result.items.length - 5} more items
-                      </div>
-                    )}
                   </div>
                 </div>
               </CardContent>

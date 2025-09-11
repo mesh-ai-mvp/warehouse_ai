@@ -66,11 +66,11 @@ class DataLoader:
         self._conn = None
 
     def get_connection(self):
-        """Get or create database connection"""
-        if self._conn is None:
-            self._conn = sqlite3.connect(self.db_path)
-            self._conn.row_factory = sqlite3.Row  # Enable column access by name
-        return self._conn
+        """Get a fresh database connection"""
+        # Always return a new connection to avoid "closed database" errors
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row  # Enable column access by name
+        return conn
 
     def load_all_data(self):
         """Load all data from SQLite database"""
@@ -263,6 +263,8 @@ class DataLoader:
                 "category": med_data.get("category", ""),
                 "current_stock": total_stock,
                 "stock_category": stock_category,
+                # Keep both keys for frontend compatibility
+                "supplier": supplier_info.get("name", "Unknown"),
                 "supplier_name": supplier_info.get("name", "Unknown"),
                 "supplier_status": supplier_info.get("status", "Unknown"),
                 "pack_size": med_data.get("pack_size", 0),
@@ -283,6 +285,14 @@ class DataLoader:
                 "days_until_stockout": inventory_info.get("days_until_stockout", 0),
                 "last_updated": inventory_info.get("last_updated", ""),
             }
+            # Computed totals & fallbacks
+            price = item["current_price"] or 0
+            item["total_value"] = float((item["current_stock"] or 0) * price)
+            if not item["days_until_stockout"]:
+                avg_daily = item.get("avg_daily_pick") or 0
+                item["days_until_stockout"] = (
+                    int(item["current_stock"] / avg_daily) if avg_daily > 0 else 0
+                )
             # Clean NaN values before adding to inventory items
             inventory_items.append(clean_nan_values(item))
 
@@ -647,31 +657,36 @@ class DataLoader:
         except Exception as e:
             conn.rollback()
             raise e
+        finally:
+            conn.close()
 
     def get_purchase_order(self, po_id: str) -> Optional[Dict[str, Any]]:
         """Get a purchase order by ID"""
         conn = self.get_connection()
+        
+        try:
+            # Query PO with items
+            po_query = """
+                SELECT * FROM purchase_orders WHERE po_id = ?
+            """
+            po_df = pd.read_sql_query(po_query, conn, params=(po_id,))
 
-        # Query PO with items
-        po_query = """
-            SELECT * FROM purchase_orders WHERE po_id = ?
-        """
-        po_df = pd.read_sql_query(po_query, conn, params=(po_id,))
+            if po_df.empty:
+                return None
 
-        if po_df.empty:
-            return None
+            po = po_df.iloc[0].to_dict()
 
-        po = po_df.iloc[0].to_dict()
+            # Query items
+            items_query = """
+                SELECT * FROM purchase_order_items WHERE po_id = ?
+            """
+            items_df = pd.read_sql_query(items_query, conn, params=(po_id,))
 
-        # Query items
-        items_query = """
-            SELECT * FROM purchase_order_items WHERE po_id = ?
-        """
-        items_df = pd.read_sql_query(items_query, conn, params=(po_id,))
+            po["items"] = items_df.to_dict("records") if not items_df.empty else []
 
-        po["items"] = items_df.to_dict("records") if not items_df.empty else []
-
-        return clean_nan_values(po)
+            return clean_nan_values(po)
+        finally:
+            conn.close()
 
     def list_purchase_orders(
         self, status: Optional[str] = None
@@ -679,36 +694,39 @@ class DataLoader:
         """List all purchase orders, optionally filtered by status"""
         conn = self.get_connection()
 
-        # Build query
-        if status:
-            query = """
-                SELECT po.*, COUNT(poi.item_id) as item_count,
-                       SUM(poi.quantity) as total_quantity
-                FROM purchase_orders po
-                LEFT JOIN purchase_order_items poi ON po.po_id = poi.po_id
-                WHERE po.status = ?
-                GROUP BY po.po_id
-                ORDER BY po.created_at DESC
-            """
-            params = (status,)
-        else:
-            query = """
-                SELECT po.*, COUNT(poi.item_id) as item_count,
-                       SUM(poi.quantity) as total_quantity
-                FROM purchase_orders po
-                LEFT JOIN purchase_order_items poi ON po.po_id = poi.po_id
-                GROUP BY po.po_id
-                ORDER BY po.created_at DESC
-            """
-            params = ()
+        try:
+            # Build query
+            if status:
+                query = """
+                    SELECT po.*, COUNT(poi.item_id) as item_count,
+                           SUM(poi.quantity) as total_quantity
+                    FROM purchase_orders po
+                    LEFT JOIN purchase_order_items poi ON po.po_id = poi.po_id
+                    WHERE po.status = ?
+                    GROUP BY po.po_id
+                    ORDER BY po.created_at DESC
+                """
+                params = (status,)
+            else:
+                query = """
+                    SELECT po.*, COUNT(poi.item_id) as item_count,
+                           SUM(poi.quantity) as total_quantity
+                    FROM purchase_orders po
+                    LEFT JOIN purchase_order_items poi ON po.po_id = poi.po_id
+                    GROUP BY po.po_id
+                    ORDER BY po.created_at DESC
+                """
+                params = ()
 
-        df = pd.read_sql_query(query, conn, params=params)
+            df = pd.read_sql_query(query, conn, params=params)
 
-        if df.empty:
-            return []
+            if df.empty:
+                return []
 
-        pos = df.to_dict("records")
-        return clean_nan_values(pos)
+            pos = df.to_dict("records")
+            return clean_nan_values(pos)
+        finally:
+            conn.close()
 
     def __del__(self):
         """Close database connection when object is destroyed"""

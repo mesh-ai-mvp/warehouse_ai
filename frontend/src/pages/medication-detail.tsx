@@ -34,6 +34,7 @@ import {
   useConsumptionHistory, 
   useSupplierPrices 
 } from "@/hooks/use-api"
+import MedicationHistoryChart from "@/components/medication-history-chart"
 
 function getStockLevelInfo(currentStock: number, reorderPoint: number) {
   const percentage = (currentStock / reorderPoint) * 100
@@ -412,7 +413,18 @@ export function MedicationDetail() {
         </Card>
       </div>
 
-      {/* Consumption History */}
+      {/* Historical Data Chart */}
+      {consumptionHistory && consumptionHistory.length > 0 && (
+        <MedicationHistoryChart
+          consumptionHistory={consumptionHistory}
+          medicationName={medication.name}
+          currentStock={medication.current_stock}
+          reorderPoint={medication.reorder_point}
+          height={300}
+        />
+      )}
+
+      {/* Consumption History Table */}
       {consumptionHistory && consumptionHistory.length > 0 && (
         <Card>
           <CardHeader>

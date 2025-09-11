@@ -7,6 +7,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from api.routes import router as api_router, data_loader
+from api.analytics import router as analytics_router
+from api.reports import router as reports_router
 from loguru import logger
 import os
 import uvicorn
@@ -46,6 +48,8 @@ app = FastAPI(
 
 # Mount API routes
 app.include_router(api_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")
+app.include_router(reports_router, prefix="/api")
 
 # Serve static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

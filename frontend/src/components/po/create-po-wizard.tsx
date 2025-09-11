@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -23,7 +24,8 @@ import {
   Plus,
   Minus,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -46,6 +48,7 @@ interface POFormData {
   buyer_name: string;
   notes: string;
   line_items: POLineItem[];
+  send_emails: boolean;
 }
 
 const STEPS = [
@@ -61,10 +64,12 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
     delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
     buyer_name: '',
     notes: '',
-    line_items: []
+    line_items: [],
+    send_emails: false
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [showNotification, setShowNotification] = useState(false);
+  const [aiInsights, setAiInsights] = useState<Record<number, { reason: string; suggested_quantity: number }>>({});
   
   const { data: suppliers } = useSuppliers();
   const { data: inventory } = useInventory({ search: searchTerm, page_size: 50 });
@@ -76,23 +81,25 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
     setFormData(prev => ({ ...prev, ...updates }));
   };
 
-  const addLineItem = (medication: any) => {
+  const addLineItem = (medication: any, qty: number = 1) => {
     const existing = formData.line_items.find(item => item.medication_id === medication.med_id);
     if (existing) {
       updateFormData({
         line_items: formData.line_items.map(item => 
           item.medication_id === medication.med_id 
-            ? { ...item, quantity: item.quantity + 1, total_price: (item.quantity + 1) * item.unit_price }
+            ? { ...item, quantity: item.quantity + qty, total_price: (item.quantity + qty) * item.unit_price }
             : item
         )
       });
     } else {
+      const price = medication.current_price || 0;
+      const quantity = Math.max(1, qty);
       const newItem: POLineItem = {
         medication_id: medication.med_id,
         medication_name: medication.name,
-        quantity: 1,
-        unit_price: medication.current_price || 0,
-        total_price: medication.current_price || 0
+        quantity,
+        unit_price: price,
+        total_price: price * quantity
       };
       updateFormData({
         line_items: [...formData.line_items, newItem]
@@ -105,7 +112,7 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
     updateFormData({
       line_items: formData.line_items.map(item =>
         item.medication_id === medication_id
-          ? { ...item, ...updates, total_price: (updates.quantity || item.quantity) * (updates.unit_price || item.unit_price) }
+          ? { ...item, ...updates, total_price: (updates.quantity ?? item.quantity) * (updates.unit_price ?? item.unit_price) }
           : item
       )
     });
@@ -118,23 +125,49 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
   };
 
   const handleAIRecommendations = (result: any) => {
-    // Convert AI recommendations to line items
-    const aiLineItems: POLineItem[] = result.items.map((item: any) => ({
-      medication_id: item.medication_id,
-      medication_name: `Medication ${item.medication_id}`, // Would need to look this up
-      quantity: item.suggested_quantity,
-      unit_price: 10, // Placeholder - would need actual price
-      total_price: item.suggested_quantity * 10
-    }));
+    // Keep user on the medications step and do not auto-fill notes
+    // Map AI items to real meds/prices and store per-item reasoning
+    const byId: Record<number, any> = {};
+    (inventory?.items || []).forEach((m: any) => { byId[m.med_id] = m; });
 
-    updateFormData({
-      line_items: aiLineItems,
-      supplier: result.supplier_suggestion,
-      notes: `AI Generated PO: ${result.reasoning}`
+    const aiLineItems: POLineItem[] = result.items.map((item: any) => {
+      const med = byId[item.medication_id] || {};
+      const name = item.medication_name || med.name || `Medication ${item.medication_id}`;
+      const price = med.current_price || 0;
+      const quantity = Math.max(1, Math.round(item.suggested_quantity || 0));
+      return {
+        medication_id: item.medication_id,
+        medication_name: name,
+        quantity,
+        unit_price: price,
+        total_price: price * quantity,
+      };
     });
 
-    setCurrentStep(2); // Jump to review step
-    toast.success('AI recommendations applied!');
+    // Merge with existing items (dedupe by medication_id)
+    const merged = [...formData.line_items];
+    aiLineItems.forEach(aiItem => {
+      const existingIdx = merged.findIndex(li => li.medication_id === aiItem.medication_id);
+      if (existingIdx >= 0) {
+        merged[existingIdx] = { ...merged[existingIdx], quantity: aiItem.quantity, unit_price: aiItem.unit_price, total_price: aiItem.total_price };
+      } else {
+        merged.push(aiItem);
+      }
+    });
+
+    // Store AI reasoning for per-med popovers
+    const insights: Record<number, { reason: string; suggested_quantity: number }> = {};
+    result.items.forEach((it: any) => {
+      insights[it.medication_id] = { reason: it.reason, suggested_quantity: it.suggested_quantity };
+    });
+
+    setAiInsights(insights);
+    updateFormData({ line_items: merged });
+    if (result.supplier_suggestion && !formData.supplier) {
+      updateFormData({ supplier: result.supplier_suggestion });
+    }
+
+    toast.success('AI recommendations inserted. Review and adjust as needed.');
   };
 
   const canGoNext = () => {
@@ -176,17 +209,15 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
         }))
       };
 
-      await createPOMutation.mutateAsync(poData);
+      await createPOMutation.mutateAsync({
+        data: poData,
+        options: { sendEmails: formData.send_emails }
+      });
       
-      // Show professional notification
       setShowNotification(true);
-      
-      // Hide notification after 3 seconds
       setTimeout(() => {
         setShowNotification(false);
-        if (onComplete) {
-          onComplete(poData);
-        }
+        if (onComplete) onComplete(poData);
       }, 3000);
     } catch (error) {
       toast.error('Failed to create purchase order');
@@ -227,15 +258,15 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                 <div 
                   key={step.id} 
                   className={cn(
-                    "flex items-center space-x-2 text-sm",
-                    index === currentStep ? "text-primary font-medium" : "text-muted-foreground",
-                    index < currentStep ? "text-green-600" : ""
+                    'flex items-center space-x-2 text-sm',
+                    index === currentStep ? 'text-primary font-medium' : 'text-muted-foreground',
+                    index < currentStep ? 'text-green-600' : ''
                   )}
                 >
                   <div className={cn(
-                    "w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs",
-                    index === currentStep ? "border-primary bg-primary text-primary-foreground" : 
-                    index < currentStep ? "border-green-600 bg-green-600 text-white" : "border-muted-foreground"
+                    'w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs',
+                    index === currentStep ? 'border-primary bg-primary text-primary-foreground' : 
+                    index < currentStep ? 'border-green-600 bg-green-600 text-white' : 'border-muted-foreground'
                   )}>
                     {index < currentStep ? <CheckCircle className="w-3 h-3" /> : index + 1}
                   </div>
@@ -305,7 +336,7 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start text-left font-normal">
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {format(formData.delivery_date, "PPP")}
+                        {format(formData.delivery_date, 'PPP')}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -362,10 +393,30 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                       {formData.line_items.map((item) => (
                         <div key={item.medication_id} className="flex items-center justify-between p-3 border rounded">
                           <div className="flex-1">
-                            <div className="font-medium">{item.medication_name}</div>
-                            <div className="text-sm text-muted-foreground">
-                              ${item.unit_price} per unit
+                            <div className="flex items-center gap-2">
+                              <div className="font-medium">{item.medication_name}</div>
+                              {aiInsights[item.medication_id] && (
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button size="icon" variant="ghost" className="h-6 w-6" title="AI reasoning">
+                                      <Info className="h-4 w-4" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="max-w-sm">
+                                    <div className="space-y-1">
+                                      <div className="text-sm font-medium">Why this quantity?</div>
+                                      <div className="text-sm text-muted-foreground">
+                                        {aiInsights[item.medication_id].reason}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground pt-1">
+                                        Suggested: {aiInsights[item.medication_id].suggested_quantity.toLocaleString()} units
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              )}
                             </div>
+                            <div className="text-sm text-muted-foreground">${item.unit_price} per unit</div>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1">
@@ -392,7 +443,7 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                               </Button>
                             </div>
                             <div className="text-right min-w-20">
-                              <div className="font-medium">${item.total_price.toLocaleString()}</div>
+                              <div className="font-medium">${item.total_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                             </div>
                             <Button
                               size="sm"
@@ -419,7 +470,12 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                     {inventory?.items?.slice(0, 10).map((med) => (
                       <div key={med.med_id} className="flex items-center justify-between p-3 border rounded hover:bg-muted/50">
                         <div className="flex-1">
-                          <div className="font-medium">{med.name}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-medium">{med.name}</div>
+                            {aiInsights[med.med_id] && (
+                              <Badge variant="secondary" className="text-xs">AI</Badge>
+                            )}
+                          </div>
                           <div className="text-sm text-muted-foreground flex items-center gap-4">
                             <span>Stock: {med.current_stock}</span>
                             <span>Reorder: {med.reorder_point}</span>
@@ -433,6 +489,16 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                             <div className="font-medium">${med.current_price}</div>
                             <div className="text-xs text-muted-foreground">per unit</div>
                           </div>
+                          {aiInsights[med.med_id] && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => addLineItem(med, Math.max(1, Math.round(aiInsights[med.med_id].suggested_quantity)))}
+                              title="Use AI quantity"
+                            >
+                              AI
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             onClick={() => addLineItem(med)}
@@ -475,7 +541,7 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                     </div>
                     <div>
                       <Label className="text-sm text-muted-foreground">Delivery Date</Label>
-                      <div className="font-medium">{format(formData.delivery_date, "PPP")}</div>
+                      <div className="font-medium">{format(formData.delivery_date, 'PPP')}</div>
                     </div>
                     {formData.notes && (
                       <div>
@@ -504,7 +570,7 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                     <Separator />
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total Amount:</span>
-                      <span>${totalAmount.toLocaleString()}</span>
+                      <span>${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -525,9 +591,31 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
                             {item.quantity.toLocaleString()} × ${item.unit_price}
                           </div>
                         </div>
-                        <div className="font-medium">${item.total_price.toLocaleString()}</div>
+                        <div className="font-medium">${item.total_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Email Options */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Email Notifications</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="send-emails"
+                      checked={formData.send_emails}
+                      onCheckedChange={(checked) => updateFormData({ send_emails: !!checked })}
+                    />
+                    <Label htmlFor="send-emails" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Send email notifications to suppliers
+                    </Label>
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-2">
+                    When enabled, suppliers will receive email notifications about this purchase order request.
                   </div>
                 </CardContent>
               </Card>
