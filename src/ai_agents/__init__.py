@@ -1,6 +1,6 @@
 """AI Agents for Purchase Order Generation"""
 
-from .workflow import POGenerationWorkflow
 from .api_handler import AIPoHandler
+from .workflow import POGenerationWorkflow
 
 __all__ = ["POGenerationWorkflow", "AIPoHandler"]

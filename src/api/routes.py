@@ -2,22 +2,23 @@
 API routes for inventory management
 """
 
-from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
-from typing import Optional, Dict, Any, List
-import sys
 import os
-from datetime import datetime
-from uuid import uuid4
 import smtplib
 import ssl
+import sys
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Any, Dict, List, Optional
+from uuid import uuid4
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from loguru import logger
 
 # Add parent directory to path to import data_loader
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from data_loader import DataLoader
 from ai_agents.api_handler import AIPoHandler
+from data_loader import DataLoader
 
 # Initialize router
 router = APIRouter()
@@ -75,6 +76,45 @@ async def get_filter_options():
     """Get available filter options"""
     try:
         return data_loader.get_filter_options()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/dashboard/stats")
+async def get_dashboard_stats():
+    """Get dashboard statistics"""
+    try:
+        # Get inventory data using the same method as the inventory endpoint
+        inventory_data = data_loader.get_inventory_data(page_size=100)
+        medications = inventory_data["items"]
+
+        # Calculate statistics
+        total_medications = len(medications)
+
+        low_stock_count = sum(
+            1 for med in medications if med["current_stock"] <= med["reorder_point"]
+        )
+
+        critical_stock_count = sum(
+            1
+            for med in medications
+            if med["current_stock"] <= med["reorder_point"] * 0.5
+        )
+
+        total_value = sum(
+            med["current_stock"] * med.get("current_price", 0) for med in medications
+        )
+
+        # For orders_today, we'll return 0 for now since PO tracking is not implemented
+        orders_today = 0
+
+        return {
+            "total_medications": total_medications,
+            "low_stock_count": low_stock_count,
+            "critical_stock_count": critical_stock_count,
+            "total_value": total_value,
+            "orders_today": orders_today,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -156,10 +196,12 @@ async def create_purchase_orders(payload: dict):
     try:
         # Payload contract: {
         #   items: [{ med_id, total_quantity, allocations: [{ supplier_id, quantity, unit_price }] }],
-        #   meta: { requested_delivery_date, notes, buyer }
+        #   meta: { requested_delivery_date, notes, buyer },
+        #   send_emails: boolean (optional, default: false)
         # }
         items = payload.get("items", [])
         meta = payload.get("meta", {})
+        send_emails = payload.get("send_emails", False)
 
         # Group allocations by supplier to create 1 PO per supplier
         supplier_to_lines = {}
@@ -219,6 +261,33 @@ async def create_purchase_orders(payload: dict):
             data_loader.save_purchase_order(po_data)
             created_pos.append(po_data)
             po_counter += 1
+
+        # Send emails to suppliers if requested
+        if send_emails and supplier_to_lines:
+            fallback_to = os.getenv("SUPPLIER_FALLBACK_EMAIL")
+            bcc = os.getenv("EMAIL_BCC")
+            email_logger.info(
+                f"PO creation email flow start | suppliers={len(supplier_to_lines)}"
+            )
+
+            for supplier_id, lines in supplier_to_lines.items():
+                supplier = data_loader.suppliers.get(supplier_id, {})
+                supplier_name = supplier.get("name", f"Supplier {supplier_id}")
+                to_email = (
+                    supplier.get("email")
+                    or fallback_to
+                    or f"{_slugify(supplier_name)}@example.com"
+                )
+                subject = f"Purchase Order Request - {supplier_name}"
+                email_logger.info(
+                    f"PO creation email: composing | supplier_id={supplier_id} | supplier={supplier_name} | to={to_email} | lines={len(lines)}"
+                )
+                html_body = _render_supplier_email_html(supplier_name, lines, meta)
+                _send_email_via_smtp(subject, html_body, to_email, bcc=bcc)
+
+            email_logger.info(
+                f"PO creation email flow success | suppliers_notified={len(supplier_to_lines)}"
+            )
 
         return {"created": [po["po_id"] for po in created_pos]}
     except Exception as e:
@@ -495,12 +564,34 @@ async def generate_po_with_ai(
     """Generate purchase orders using AI multi-agent system (async kickoff)"""
     try:
         medication_ids = payload.get("medication_ids", [])
+        days_forecast = int(payload.get("days_forecast", 30))
+        urgency_threshold = float(payload.get("urgency_threshold", 0.5))
+
+        # If no medications passed, auto-select by urgency from inventory
+        if not medication_ids:
+            inv = data_loader.get_inventory_data(page_size=500)
+            urgent = []
+            for item in inv.get("items", []):
+                reorder = item.get("reorder_point") or 0
+                current = item.get("current_stock") or 0
+                if reorder <= 0:
+                    continue
+                if current <= reorder * urgency_threshold:
+                    urgent.append(int(item.get("med_id")))
+            medication_ids = urgent[:50]  # limit to 50 meds
 
         if not medication_ids:
             raise HTTPException(status_code=400, detail="No medications selected")
 
         # Start background generation and return session id immediately
         kick = ai_po_handler.start_generation_async(medication_ids, background_tasks)
+        # Echo back normalized params for client display
+        kick.update(
+            {
+                "days_forecast": days_forecast,
+                "urgency_threshold": urgency_threshold,
+            }
+        )
         return kick
 
     except HTTPException:
