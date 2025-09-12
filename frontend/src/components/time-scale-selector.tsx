@@ -3,7 +3,7 @@
 import { Calendar, Clock, TrendingUp } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
-export type TimeScale = 'weekly' | 'monthly' | 'quarterly'
+export type TimeScale = 'weekly' | 'monthly'
 
 interface TimeScaleSelectorProps {
   value: TimeScale
@@ -37,14 +37,7 @@ export function TimeScaleSelector({ value, onValueChange, className }: TimeScale
           <Clock className="h-3 w-3 mr-1.5" />
           Monthly
         </ToggleGroupItem>
-        <ToggleGroupItem 
-          value="quarterly" 
-          aria-label="Quarterly view"
-          className="text-xs px-3 py-1.5 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-        >
-          <TrendingUp className="h-3 w-3 mr-1.5" />
-          Quarterly
-        </ToggleGroupItem>
+        {/* Quarterly option removed */}
       </ToggleGroup>
     </div>
   )
@@ -66,13 +59,6 @@ export function getTimeScaleConfig(timeScale: TimeScale) {
         label: 'Monthly', 
         aggregation: 'weekly',
         format: 'MMM dd'
-      }
-    case 'quarterly':
-      return {
-        days: 90,
-        label: 'Quarterly',
-        aggregation: 'monthly', 
-        format: 'MMM yyyy'
       }
   }
 }

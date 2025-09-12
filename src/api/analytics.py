@@ -760,7 +760,7 @@ async def get_consumption_forecast(
     forecast_days: int = Query(7, description="Number of days to forecast"),
     time_scale: str = Query(
         "weekly",
-        regex="^(weekly|monthly|quarterly)$",
+        regex="^(weekly|monthly)$",
         description="Time scale for forecast aggregation",
     ),
 ) -> Dict[str, Any]:
@@ -783,10 +783,6 @@ async def get_consumption_forecast(
             # For monthly: 60 days forecast, 90 days history
             forecast_days = max(forecast_days, 60)
             historical_days = 90
-        elif time_scale == "quarterly":
-            # For quarterly: 90 days forecast, 180 days history
-            forecast_days = max(forecast_days, 90)
-            historical_days = 180
         else:
             # Default to weekly
             historical_days = 30
@@ -953,8 +949,11 @@ async def get_consumption_forecast(
                     1, forecast_days - 1
                 ):
                     import random as _rnd
+
                     # Add fixed seed based on medication_id and date for consistent forecasts
-                    seed_value = (medication_id or 0) * 10000 + last_hist_date.toordinal()
+                    seed_value = (
+                        medication_id or 0
+                    ) * 10000 + last_hist_date.toordinal()
                     _rnd.seed(seed_value)
 
                     shaped = []
@@ -1011,6 +1010,7 @@ async def get_consumption_forecast(
             if means:
                 import numpy as _np
                 import random as _rnd
+
                 # Fixed seed for consistent dashboard forecasts
                 seed_value = last_hist_date.toordinal()
                 _rnd.seed(seed_value)
@@ -1155,8 +1155,11 @@ async def get_consumption_forecast(
                     # Apply full trend impact for more realistic forecasts
                     base_level = recent_avg * (1 + trend_change)
                     import random
+
                     # Fixed seed for consistent fallback forecasts
-                    seed_value = (medication_id or 0) * 10000 + last_hist_date.toordinal()
+                    seed_value = (
+                        medication_id or 0
+                    ) * 10000 + last_hist_date.toordinal()
                     random.seed(seed_value)
 
                     daily_noise = random.gauss(0, std_resid * 0.25)
@@ -1196,23 +1199,10 @@ async def get_consumption_forecast(
                 historical_data, 7, "consumption"
             )
             forecast_data = aggregate_data_by_period(forecast_data, 7, "predicted")
-        elif time_scale == "quarterly":
-            # Apply scaling factor for quarterly aggregation (30-day periods)
-            scaling_factor = 1.5  # 50% increase for monthly aggregation uncertainty
-            for item in forecast_data:
-                item["predicted"] = item["predicted"] * scaling_factor
-                item["upper_bound"] = item["upper_bound"] * scaling_factor
-                item["lower_bound"] = item["lower_bound"] * scaling_factor
-
-            # Aggregate historical data by month (~30-day periods)
-            historical_data = aggregate_data_by_period(
-                historical_data, 30, "consumption"
-            )
-            forecast_data = aggregate_data_by_period(forecast_data, 30, "predicted")
         # Weekly scale uses daily data (no aggregation needed)
 
         # Improve alignment for aggregated views to create smooth transitions
-        if time_scale in ("monthly", "quarterly") and historical_data and forecast_data:
+        if time_scale == "monthly" and historical_data and forecast_data:
             # Align dates and values for smooth visual continuity
             forecast_data[0]["date"] = historical_data[-1]["date"]
             # Use the average of last few historical points for smooth transition

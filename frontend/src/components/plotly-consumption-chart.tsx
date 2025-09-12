@@ -29,13 +29,14 @@ interface PlotlyConsumptionChartProps {
 }
 
 // Helper function to map time range to appropriate API parameters
-function getTimeScaleForRange(days: number): { requestDays: number; timeScale: 'weekly' | 'monthly' | 'quarterly' } {
+function getTimeScaleForRange(days: number): { requestDays: number; timeScale: 'weekly' | 'monthly' } {
   if (days <= 30) {
     return { requestDays: days, timeScale: 'weekly' }
   } else if (days <= 90) {
     return { requestDays: days, timeScale: 'monthly' }
   } else {
-    return { requestDays: days, timeScale: 'quarterly' }
+    // Cap at monthly since quarterly support was removed
+    return { requestDays: 90, timeScale: 'monthly' }
   }
 }
 
@@ -456,7 +457,7 @@ export function PlotlyConsumptionChart({
           {/* Controls overlay at top-right of chart */}
           <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
             <div className="flex items-center gap-1 bg-background/80 border rounded-md p-1 shadow-sm">
-              {[30, 60, 90, 180].map((days) => (
+              {[30, 60, 90].map((days) => (
                 <Button
                   key={days}
                   onClick={() => handleTimeRangeChange(days)}
