@@ -30,7 +30,7 @@ import {
 } from 'lucide-react'
 
 import { useMedication, useConsumptionHistory, useSupplierPrices } from '@/hooks/use-api'
-import MedicationHistoryChart from '@/components/medication-history-chart'
+import PlotlyConsumptionChart from '@/components/plotly-consumption-chart'
 
 function getStockLevelInfo(currentStock: number, reorderPoint: number) {
   const percentage = (currentStock / reorderPoint) * 100
@@ -427,16 +427,14 @@ export function MedicationDetail() {
         </Card>
       </div>
 
-      {/* Historical Data Chart */}
-      {consumptionHistory && consumptionHistory.length > 0 && (
-        <MedicationHistoryChart
-          consumptionHistory={consumptionHistory}
-          medicationName={medication.name}
-          currentStock={medication.current_stock}
-          reorderPoint={medication.reorder_point}
-          height={300}
-        />
-      )}
+      {/* Enhanced Historical Data & Forecast Chart */}
+      <PlotlyConsumptionChart
+        medicationId={medication.med_id}
+        title={`${medication.name} - Consumption Trend & Forecast`}
+        subtitle="Historical consumption data with AI-powered forecasting - Interactive Plotly chart"
+        height={400}
+        className="mt-6"
+      />
 
       {/* Consumption History Table */}
       {consumptionHistory && consumptionHistory.length > 0 && (

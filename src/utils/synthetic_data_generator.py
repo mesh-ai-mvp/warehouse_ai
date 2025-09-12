@@ -132,6 +132,18 @@ def create_tables(conn):
       FOREIGN KEY (med_id) REFERENCES medications(med_id)
     );
 
+    -- Medication-level aggregated forecasts (6 months horizon)
+    CREATE TABLE IF NOT EXISTS forecasts_med (
+      forecast_id INTEGER PRIMARY KEY,
+      med_id INTEGER,
+      model TEXT,
+      horizon_days INTEGER,
+      forecast_mean TEXT,
+      forecast_samples TEXT,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (med_id) REFERENCES medications(med_id)
+    );
+
     -- Simplified storage / slotting tables (minimal)
     CREATE TABLE IF NOT EXISTS sku_meta (
       med_id INTEGER PRIMARY KEY,
@@ -233,6 +245,47 @@ def create_tables(conn):
     );
 
     -- ========== ANALYTICS AND REPORTS TABLES ==========
+    -- Pre-aggregated dashboard tables for chart performance
+    CREATE TABLE IF NOT EXISTS dashboard_daily_aggregates (
+        date DATE PRIMARY KEY,
+        total_consumption INTEGER NOT NULL DEFAULT 0,
+        total_orders INTEGER NOT NULL DEFAULT 0,
+        unique_medications INTEGER NOT NULL DEFAULT 0,
+        stockout_events INTEGER NOT NULL DEFAULT 0,
+        avg_stock_level REAL NOT NULL DEFAULT 0.0,
+        total_value REAL NOT NULL DEFAULT 0.0,
+        critical_stock_count INTEGER NOT NULL DEFAULT 0,
+        low_stock_count INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Category-level daily aggregates for breakdown charts
+    CREATE TABLE IF NOT EXISTS category_daily_aggregates (
+        date DATE NOT NULL,
+        category TEXT NOT NULL,
+        total_consumption INTEGER NOT NULL DEFAULT 0,
+        medication_count INTEGER NOT NULL DEFAULT 0,
+        avg_stock_level REAL NOT NULL DEFAULT 0.0,
+        total_value REAL NOT NULL DEFAULT 0.0,
+        stockout_events INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (date, category)
+    );
+
+    -- Hourly consumption patterns for intraday analysis
+    CREATE TABLE IF NOT EXISTS hourly_consumption (
+        datetime TIMESTAMP NOT NULL,
+        med_id INTEGER NOT NULL,
+        store_id INTEGER NOT NULL,
+        hour INTEGER NOT NULL CHECK(hour >= 0 AND hour <= 23),
+        qty_dispensed INTEGER NOT NULL DEFAULT 0,
+        on_hand INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (datetime, med_id, store_id),
+        FOREIGN KEY (med_id) REFERENCES medications(med_id),
+        FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    );
+
     -- Pre-calculated analytics metrics cache
     CREATE TABLE IF NOT EXISTS analytics_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -390,6 +443,40 @@ def create_tables(conn):
     )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_category_metrics_category_period ON category_metrics(category, period_start, period_end)"
+    )
+
+    # Chart performance optimization indexes
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_consumption_date ON consumption_history(date)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_consumption_med_date ON consumption_history(med_id, date)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_consumption_store_date ON consumption_history(store_id, date)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_consumption_med_store_date ON consumption_history(med_id, store_id, date)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_forecasts_med_timestamp ON forecasts_med(med_id, timestamp)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_drug_prices_med_date ON drug_prices(med_id, valid_from)"
+    )
+
+    # Pre-aggregated table indexes
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dashboard_daily_date ON dashboard_daily_aggregates(date)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_category_daily_date_cat ON category_daily_aggregates(date, category)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_hourly_consumption_datetime ON hourly_consumption(datetime)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_hourly_consumption_med_datetime ON hourly_consumption(med_id, datetime)"
     )
 
     # Ensure new supplier contact columns exist on older DBs
@@ -879,10 +966,16 @@ def compute_forecast_from_series(
     rng = np.random.default_rng()
     samples = []
     for _ in range(n_samples):
-        noise = rng.normal(0.0, residual_std + 1e-6, size=horizon)
-        samp = (
-            np.clip(np.array(mean_forecast) + noise, 0.0, None).astype(float).tolist()
-        )
+        # Base noise with increased volatility for more realistic variation
+        noise = rng.normal(0.0, residual_std * 1.2, size=horizon)
+
+        # Add occasional spikes (2% chance per day)
+        spike_mask = rng.random(horizon) < 0.02
+        spike_multipliers = np.where(spike_mask, rng.uniform(1.5, 3.0, horizon), 1.0)
+
+        # Apply spikes to mean forecast first, then add noise
+        spiked_forecast = np.array(mean_forecast) * spike_multipliers
+        samp = np.clip(spiked_forecast + noise, 0.0, None).astype(float).tolist()
         samples.append(samp)
 
     return [float(x) for x in mean_forecast], samples
@@ -1744,6 +1837,271 @@ def generate_purchase_orders(
 
 
 # -----------------------
+# Pre-aggregated data generation functions
+# -----------------------
+def generate_dashboard_daily_aggregates(
+    consumption_history,
+    medications,
+    inventory_levels,
+    drug_prices,
+    seed=DEFAULT_SEED + 50,
+):
+    """
+    Generate pre-aggregated dashboard metrics by date for fast chart rendering
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+
+    df_consumption = pd.DataFrame(consumption_history)
+    df_consumption["date"] = pd.to_datetime(df_consumption["date"]).dt.date
+
+    # Create medication and pricing lookups
+    med_lookup = {med["med_id"]: med for med in medications}
+    price_lookup = {}
+    for price in drug_prices:
+        med_id = price["med_id"]
+        if med_id not in price_lookup:
+            price_lookup[med_id] = []
+        price_lookup[med_id].append(price)
+
+    # Sort prices by date
+    for med_id in price_lookup:
+        price_lookup[med_id].sort(key=lambda x: x["valid_from"])
+
+    # Get inventory lookup
+    inventory_lookup = {inv["med_id"]: inv for inv in inventory_levels}
+
+    dashboard_aggregates = []
+
+    # Group by date and calculate aggregates
+    daily_groups = df_consumption.groupby("date")
+
+    for date, group in daily_groups:
+        date_str = date.isoformat()
+
+        # Basic consumption metrics
+        total_consumption = int(group["qty_dispensed"].sum())
+        total_orders = len(group)
+        unique_medications = int(group["med_id"].nunique())
+        stockout_events = int(group["censored"].sum())
+        avg_stock_level = float(group["on_hand"].mean())
+
+        # Calculate total value for the date
+        total_value = 0.0
+        critical_stock_count = 0
+        low_stock_count = 0
+
+        for _, row in group.iterrows():
+            med_id = row["med_id"]
+
+            # Get price for this date
+            if med_id in price_lookup:
+                applicable_prices = [
+                    p
+                    for p in price_lookup[med_id]
+                    if pd.to_datetime(p["valid_from"]).date() <= date
+                ]
+                if applicable_prices:
+                    unit_price = applicable_prices[-1]["price_per_unit"]
+                    total_value += row["qty_dispensed"] * unit_price
+
+            # Check stock status
+            inv_info = inventory_lookup.get(med_id, {})
+            current_stock = row["on_hand"]
+            reorder_point = inv_info.get("reorder_point", 100)
+
+            if current_stock <= reorder_point * 0.25:
+                critical_stock_count += 1
+            elif current_stock <= reorder_point * 0.5:
+                low_stock_count += 1
+
+        dashboard_aggregates.append(
+            {
+                "date": date_str,
+                "total_consumption": total_consumption,
+                "total_orders": total_orders,
+                "unique_medications": unique_medications,
+                "stockout_events": stockout_events,
+                "avg_stock_level": round(avg_stock_level, 2),
+                "total_value": round(total_value, 2),
+                "critical_stock_count": critical_stock_count,
+                "low_stock_count": low_stock_count,
+            }
+        )
+
+    return dashboard_aggregates
+
+
+def generate_category_daily_aggregates(
+    consumption_history,
+    medications,
+    inventory_levels,
+    drug_prices,
+    seed=DEFAULT_SEED + 51,
+):
+    """
+    Generate category-level daily aggregates for breakdown charts
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+
+    df_consumption = pd.DataFrame(consumption_history)
+    df_consumption["date"] = pd.to_datetime(df_consumption["date"]).dt.date
+
+    # Add category information
+    med_category_lookup = {med["med_id"]: med["category"] for med in medications}
+    df_consumption["category"] = df_consumption["med_id"].map(med_category_lookup)
+
+    # Create pricing lookup
+    price_lookup = {}
+    for price in drug_prices:
+        med_id = price["med_id"]
+        if med_id not in price_lookup:
+            price_lookup[med_id] = []
+        price_lookup[med_id].append(price)
+
+    for med_id in price_lookup:
+        price_lookup[med_id].sort(key=lambda x: x["valid_from"])
+
+    inventory_lookup = {inv["med_id"]: inv for inv in inventory_levels}
+
+    category_aggregates = []
+
+    # Group by date and category
+    daily_category_groups = df_consumption.groupby(["date", "category"])
+
+    for (date, category), group in daily_category_groups:
+        date_str = date.isoformat()
+
+        total_consumption = int(group["qty_dispensed"].sum())
+        medication_count = int(group["med_id"].nunique())
+        avg_stock_level = float(group["on_hand"].mean())
+        stockout_events = int(group["censored"].sum())
+
+        # Calculate category value
+        total_value = 0.0
+        for _, row in group.iterrows():
+            med_id = row["med_id"]
+            if med_id in price_lookup:
+                applicable_prices = [
+                    p
+                    for p in price_lookup[med_id]
+                    if pd.to_datetime(p["valid_from"]).date() <= date
+                ]
+                if applicable_prices:
+                    unit_price = applicable_prices[-1]["price_per_unit"]
+                    total_value += row["qty_dispensed"] * unit_price
+
+        category_aggregates.append(
+            {
+                "date": date_str,
+                "category": category,
+                "total_consumption": total_consumption,
+                "medication_count": medication_count,
+                "avg_stock_level": round(avg_stock_level, 2),
+                "total_value": round(total_value, 2),
+                "stockout_events": stockout_events,
+            }
+        )
+
+    return category_aggregates
+
+
+def generate_hourly_consumption_patterns(
+    consumption_history, medications, seed=DEFAULT_SEED + 52
+):
+    """
+    Generate realistic hourly consumption patterns for intraday analysis
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+
+    hourly_patterns = []
+
+    # Define hourly distribution patterns (pharmacy operating hours)
+    # Higher activity during business hours, minimal at night
+    hourly_weights = {
+        0: 0.01,
+        1: 0.01,
+        2: 0.01,
+        3: 0.01,
+        4: 0.01,
+        5: 0.01,
+        6: 0.02,
+        7: 0.05,
+        8: 0.12,
+        9: 0.15,
+        10: 0.14,
+        11: 0.12,
+        12: 0.08,
+        13: 0.10,
+        14: 0.12,
+        15: 0.08,
+        16: 0.06,
+        17: 0.04,
+        18: 0.03,
+        19: 0.02,
+        20: 0.01,
+        21: 0.01,
+        22: 0.01,
+        23: 0.01,
+    }
+
+    # Sample 20% of consumption history for hourly breakdown
+    sample_size = max(1000, len(consumption_history) // 5)
+    sampled_history = random.sample(
+        consumption_history, min(sample_size, len(consumption_history))
+    )
+
+    for record in sampled_history:
+        if record["qty_dispensed"] == 0:
+            continue
+
+        date = pd.to_datetime(record["date"])
+        med_id = record["med_id"]
+        store_id = record["store_id"]
+        total_daily_qty = record["qty_dispensed"]
+
+        # Distribute daily quantity across hours based on pharmacy patterns
+        remaining_qty = total_daily_qty
+
+        for hour in range(24):
+            if remaining_qty <= 0:
+                break
+
+            # Calculate expected hourly quantity
+            expected_hourly = int(total_daily_qty * hourly_weights[hour])
+
+            # Add some randomness
+            if expected_hourly > 0:
+                hourly_qty = max(
+                    0, min(remaining_qty, int(np.random.poisson(expected_hourly)))
+                )
+            else:
+                hourly_qty = 1 if remaining_qty > 0 and random.random() < 0.1 else 0
+
+            if hourly_qty > 0:
+                datetime_str = date.replace(hour=hour, minute=0, second=0).isoformat()
+
+                hourly_patterns.append(
+                    {
+                        "datetime": datetime_str,
+                        "med_id": med_id,
+                        "store_id": store_id,
+                        "hour": hour,
+                        "qty_dispensed": hourly_qty,
+                        "on_hand": record[
+                            "on_hand"
+                        ],  # Simplified - same for all hours of day
+                    }
+                )
+
+                remaining_qty -= hourly_qty
+
+    return hourly_patterns
+
+
+# -----------------------
 # Orchestrator
 # -----------------------
 def generate_all(
@@ -1755,13 +2113,14 @@ def generate_all(
     days=365,
     start_date=None,
     n_forecast_samples=50,
-    forecast_horizon=28,
+    forecast_horizon=180,
     n_storage_locs=24,
     seed=DEFAULT_SEED,
 ):
     ensure_dir(output_dir)
     if start_date is None:
-        start_date = (datetime.now(timezone.utc) - relativedelta(days=days)).date()
+        # Exclude current incomplete day to avoid zero consumption entries
+        start_date = (datetime.now(timezone.utc) - relativedelta(days=days + 1)).date()
     else:
         start_date = pd.Timestamp(start_date).date()
 
@@ -1982,6 +2341,63 @@ def generate_all(
     )
     conn.commit()
 
+    # Medication-level aggregated forecasts (6 months), averaged across stores
+    print("Writing medication-level 6-month forecasts to DB …")
+    forecasts_med_rows = []
+    # Build mapping: (store_id, med_id) -> forecast arrays already computed in all_forecast_rows
+    by_med = {}
+    for fr in all_forecast_rows:
+        med_id = fr["med_id"]
+        mean_arr = (
+            json.loads(fr["forecast_mean"])
+            if isinstance(fr["forecast_mean"], str)
+            else fr["forecast_mean"]
+        )
+        samp_arr = (
+            json.loads(fr["forecast_samples"])
+            if isinstance(fr["forecast_samples"], str)
+            else fr["forecast_samples"]
+        )
+        by_med.setdefault(med_id, []).append((mean_arr, samp_arr))
+
+    for med in meds:
+        med_id = med["med_id"]
+        if med_id not in by_med:
+            continue
+        means = [np.array(m) for m, _ in by_med[med_id] if m]
+        if not means:
+            continue
+        # Average means across stores; concatenate samples from all stores
+        avg_mean = np.mean(means, axis=0).tolist()
+        # Flatten and cap number of samples to keep payload reasonable
+        all_samples = []
+        for _, samples in by_med[med_id]:
+            if samples:
+                all_samples.extend(samples)
+        # Optionally subsample to 50
+        if len(all_samples) > 50:
+            all_samples = all_samples[:50]
+
+        forecasts_med_rows.append(
+            {
+                "med_id": med_id,
+                "model": "ExponentialSmoothing-avg",
+                "horizon_days": forecast_horizon,
+                "forecast_mean": json.dumps([float(x) for x in avg_mean]),
+                "forecast_samples": json.dumps(all_samples),
+            }
+        )
+
+    if forecasts_med_rows:
+        pd.DataFrame(forecasts_med_rows).to_csv(
+            os.path.join(output_dir, "forecasts_med.csv"), index=False
+        )
+        cur.executemany(
+            "INSERT INTO forecasts_med (med_id, model, horizon_days, forecast_mean, forecast_samples) VALUES (:med_id, :model, :horizon_days, :forecast_mean, :forecast_samples);",
+            forecasts_med_rows,
+        )
+        conn.commit()
+
     # Storage meta & locations & simple assignment
     print("Generating simplified storage metadata and slot assignments …")
     # compute avg_daily pick per med from history (aggregate across stores to get SKU-level velocity)
@@ -2089,6 +2505,56 @@ def generate_all(
         os.path.join(output_dir, "purchase_orders.csv"), index=False
     )
 
+    # Generate pre-aggregated data for fast chart performance
+    print("Generating pre-aggregated analytics data …")
+
+    # Dashboard daily aggregates
+    dashboard_aggregates = generate_dashboard_daily_aggregates(
+        all_history_rows, meds, current_inventory, all_price_rows, seed=seed + 50
+    )
+    if dashboard_aggregates:
+        cur.executemany(
+            "INSERT INTO dashboard_daily_aggregates (date, total_consumption, total_orders, unique_medications, stockout_events, avg_stock_level, total_value, critical_stock_count, low_stock_count) VALUES (:date, :total_consumption, :total_orders, :unique_medications, :stockout_events, :avg_stock_level, :total_value, :critical_stock_count, :low_stock_count);",
+            dashboard_aggregates,
+        )
+        pd.DataFrame(dashboard_aggregates).to_csv(
+            os.path.join(output_dir, "dashboard_daily_aggregates.csv"), index=False
+        )
+        print(
+            f"Generated {len(dashboard_aggregates)} dashboard daily aggregate records"
+        )
+
+    # Category daily aggregates
+    category_aggregates = generate_category_daily_aggregates(
+        all_history_rows, meds, current_inventory, all_price_rows, seed=seed + 51
+    )
+    if category_aggregates:
+        cur.executemany(
+            "INSERT INTO category_daily_aggregates (date, category, total_consumption, medication_count, avg_stock_level, total_value, stockout_events) VALUES (:date, :category, :total_consumption, :medication_count, :avg_stock_level, :total_value, :stockout_events);",
+            category_aggregates,
+        )
+        pd.DataFrame(category_aggregates).to_csv(
+            os.path.join(output_dir, "category_daily_aggregates.csv"), index=False
+        )
+        print(f"Generated {len(category_aggregates)} category daily aggregate records")
+
+    # Hourly consumption patterns
+    hourly_patterns = generate_hourly_consumption_patterns(
+        all_history_rows, meds, seed=seed + 52
+    )
+    if hourly_patterns:
+        cur.executemany(
+            "INSERT INTO hourly_consumption (datetime, med_id, store_id, hour, qty_dispensed, on_hand) VALUES (:datetime, :med_id, :store_id, :hour, :qty_dispensed, :on_hand);",
+            hourly_patterns,
+        )
+        pd.DataFrame(hourly_patterns).to_csv(
+            os.path.join(output_dir, "hourly_consumption.csv"), index=False
+        )
+        print(f"Generated {len(hourly_patterns)} hourly consumption pattern records")
+
+    conn.commit()
+    print("Pre-aggregated data generation completed")
+
     # final: export key CSVs (masters already done)
     print("Exporting CSVs and finishing …")
     # Ensure forecasts CSV already done
@@ -2184,7 +2650,10 @@ def parse_args():
         help="Monte-Carlo forecast samples per forecast",
     )
     p.add_argument(
-        "--forecast_horizon", type=int, default=28, help="Forecast horizon in days"
+        "--forecast_horizon",
+        type=int,
+        default=180,
+        help="Forecast horizon in days (e.g., 180 for 6 months)",
     )
     p.add_argument(
         "--storage_locs",

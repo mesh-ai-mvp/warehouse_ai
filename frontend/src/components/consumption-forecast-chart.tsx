@@ -1,10 +1,13 @@
 'use client'
+import React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import type { ChartConfig } from '@/components/ui/chart'
 import { TrendingUp, Brain } from 'lucide-react'
 import { Area, CartesianGrid, ComposedChart, Line, XAxis, YAxis, ReferenceLine } from 'recharts'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { TimeScaleSelector, TimeScale, getTimeScaleConfig } from '@/components/time-scale-selector'
 
 interface ConsumptionDataPoint {
   date: string
@@ -20,6 +23,10 @@ interface ConsumptionForecastChartProps {
   title?: string
   subtitle?: string
   height?: number
+  // Time scale functionality
+  timeScale?: TimeScale
+  onTimeScaleChange?: (value: TimeScale) => void
+  showTimeScaleSelector?: boolean
 }
 
 const chartConfig = {
@@ -83,9 +90,82 @@ export default function ConsumptionForecastChart({
   title = 'Demand Forecast',
   subtitle = 'Historical data with predictive analytics',
   height = 350,
+  timeScale,
+  onTimeScaleChange,
+  showTimeScaleSelector = false,
 }: ConsumptionForecastChartProps) {
-  // Combine historical and forecast data
-  const combinedData = [...historicalData, ...forecastData]
+  // Validate input data
+  const validHistoricalData = Array.isArray(historicalData) ? historicalData : []
+  const validForecastData = Array.isArray(forecastData) ? forecastData : []
+
+  // Check if we have valid data to display
+  if (validHistoricalData.length === 0 && validForecastData.length === 0) {
+    return (
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <div className="space-y-1">
+            <CardTitle className="text-lg flex items-center gap-2">
+              {title}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
+          </div>
+          {showTimeScaleSelector && timeScale && onTimeScaleChange && (
+            <TimeScaleSelector value={timeScale} onChange={onTimeScaleChange} />
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="text-muted-foreground text-sm">
+              No chart data available
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Historical and forecast data are both empty
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Combine historical and forecast data with smooth transition
+  const combinedData = React.useMemo(() => {
+    if (validHistoricalData.length === 0 && validForecastData.length === 0) {
+      return []
+    }
+    
+    // Create smooth transition between historical and forecast
+    const historical = [...validHistoricalData]
+    const forecast = [...validForecastData]
+    
+    // If both have data, ensure smooth connection
+    if (historical.length > 0 && forecast.length > 0) {
+      // Find the last non-zero historical value for smooth transition
+      let lastNonZeroValue = 0
+      for (let i = historical.length - 1; i >= 0; i--) {
+        if (historical[i].consumption && historical[i].consumption > 0) {
+          lastNonZeroValue = historical[i].consumption
+          break
+        }
+      }
+      
+      // If the first forecast prediction is very different from last historical,
+      // adjust it for visual continuity (but keep the original logic in backend)
+      if (lastNonZeroValue > 0 && forecast[0]?.predicted) {
+        const ratio = forecast[0].predicted / lastNonZeroValue
+        // If forecast is drastically different, add a bridging point
+        if (ratio > 3 || ratio < 0.3) {
+          const bridgeValue = (lastNonZeroValue + forecast[0].predicted) / 2
+          // Update the first forecast point for smoother visual transition
+          forecast[0] = {
+            ...forecast[0],
+            predicted: bridgeValue
+          }
+        }
+      }
+    }
+    
+    return [...historical, ...forecast]
+  }, [validHistoricalData, validForecastData])
 
   // Build weekly ticks (every 7th point)
   const weeklyTicks = combinedData
@@ -93,20 +173,20 @@ export default function ConsumptionForecastChart({
     .filter(({ i }) => i % 7 === 0)
     .map(({ date }) => date)
 
-  // Calculate metrics
-  const totalHistoricalConsumption = historicalData.reduce(
+  // Calculate metrics using validated data
+  const totalHistoricalConsumption = validHistoricalData.reduce(
     (sum, item) => sum + (item.consumption || 0),
     0
   )
-  const avgDailyConsumption = totalHistoricalConsumption / historicalData.length
-  const totalForecastConsumption = forecastData.reduce(
+  const avgDailyConsumption = validHistoricalData.length > 0 ? totalHistoricalConsumption / validHistoricalData.length : 0
+  const totalForecastConsumption = validForecastData.reduce(
     (sum, item) => sum + (item.predicted || 0),
     0
   )
   const forecastTrend = totalForecastConsumption > totalHistoricalConsumption ? 'up' : 'down'
-  const trendPercentage = Math.abs(
+  const trendPercentage = totalHistoricalConsumption > 0 ? Math.abs(
     ((totalForecastConsumption - totalHistoricalConsumption) / totalHistoricalConsumption) * 100
-  )
+  ) : 0
 
   // Find today's date index for reference line
   const today = new Date().toISOString().split('T')[0]
@@ -117,15 +197,22 @@ export default function ConsumptionForecastChart({
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <div className="space-y-1">
           <CardTitle className="text-lg flex items-center gap-2">
-            <Brain className="h-5 w-5 text-blue-600" />
             {title}
           </CardTitle>
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
+          <p className="text-sm text-muted-foreground">
+            {subtitle}{timeScale && getTimeScaleConfig(timeScale) ? ` • ${getTimeScaleConfig(timeScale).label} view` : ''}
+          </p>
         </div>
 
-        <Badge variant="outline" className="text-xs">
-          AI Powered
-        </Badge>
+        <div className="flex items-center gap-3">
+          {showTimeScaleSelector && timeScale && onTimeScaleChange && (
+            <TimeScaleSelector value={timeScale} onValueChange={onTimeScaleChange} />
+          )}
+          <Badge variant="outline" className="text-xs flex items-center gap-1">
+            <Brain className="h-3 w-3" />
+            AI Powered
+          </Badge>
+        </div>
       </CardHeader>
 
       <CardContent className="px-2 pb-6">
@@ -137,7 +224,17 @@ export default function ConsumptionForecastChart({
               style={{ backgroundColor: chartConfig.consumption.color }}
             />
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Avg Daily:</span>
+              <span className="text-sm text-muted-foreground">Avg Daily</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-muted text-[10px] cursor-default">i</span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Average units dispensed per day over the displayed historical period.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <span className="text-lg font-bold">{avgDailyConsumption.toFixed(0)} units</span>
             </div>
           </div>
@@ -147,7 +244,17 @@ export default function ConsumptionForecastChart({
               style={{ backgroundColor: chartConfig.predicted.color }}
             />
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Forecast Trend:</span>
+              <span className="text-sm text-muted-foreground">Forecast Trend</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-muted text-[10px] cursor-default">i</span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Percentage change between total forecasted and total historical consumption for the same number of days.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Badge
                 variant={forecastTrend === 'up' ? 'destructive' : 'success'}
                 className="text-xs"
@@ -229,7 +336,7 @@ export default function ConsumptionForecastChart({
               activeDot={false as any}
             />
             <Area
-              dataKey={(d: any) => d.lower_bound}
+              dataKey="lower_bound"
               stroke="none"
               fill="transparent"
               isAnimationActive={false}
@@ -252,7 +359,7 @@ export default function ConsumptionForecastChart({
               strokeWidth={2}
               strokeDasharray="5 5"
               dot={{ r: 3, fill: chartConfig.predicted.color }}
-              connectNulls={false}
+              connectNulls={true}
             />
 
             <ChartTooltip content={<CustomTooltip />} />

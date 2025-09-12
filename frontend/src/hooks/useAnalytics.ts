@@ -143,10 +143,10 @@ export function useStockLevelTrends(medicationId?: number, timeRange: string = '
   })
 }
 
-export function useConsumptionForecast(medicationId?: number, forecastDays: number = 7) {
+export function useConsumptionForecast(medicationId?: number, forecastDays: number = 7, timeScale: string = 'weekly') {
   return useQuery<ConsumptionForecastResponse>({
-    queryKey: ['analytics', 'consumption-forecast', medicationId, forecastDays],
-    queryFn: () => apiClient.getConsumptionForecast(medicationId, forecastDays),
+    queryKey: ['analytics', 'consumption-forecast', medicationId, forecastDays, timeScale],
+    queryFn: () => apiClient.getConsumptionForecast(medicationId, forecastDays, timeScale),
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 10 * 60 * 1000,
   })

@@ -193,6 +193,7 @@ export interface ConsumptionForecastResponse {
   forecast_days: number
   avg_consumption: number
   trend: number
+  time_scale: string
 }
 
 export interface StockLevelTrendData {

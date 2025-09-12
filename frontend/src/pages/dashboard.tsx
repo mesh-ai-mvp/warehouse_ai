@@ -8,7 +8,7 @@ import { AnimatedStatCard } from '@/components/ui/animated-card'
 import { AnimatedChart } from '@/components/ui/animated-chart'
 import { ReUIStatCard, PharmacyStatPresets } from '@/components/ui/reui-stats'
 import { GanttChart, PharmaGanttPresets } from '@/components/charts/gantt-chart'
-import ConsumptionForecastChart from '@/components/consumption-forecast-chart'
+import TimeScaleChart from '@/components/time-scale-chart'
 import StockLevelChart from '@/components/stock-level-chart'
 import DeliveryTimeline from '@/components/delivery-timeline'
 import {
@@ -79,10 +79,7 @@ export function Dashboard() {
 
   // Real data from analytics API - using monthly timeline data
   const { data: categoryBreakdown, isLoading: categoryLoading } = useCategoryBreakdown()
-  const { data: consumptionForecast, isLoading: forecastLoading } = useConsumptionForecast(
-    undefined,
-    30
-  ) // 30 days forecast
+  // consumptionForecast now handled by TimeScaleChart component
   const { data: stockTrends, isLoading: stockTrendsLoading } = useStockLevelTrends(undefined, '30d') // 30 days trend
   const { data: timelineTasks, isLoading: timelineLoading } = useDeliveryTimeline()
   const { data: stockAlerts, isLoading: alertsLoading } = useStockAlerts()
@@ -312,10 +309,11 @@ export function Dashboard() {
 
           {/* Enhanced Analytics Charts */}
           <div className="grid gap-6">
-            <ConsumptionForecastChart
-              historicalData={consumptionForecast?.historical_data || []}
-              forecastData={consumptionForecast?.forecast_data || []}
+            <TimeScaleChart
+              title="Demand Forecast Analytics"
+              subtitle="Historical consumption data with AI-powered forecasting"
               height={350}
+              defaultTimeScale="weekly"
             />
 
             <StockLevelChart

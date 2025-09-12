@@ -25,6 +25,52 @@ data_loader = DataLoader()
 analytics_logger = logger.bind(name="analytics")
 
 
+def aggregate_data_by_period(
+    data: List[Dict[str, Any]], days_per_period: int, value_key: str
+) -> List[Dict[str, Any]]:
+    """Aggregate daily data into periods (weekly/monthly) by summing values"""
+    if not data or days_per_period <= 1:
+        return data
+
+    aggregated = []
+    current_period = []
+
+    for i, item in enumerate(data):
+        current_period.append(item)
+
+        # When we reach the period size or it's the last item
+        if len(current_period) == days_per_period or i == len(data) - 1:
+            if current_period:
+                # Sum the values for this period
+                total_value = sum(d.get(value_key, 0) for d in current_period)
+
+                # Use the last date of the period as the period date
+                period_date = current_period[-1]["date"]
+
+                # Create aggregated item
+                aggregated_item = {
+                    "date": period_date,
+                    value_key: round(total_value, 2),
+                }
+
+                # For forecast data, also aggregate bounds
+                if (
+                    "upper_bound" in current_period[0]
+                    and "lower_bound" in current_period[0]
+                ):
+                    aggregated_item["upper_bound"] = round(
+                        sum(d.get("upper_bound", 0) for d in current_period), 2
+                    )
+                    aggregated_item["lower_bound"] = round(
+                        sum(d.get("lower_bound", 0) for d in current_period), 2
+                    )
+
+                aggregated.append(aggregated_item)
+                current_period = []
+
+    return aggregated
+
+
 @router.get("/kpis")
 async def get_analytics_kpis(
     time_range: str = Query("30d", description="Time range: 7d, 30d, 90d, 1y"),
@@ -712,6 +758,11 @@ async def get_stock_level_trends(
 async def get_consumption_forecast(
     medication_id: Optional[int] = Query(None, description="Specific medication ID"),
     forecast_days: int = Query(7, description="Number of days to forecast"),
+    time_scale: str = Query(
+        "weekly",
+        regex="^(weekly|monthly|quarterly)$",
+        description="Time scale for forecast aggregation",
+    ),
 ) -> Dict[str, Any]:
     """Get consumption forecast with AI predictions sourced from poc_supplychain.db.
 
@@ -720,25 +771,63 @@ async def get_consumption_forecast(
     """
     try:
         analytics_logger.info(
-            f"Getting consumption forecast for medication: {medication_id}"
+            f"Getting consumption forecast for medication: {medication_id}, time_scale: {time_scale}"
         )
+
+        # Adjust parameters based on time scale
+        if time_scale == "weekly":
+            # For weekly: 14 days forecast, 30 days history (reasonable for chart display)
+            forecast_days = max(forecast_days, 14)
+            historical_days = 30
+        elif time_scale == "monthly":
+            # For monthly: 60 days forecast, 90 days history
+            forecast_days = max(forecast_days, 60)
+            historical_days = 90
+        elif time_scale == "quarterly":
+            # For quarterly: 90 days forecast, 180 days history
+            forecast_days = max(forecast_days, 90)
+            historical_days = 180
+        else:
+            # Default to weekly
+            historical_days = 30
 
         conn = data_loader.get_connection()
         cursor = conn.cursor()
+        analytics_logger.info(f"Using database: {data_loader.db_path}")
 
-        # Use last ~16 weeks of history for seasonality (112 days)
-        historical_start = date.today() - timedelta(days=112)
-
+        # Get the latest date available in the data instead of using today
         if medication_id:
             cursor.execute(
-                """
-                SELECT ch.date, ch.qty_dispensed as consumption
+                "SELECT MAX(date) FROM consumption_history WHERE med_id = ?",
+                (medication_id,),
+            )
+        else:
+            cursor.execute("SELECT MAX(date) FROM consumption_history")
+
+        latest_date_result = cursor.fetchone()
+        if latest_date_result and latest_date_result[0]:
+            latest_date = datetime.strptime(latest_date_result[0], "%Y-%m-%d").date()
+        else:
+            latest_date = date.today()
+
+        # Use adjusted history period for seasonality from the latest available data
+        historical_start = latest_date - timedelta(days=historical_days)
+        analytics_logger.info(
+            f"Latest data date: {latest_date}, Historical start date: {historical_start}, historical_days: {historical_days}"
+        )
+
+        if medication_id:
+            query = """
+                SELECT ch.date, SUM(ch.qty_dispensed) as consumption
                 FROM consumption_history ch
                 WHERE ch.med_id = ? AND ch.date >= ?
+                GROUP BY ch.date
                 ORDER BY ch.date
-                """,
-                (medication_id, historical_start.isoformat()),
-            )
+                """
+            params = (medication_id, historical_start.isoformat())
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()  # Fetch consumption history results immediately
 
             cursor.execute(
                 "SELECT name FROM medications WHERE med_id = ?", (medication_id,)
@@ -748,7 +837,7 @@ async def get_consumption_forecast(
         else:
             cursor.execute(
                 """
-                SELECT ch.date, AVG(ch.qty_dispensed) as consumption
+                SELECT ch.date, SUM(ch.qty_dispensed) as consumption
                 FROM consumption_history ch
                 WHERE ch.date >= ?
                 GROUP BY ch.date
@@ -756,9 +845,16 @@ async def get_consumption_forecast(
                 """,
                 (historical_start.isoformat(),),
             )
-            medication_name = "Average Consumption"
+            rows = (
+                cursor.fetchall()
+            )  # Fetch dashboard consumption history results immediately
+            medication_name = "Total Consumption"
 
-        rows = cursor.fetchall()
+        analytics_logger.info(f"Processing {len(rows)} rows from consumption_history")
+        if len(rows) > 0:
+            analytics_logger.info(
+                f"Sample rows: {rows[:3]} ... {rows[-3:] if len(rows) > 3 else ''}"
+            )
 
         # Build dense daily series (fill missing with 0 to keep structure)
         history_map: Dict[str, float] = {}
@@ -779,6 +875,181 @@ async def get_consumption_forecast(
             historical_data.append(
                 {"date": ds, "consumption": history_map.get(ds, 0.0)}
             )
+
+        # Baseline metrics from history so they are always available (even if using DB forecasts)
+        last_n_base = (
+            historical_data[-84:] if len(historical_data) > 84 else historical_data
+        )
+        values_base = [float(item["consumption"] or 0) for item in last_n_base]
+        recent_vals_base = values_base[-28:] if len(values_base) >= 28 else values_base
+        earlier_vals_base = (
+            values_base[-56:-28]
+            if len(values_base) >= 56
+            else values_base[: max(len(values_base) - 28, 0)]
+        )
+        recent_avg = sum(recent_vals_base) / max(len(recent_vals_base), 1)
+        earlier_avg = (
+            sum(earlier_vals_base) / max(len(earlier_vals_base), 1)
+            if earlier_vals_base
+            else recent_avg
+        )
+        if earlier_avg <= 0:
+            earlier_avg = recent_avg or 1.0
+        trend_change = (recent_avg - earlier_avg) / earlier_avg
+        # Remove artificial trend caps to allow natural growth patterns
+        if trend_change > 1.0:
+            trend_change = 1.0  # Allow up to 100% growth
+        if trend_change < -0.5:
+            trend_change = -0.5  # Limit decline to 50%
+
+        # Compute weekday factors from history (used to shape DB forecasts too)
+        weekday_totals_base = {i: 0.0 for i in range(7)}
+        weekday_counts_base = {i: 0 for i in range(7)}
+        for item in last_n_base:
+            dt_b = datetime.fromisoformat(item["date"]).date()
+            wd_b = dt_b.weekday()
+            val_b = float(item["consumption"] or 0)
+            weekday_totals_base[wd_b] += val_b
+            weekday_counts_base[wd_b] += 1
+        overall_avg_base = sum(values_base) / max(len(values_base), 1) or 1.0
+        weekday_factors_base = {
+            wd: (weekday_totals_base[wd] / max(weekday_counts_base[wd], 1))
+            / overall_avg_base
+            for wd in range(7)
+        }
+
+        # Residual volatility from history (used to scale noise for DB forecasts)
+        resids_base = []
+        for item in last_n_base:
+            dt_b = datetime.fromisoformat(item["date"]).date()
+            wd_b = dt_b.weekday()
+            expected_b = recent_avg * weekday_factors_base.get(wd_b, 1.0)
+            resids_base.append((item["consumption"] or 0) - expected_b)
+        if resids_base:
+            mean_resid_b = sum(resids_base) / len(resids_base)
+            var_b = sum((r - mean_resid_b) ** 2 for r in resids_base) / max(
+                len(resids_base) - 1, 1
+            )
+            std_resid_base = var_b**0.5
+        else:
+            std_resid_base = max(1.0, recent_avg * 0.2)
+
+        last_hist_date = datetime.fromisoformat(historical_data[-1]["date"]).date()
+        # Use recent_avg instead of last value for continuity (avoid starting from 0)
+        last_hist_value = recent_avg
+
+        # Try to read forecasts from DB first (6-month horizon in forecasts_med)
+        db_forecast: Optional[List[Dict[str, Any]]] = None
+        if medication_id:
+            cursor.execute(
+                "SELECT horizon_days, forecast_mean FROM forecasts_med WHERE med_id = ? ORDER BY timestamp DESC LIMIT 1",
+                (medication_id,),
+            )
+            fr = cursor.fetchone()
+            if fr:
+                horizon_days, forecast_mean_json = fr
+                mean_list = json.loads(forecast_mean_json or "[]")
+                if isinstance(mean_list, list) and len(mean_list) >= max(
+                    1, forecast_days - 1
+                ):
+                    import random as _rnd
+                    # Add fixed seed based on medication_id and date for consistent forecasts
+                    seed_value = (medication_id or 0) * 10000 + last_hist_date.toordinal()
+                    _rnd.seed(seed_value)
+
+                    shaped = []
+                    for i in range(forecast_days):
+                        f_date = last_hist_date + timedelta(days=i)
+                        wd = f_date.weekday()
+                        if i == 0:
+                            # Start forecast from recent average for smooth transition
+                            pred = recent_avg
+                        else:
+                            idx = min(len(mean_list) - 1, i - 1)
+                            base_level = float(mean_list[idx])
+                            weekday_variation = 1.0 + _rnd.uniform(-0.2, 0.2)
+                            pred = max(
+                                0.0,
+                                base_level
+                                * weekday_factors_base.get(wd, 1.0)
+                                * weekday_variation,
+                            )
+                            # Noise scaled by residual volatility and level
+                            noise = _rnd.gauss(
+                                0, max(std_resid_base * 0.6, pred * 0.15, 1.0)
+                            )
+                            pred = max(0.0, pred + noise)
+                            # Occasional spikes
+                            if _rnd.random() < 0.02:
+                                pred *= _rnd.uniform(1.5, 3.0)
+                        margin = max(std_resid_base * 1.0, pred * 0.25, 1.0)
+                        shaped.append(
+                            {
+                                "date": f_date.isoformat(),
+                                "predicted": round(pred, 2),
+                                "upper_bound": round(pred + margin, 2),
+                                "lower_bound": round(max(0.0, pred - margin), 2),
+                            }
+                        )
+                    db_forecast = shaped
+        else:
+            # Average forecasts across all meds if available (use first N meds to limit load)
+            cursor.execute(
+                "SELECT horizon_days, forecast_mean FROM forecasts_med ORDER BY timestamp DESC"
+            )
+            rows_fc = cursor.fetchall()
+            means = []
+            for h, fm in rows_fc:
+                try:
+                    arr = json.loads(fm or "[]")
+                    if isinstance(arr, list) and len(arr) >= max(1, forecast_days - 1):
+                        means.append(
+                            arr[: forecast_days - 1 if forecast_days > 1 else 1]
+                        )
+                except Exception:
+                    continue
+            if means:
+                import numpy as _np
+                import random as _rnd
+                # Fixed seed for consistent dashboard forecasts
+                seed_value = last_hist_date.toordinal()
+                _rnd.seed(seed_value)
+
+                # Fix: Sum forecasts across medications for dashboard totals, don't average them
+                avg = _np.sum(_np.array(means, dtype=float), axis=0).tolist()
+                shaped = []
+                for i in range(forecast_days):
+                    f_date = last_hist_date + timedelta(days=i)
+                    wd = f_date.weekday()
+                    if i == 0:
+                        # Start dashboard forecast from recent average for continuity
+                        pred = recent_avg
+                    else:
+                        idx = min(len(avg) - 1, i - 1)
+                        base_level = float(avg[idx])
+                        weekday_variation = 1.0 + _rnd.uniform(-0.2, 0.2)
+                        pred = max(
+                            0.0,
+                            base_level
+                            * weekday_factors_base.get(wd, 1.0)
+                            * weekday_variation,
+                        )
+                        noise = _rnd.gauss(
+                            0, max(std_resid_base * 0.6, pred * 0.15, 1.0)
+                        )
+                        pred = max(0.0, pred + noise)
+                        if _rnd.random() < 0.02:
+                            pred *= _rnd.uniform(1.5, 3.0)
+                    margin = max(std_resid_base * 1.0, pred * 0.25, 1.0)
+                    shaped.append(
+                        {
+                            "date": f_date.isoformat(),
+                            "predicted": round(pred, 2),
+                            "upper_bound": round(pred + margin, 2),
+                            "lower_bound": round(max(0.0, pred - margin), 2),
+                        }
+                    )
+                db_forecast = shaped
 
         if not historical_data:
             # Fallback
@@ -801,84 +1072,164 @@ async def get_consumption_forecast(
                 "trend": 0.0,
             }
 
-        # Compute weekday seasonality factors from the last 12 weeks
-        last_n = historical_data[-84:] if len(historical_data) > 84 else historical_data
-        weekday_totals = {i: 0.0 for i in range(7)}
-        weekday_counts = {i: 0 for i in range(7)}
-        values = []
-        for item in last_n:
-            dt = datetime.fromisoformat(item["date"]).date()
-            wd = dt.weekday()  # 0=Mon
-            val = float(item["consumption"] or 0)
-            weekday_totals[wd] += val
-            weekday_counts[wd] += 1
-            values.append(val)
-
-        overall_avg = sum(values) / max(len(values), 1)
-        # Avoid divide-by-zero
-        if overall_avg <= 0:
-            overall_avg = 1.0
-
-        weekday_factors = {
-            wd: (weekday_totals[wd] / max(weekday_counts[wd], 1)) / overall_avg
-            for wd in range(7)
-        }
-
-        # Compute recent vs earlier averages to capture trend (last 4 weeks vs previous 4 weeks)
-        recent_vals = values[-28:] if len(values) >= 28 else values
-        earlier_vals = (
-            values[-56:-28] if len(values) >= 56 else values[: max(len(values) - 28, 0)]
-        )
-        recent_avg = sum(recent_vals) / max(len(recent_vals), 1)
-        earlier_avg = (
-            sum(earlier_vals) / max(len(earlier_vals), 1)
-            if earlier_vals
-            else recent_avg
-        )
-        if earlier_avg <= 0:
-            earlier_avg = recent_avg or 1.0
-        trend_change = (recent_avg - earlier_avg) / earlier_avg
-        # Clamp to keep forecasts sane
-        if trend_change > 0.3:
-            trend_change = 0.3
-        if trend_change < -0.3:
-            trend_change = -0.3
-
-        # Residual std for CI
-        # Expected value by weekday using recent_avg baseline
-        expected_by_day = []
-        resids = []
-        for item in last_n:
-            dt = datetime.fromisoformat(item["date"]).date()
-            wd = dt.weekday()
-            expected = recent_avg * weekday_factors.get(wd, 1.0)
-            expected_by_day.append(expected)
-            resids.append((item["consumption"] or 0) - expected)
-        if resids:
-            mean_resid = sum(resids) / len(resids)
-            variance = sum((r - mean_resid) ** 2 for r in resids) / max(
-                len(resids) - 1, 1
-            )
-            std_resid = variance**0.5
+        # If DB forecast is available, use it; otherwise compute on the fly
+        if db_forecast is not None:
+            forecast_data = db_forecast
         else:
-            std_resid = recent_avg * 0.2
-
-        # Build forecast repeating weekday pattern scaled by recent level and trend
-        forecast_data: List[Dict[str, Any]] = []
-        for i in range(1, forecast_days + 1):
-            future_date = today_d + timedelta(days=i)
-            wd = future_date.weekday()
-            base_level = recent_avg * (1 + 0.5 * trend_change)
-            pred = max(0.0, base_level * weekday_factors.get(wd, 1.0))
-            margin = max(std_resid, pred * 0.15)
-            forecast_data.append(
-                {
-                    "date": future_date.isoformat(),
-                    "predicted": round(pred, 2),
-                    "upper_bound": round(pred + margin, 2),
-                    "lower_bound": round(max(0.0, pred - margin), 2),
-                }
+            # Compute weekday seasonality factors from the last 12 weeks
+            last_n = (
+                historical_data[-84:] if len(historical_data) > 84 else historical_data
             )
+            weekday_totals = {i: 0.0 for i in range(7)}
+            weekday_counts = {i: 0 for i in range(7)}
+            values = []
+            for item in last_n:
+                dt = datetime.fromisoformat(item["date"]).date()
+                wd = dt.weekday()  # 0=Mon
+                val = float(item["consumption"] or 0)
+                weekday_totals[wd] += val
+                weekday_counts[wd] += 1
+                values.append(val)
+
+            overall_avg = sum(values) / max(len(values), 1)
+            # Avoid divide-by-zero
+            if overall_avg <= 0:
+                overall_avg = 1.0
+
+            weekday_factors = {
+                wd: (weekday_totals[wd] / max(weekday_counts[wd], 1)) / overall_avg
+                for wd in range(7)
+            }
+
+            # Compute recent vs earlier averages to capture trend (last 4 weeks vs previous 4 weeks)
+            recent_vals = values[-28:] if len(values) >= 28 else values
+            earlier_vals = (
+                values[-56:-28]
+                if len(values) >= 56
+                else values[: max(len(values) - 28, 0)]
+            )
+            recent_avg = sum(recent_vals) / max(len(recent_vals), 1)
+            earlier_avg = (
+                sum(earlier_vals) / max(len(earlier_vals), 1)
+                if earlier_vals
+                else recent_avg
+            )
+            if earlier_avg <= 0:
+                earlier_avg = recent_avg or 1.0
+            trend_change = (recent_avg - earlier_avg) / earlier_avg
+            # Clamp to keep forecasts sane
+            # Remove artificial trend caps for more realistic forecasts
+            if trend_change > 1.0:
+                trend_change = 1.0  # Allow up to 100% growth
+            if trend_change < -0.5:
+                trend_change = -0.5  # Limit decline to 50%
+
+            # Residual std for CI
+            expected_by_day = []
+            resids = []
+            for item in last_n:
+                dt = datetime.fromisoformat(item["date"]).date()
+                wd = dt.weekday()
+                expected = recent_avg * weekday_factors.get(wd, 1.0)
+                expected_by_day.append(expected)
+                resids.append((item["consumption"] or 0) - expected)
+            if resids:
+                mean_resid = sum(resids) / len(resids)
+                variance = sum((r - mean_resid) ** 2 for r in resids) / max(
+                    len(resids) - 1, 1
+                )
+                std_resid = variance**0.5
+            else:
+                std_resid = recent_avg * 0.2
+
+            # Build forecast repeating weekday pattern scaled by recent level and trend
+            forecast_data = []
+            for i in range(0, forecast_days):
+                # Start forecasts from the last historical date for continuity
+                future_date = last_hist_date + timedelta(days=i)
+                wd = future_date.weekday()
+                if i == 0:
+                    # Use recent_avg for smooth visual transition from historical to forecast
+                    pred = recent_avg
+                else:
+                    # Apply full trend impact for more realistic forecasts
+                    base_level = recent_avg * (1 + trend_change)
+                    import random
+                    # Fixed seed for consistent fallback forecasts
+                    seed_value = (medication_id or 0) * 10000 + last_hist_date.toordinal()
+                    random.seed(seed_value)
+
+                    daily_noise = random.gauss(0, std_resid * 0.25)
+                    spike_mult = (
+                        random.uniform(1.5, 3.0) if random.random() < 0.02 else 1.0
+                    )
+                    weekday_variation = 1.0 + random.uniform(-0.2, 0.2)
+                    pred = max(
+                        0.0,
+                        (base_level + daily_noise)
+                        * weekday_factors.get(wd, 1.0)
+                        * weekday_variation
+                        * spike_mult,
+                    )
+
+                margin = max(std_resid * 1.2, pred * 0.25)
+                forecast_data.append(
+                    {
+                        "date": future_date.isoformat(),
+                        "predicted": round(pred, 2),
+                        "upper_bound": round(pred + margin, 2),
+                        "lower_bound": round(max(0.0, pred - margin), 2),
+                    }
+                )
+
+        # Apply scaling factors before aggregation to compensate for forecast underestimation
+        if time_scale == "monthly":
+            # Apply scaling factor for monthly aggregation (7-day periods)
+            scaling_factor = 1.2  # 20% increase for weekly aggregation uncertainty
+            for item in forecast_data:
+                item["predicted"] = item["predicted"] * scaling_factor
+                item["upper_bound"] = item["upper_bound"] * scaling_factor
+                item["lower_bound"] = item["lower_bound"] * scaling_factor
+
+            # Aggregate historical data by week (7-day periods)
+            historical_data = aggregate_data_by_period(
+                historical_data, 7, "consumption"
+            )
+            forecast_data = aggregate_data_by_period(forecast_data, 7, "predicted")
+        elif time_scale == "quarterly":
+            # Apply scaling factor for quarterly aggregation (30-day periods)
+            scaling_factor = 1.5  # 50% increase for monthly aggregation uncertainty
+            for item in forecast_data:
+                item["predicted"] = item["predicted"] * scaling_factor
+                item["upper_bound"] = item["upper_bound"] * scaling_factor
+                item["lower_bound"] = item["lower_bound"] * scaling_factor
+
+            # Aggregate historical data by month (~30-day periods)
+            historical_data = aggregate_data_by_period(
+                historical_data, 30, "consumption"
+            )
+            forecast_data = aggregate_data_by_period(forecast_data, 30, "predicted")
+        # Weekly scale uses daily data (no aggregation needed)
+
+        # Improve alignment for aggregated views to create smooth transitions
+        if time_scale in ("monthly", "quarterly") and historical_data and forecast_data:
+            # Align dates and values for smooth visual continuity
+            forecast_data[0]["date"] = historical_data[-1]["date"]
+            # Use the average of last few historical points for smooth transition
+            last_historical_values = [
+                item["consumption"]
+                for item in historical_data[-3:]
+                if item["consumption"] > 0
+            ]
+            if last_historical_values:
+                smooth_transition_value = sum(last_historical_values) / len(
+                    last_historical_values
+                )
+                forecast_data[0]["predicted"] = smooth_transition_value
+                forecast_data[0]["upper_bound"] = smooth_transition_value * 1.25
+                forecast_data[0]["lower_bound"] = max(
+                    0.0, smooth_transition_value * 0.75
+                )
 
         return {
             "medication_name": medication_name,
@@ -887,6 +1238,7 @@ async def get_consumption_forecast(
             "forecast_days": forecast_days,
             "avg_consumption": round(recent_avg, 2),
             "trend": round(trend_change, 3),
+            "time_scale": time_scale,
         }
 
     except Exception as e:

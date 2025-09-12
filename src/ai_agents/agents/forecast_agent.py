@@ -143,7 +143,11 @@ class ForecastAgent:
         return state
 
     def _calculate_base_forecast(
-        self, history: Dict[str, Any], med: Dict[str, Any], current_stock: float, state: Dict[str, Any]
+        self,
+        history: Dict[str, Any],
+        med: Dict[str, Any],
+        current_stock: float,
+        state: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Calculate base forecast using statistical methods"""
 

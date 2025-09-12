@@ -144,9 +144,50 @@ export function AnimatedChart({
     triggerOnce: true,
   })
 
+  // Validate and sanitize data
+  const validData = Array.isArray(data) ? data : []
+  const hasValidData = validData.length > 0 && validData.some(item => 
+    item && typeof item === 'object' && item[dataKey] !== undefined
+  )
+
+  // Show empty state if no valid data
+  if (!hasValidData) {
+    return (
+      <motion.div
+        ref={ref}
+        custom={delay}
+        variants={chartVariants}
+        initial="hidden"
+        animate={inView ? 'visible' : 'hidden'}
+        className={className}
+      >
+        <Card className="overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="space-y-1">
+              <motion.div variants={headerVariants}>
+                {title && (
+                  <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                )}
+                {subtitle && (
+                  <p className="text-xs text-muted-foreground">{subtitle}</p>
+                )}
+              </motion.div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center text-center" style={{ height: height - 100 }}>
+              <div className="text-muted-foreground text-sm">No data available</div>
+              <div className="text-xs text-muted-foreground mt-1">Chart cannot be displayed without valid data</div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    )
+  }
+
   const renderChart = () => {
     const commonProps = {
-      data,
+      data: validData,
       width: '100%',
       height,
     }
@@ -155,7 +196,7 @@ export function AnimatedChart({
       case 'area':
         return (
           <ResponsiveContainer {...commonProps}>
-            <AreaChart data={data}>
+            <AreaChart data={validData}>
               <defs>
                 <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={colors[0]} stopOpacity={0.8} />
@@ -190,7 +231,7 @@ export function AnimatedChart({
 
         return (
           <ResponsiveContainer {...commonProps}>
-            <BarChart data={data}>
+            <BarChart data={validData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey={xAxisKey}
@@ -246,7 +287,7 @@ export function AnimatedChart({
           <ResponsiveContainer {...commonProps}>
             <PieChart>
               <Pie
-                data={data}
+                data={validData}
                 cx="50%"
                 cy="50%"
                 outerRadius={80}
@@ -257,7 +298,7 @@ export function AnimatedChart({
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 labelLine={false}
               >
-                {data.map((entry, index) => (
+                {validData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
                 ))}
               </Pie>
@@ -269,7 +310,7 @@ export function AnimatedChart({
       case 'line':
         return (
           <ResponsiveContainer {...commonProps}>
-            <LineChart data={data}>
+            <LineChart data={validData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey={xAxisKey}
