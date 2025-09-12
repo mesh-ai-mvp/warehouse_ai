@@ -290,7 +290,7 @@ export function PurchaseOrders() {
                 <TableHead>Supplier</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created Date</TableHead>
-                <TableHead>Delivery Date</TableHead>
+                <TableHead>Expected Delivery</TableHead>
                 <TableHead>Line Items</TableHead>
                 <TableHead>Total Amount</TableHead>
                 <TableHead>Actions</TableHead>
@@ -339,12 +339,15 @@ export function PurchaseOrders() {
                           <ExternalLink className="h-3 w-3" />
                         </Link>
                       </div>
-                      {po.ai_generated && <div className="text-xs text-blue-600">AI Generated</div>}
+                      {po.ai_generated && <div className="text-xs text-blue-600">Auto Generated</div>}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Truck className="h-4 w-4 text-muted-foreground" />
                         {po.supplier}
+                        {po.expected_delivery_date && (
+                          <span className="ml-2 text-xs text-muted-foreground">• lead-based</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(po.status)}</TableCell>
@@ -355,10 +358,10 @@ export function PurchaseOrders() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {po.delivery_date ? (
+                      {po.delivery_date || po.expected_delivery_date ? (
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
-                          {new Date(po.delivery_date).toLocaleDateString()}
+                          {new Date(po.delivery_date || (po.expected_delivery_date as string)).toLocaleDateString()}
                         </div>
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -367,7 +370,7 @@ export function PurchaseOrders() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Package className="h-4 w-4 text-muted-foreground" />
-                        {po.line_items.length} items
+                        {(po.line_items?.length ?? po.total_lines ?? 0)} items
                       </div>
                     </TableCell>
                     <TableCell className="font-mono font-medium">

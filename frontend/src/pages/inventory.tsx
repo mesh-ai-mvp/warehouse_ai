@@ -4,7 +4,6 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
@@ -61,6 +60,7 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react'
+import { SidebarTrigger } from '@/components/ui/sidebar'
 
 import { useInventory, useFilterOptions } from '@/hooks/use-api'
 import type { Medication, InventoryFilters } from '@/types/api'
@@ -97,7 +97,7 @@ export function Inventory() {
       supplier: searchParams.get('supplier') || undefined,
       stock_level: (searchParams.get('filter') as any) || undefined,
       page: parseInt(searchParams.get('page') || '1'),
-      page_size: parseInt(searchParams.get('page_size') || '50'),
+      page_size: parseInt(searchParams.get('page_size') || '10'),
       sort_by: searchParams.get('sort_by') || undefined,
       sort_order: (searchParams.get('sort_order') as any) || undefined,
     }),
@@ -319,7 +319,6 @@ export function Inventory() {
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
@@ -375,16 +374,19 @@ export function Inventory() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Inventory</h2>
-          <p className="text-muted-foreground">
-            Manage your pharmaceutical inventory ({(data?.total || 0).toLocaleString()} items)
-          </p>
+        <div className="flex items-center gap-3">
+          <SidebarTrigger className="h-8 w-8" />
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Inventory</h2>
+            <p className="text-muted-foreground">
+              Manage your pharmaceutical inventory ({(data?.total || 0).toLocaleString()} items)
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
           <Button onClick={() => refetch()} variant="outline" size="sm">
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`${isLoading ? 'animate-spin' : ''} h-4 w-4 mr-2`} />
             Refresh
           </Button>
           <Button variant="outline" size="sm">
@@ -507,7 +509,7 @@ export function Inventory() {
               <div className="flex items-center space-x-2">
                 <p className="text-sm font-medium">Show</p>
                 <Select
-                  value={filters.page_size?.toString() || '50'}
+                  value={filters.page_size?.toString() || '10'}
                   onValueChange={value => updateFilters({ page_size: parseInt(value), page: 1 })}
                 >
                   <SelectTrigger className="h-8 w-20">

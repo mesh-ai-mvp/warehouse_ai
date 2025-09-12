@@ -333,9 +333,9 @@ class DataLoader:
 
         return {
             "items": paginated_items,
-            "total_items": total_items,
+            "total": total_items,
             "total_pages": (total_items + page_size - 1) // page_size,
-            "current_page": page,
+            "page": page,
             "page_size": page_size,
         }
 
@@ -666,9 +666,16 @@ class DataLoader:
         conn = self.get_connection()
 
         try:
-            # Query PO with items
+            # Query PO with supplier contact information
             po_query = """
-                SELECT * FROM purchase_orders WHERE po_id = ?
+                SELECT po.*, 
+                       s.contact_name as contact_person,
+                       s.email,
+                       s.phone,
+                       s.address as supplier_address
+                FROM purchase_orders po
+                LEFT JOIN suppliers s ON po.supplier_id = s.supplier_id
+                WHERE po.po_id = ?
             """
             po_df = pd.read_sql_query(po_query, conn, params=(po_id,))
 
@@ -699,10 +706,14 @@ class DataLoader:
             # Build query
             if status:
                 query = """
-                    SELECT po.*, COUNT(poi.item_id) as item_count,
-                           SUM(poi.quantity) as total_quantity
+                    SELECT po.*, 
+                           COUNT(CASE WHEN poi.item_id IS NOT NULL THEN 1 END) as item_count,
+                           SUM(poi.quantity) as total_quantity,
+                           s.avg_lead_time,
+                           datetime(po.created_at, '+' || COALESCE(s.avg_lead_time, 7) || ' days') as expected_delivery_date
                     FROM purchase_orders po
                     LEFT JOIN purchase_order_items poi ON po.po_id = poi.po_id
+                    LEFT JOIN suppliers s ON po.supplier_id = s.supplier_id
                     WHERE po.status = ?
                     GROUP BY po.po_id
                     ORDER BY po.created_at DESC
@@ -710,10 +721,14 @@ class DataLoader:
                 params = (status,)
             else:
                 query = """
-                    SELECT po.*, COUNT(poi.item_id) as item_count,
-                           SUM(poi.quantity) as total_quantity
+                    SELECT po.*, 
+                           COUNT(CASE WHEN poi.item_id IS NOT NULL THEN 1 END) as item_count,
+                           SUM(poi.quantity) as total_quantity,
+                           s.avg_lead_time,
+                           datetime(po.created_at, '+' || COALESCE(s.avg_lead_time, 7) || ' days') as expected_delivery_date
                     FROM purchase_orders po
                     LEFT JOIN purchase_order_items poi ON po.po_id = poi.po_id
+                    LEFT JOIN suppliers s ON po.supplier_id = s.supplier_id
                     GROUP BY po.po_id
                     ORDER BY po.created_at DESC
                 """

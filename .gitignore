@@ -1,6 +1,7 @@
 data/
 *.db
 *__pycache__
+src/api/__pycache__/
 
 # Environment files
 .env

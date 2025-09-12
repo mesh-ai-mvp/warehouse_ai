@@ -1,6 +1,6 @@
+import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,11 +18,9 @@ import {
   ShoppingCart,
   DollarSign,
   Calendar,
-  Activity,
-  Zap,
-  Brain,
   Sparkles,
   RefreshCw,
+  Activity,
 } from 'lucide-react'
 import { useDashboardStats, useInventory, usePurchaseOrders } from '@/hooks/use-api'
 import {
@@ -32,6 +30,7 @@ import {
   useDeliveryTimeline,
   useStockAlerts,
 } from '@/hooks/useAnalytics'
+import { ENV } from '@/lib/env'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -110,15 +109,44 @@ export function Dashboard() {
       })) ||
     []
 
-  const consumptionData = [
-    { date: 'Mon', consumption: 145 },
-    { date: 'Tue', consumption: 168 },
-    { date: 'Wed', consumption: 142 },
-    { date: 'Thu', consumption: 189 },
-    { date: 'Fri', consumption: 176 },
-    { date: 'Sat', consumption: 98 },
-    { date: 'Sun', consumption: 87 },
-  ]
+  // Get consumption forecast data (includes historical data for last 7 days)
+  const { data: weeklyForecastData, isLoading: weeklyForecastLoading } = useConsumptionForecast(undefined, 7)
+  
+  // Transform historical data to weekly consumption pattern with day names
+  const consumptionData = React.useMemo(() => {
+    if (!weeklyForecastData?.historical_data) {
+      // Only use fallback data if environment flag is enabled
+      if (ENV.enableMockFallbacks) {
+        console.warn('[Dashboard] Using mock consumption fallback data - set VITE_ENABLE_MOCK_FALLBACKS=false to disable')
+        return [
+          { date: 'Mon', consumption: 145 },
+          { date: 'Tue', consumption: 168 },
+          { date: 'Wed', consumption: 142 },
+          { date: 'Thu', consumption: 189 },
+          { date: 'Fri', consumption: 176 },
+          { date: 'Sat', consumption: 98 },
+          { date: 'Sun', consumption: 87 },
+        ]
+      }
+      
+      // No fallback data - return empty array
+      return []
+    }
+
+    // Get last 7 days of historical data and format with day names
+    const last7Days = weeklyForecastData.historical_data
+      .slice(-7)
+      .map((item: any) => {
+        const date = new Date(item.date)
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
+        return {
+          date: dayName,
+          consumption: Math.round(item.consumption || 0)
+        }
+      })
+    
+    return last7Days
+  }, [weeklyForecastData?.historical_data])
 
   return (
     <motion.div
@@ -178,7 +206,6 @@ export function Dashboard() {
             value={(stats?.total_medications || 0).toString()}
             subtitle="Across all categories"
             icon={Package}
-            trend={{ value: 12, direction: 'up' }}
             delay={0}
           />
 
@@ -187,7 +214,6 @@ export function Dashboard() {
             value={(stats?.low_stock_count || 0).toString()}
             subtitle={`${stats?.critical_stock_count || 0} critical`}
             icon={AlertTriangle}
-            trend={{ value: 8, direction: 'up' }}
             variant="warning"
             delay={1}
           />
@@ -197,7 +223,6 @@ export function Dashboard() {
             value={`$${(stats?.total_value || 0).toLocaleString()}`}
             subtitle="Current market value"
             icon={DollarSign}
-            trend={{ value: 5.2, direction: 'up' }}
             variant="success"
             delay={2}
           />
@@ -207,78 +232,11 @@ export function Dashboard() {
             value={(stats?.orders_today || 0).toString()}
             subtitle="Purchase orders created"
             icon={ShoppingCart}
-            trend={{ value: 5.2, direction: 'up' }}
             delay={3}
           />
         </div>
       </motion.section>
 
-      {/* AI Insights */}
-      <motion.section variants={sectionVariants}>
-        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/50 dark:to-purple-950/50 border-blue-200 dark:border-blue-800">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-              <Brain className="h-5 w-5" />
-              AI Insights & Recommendations
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
-              <motion.div
-                className="flex items-center gap-3 p-3 bg-white/60 dark:bg-white/5 rounded-lg"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="h-10 w-10 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
-                  <Zap className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="font-medium text-blue-900 dark:text-blue-100">
-                    Optimal Reorder Time
-                  </p>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
-                    3 medications need immediate attention
-                  </p>
-                </div>
-              </motion.div>
-
-              <motion.div
-                className="flex items-center gap-3 p-3 bg-white/60 dark:bg-white/5 rounded-lg"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="h-10 w-10 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center">
-                  <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
-                </div>
-                <div>
-                  <p className="font-medium text-green-900 dark:text-green-100">Demand Forecast</p>
-                  <p className="text-sm text-green-700 dark:text-green-300">
-                    15% increase expected next month
-                  </p>
-                </div>
-              </motion.div>
-
-              <motion.div
-                className="flex items-center gap-3 p-3 bg-white/60 dark:bg-white/5 rounded-lg"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="h-10 w-10 bg-purple-100 dark:bg-purple-900/50 rounded-full flex items-center justify-center">
-                  <Activity className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                </div>
-                <div>
-                  <p className="font-medium text-purple-900 dark:text-purple-100">
-                    Cost Optimization
-                  </p>
-                  <p className="text-sm text-purple-700 dark:text-purple-300">
-                    Potential savings: $12,450
-                  </p>
-                </div>
-              </motion.div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.section>
 
       {/* Charts Grid */}
       <motion.section variants={sectionVariants}>
@@ -330,7 +288,7 @@ export function Dashboard() {
           <AnimatedChart
             type="line"
             data={consumptionData}
-            title="Weekly Consumption Pattern"
+            title="Demand Pattern"
             subtitle="Daily medication usage this week"
             xAxisKey="date"
             dataKey="consumption"

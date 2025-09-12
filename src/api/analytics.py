@@ -352,6 +352,7 @@ async def get_supplier_performance(
                     THEN julianday(po.actual_delivery_date) - julianday(po.requested_delivery_date)
                     ELSE 0 
                 END) as avg_delay,
+                s.avg_lead_time,
                 CASE
                     WHEN COUNT(po.po_id) = 0 THEN 4.0
                     WHEN COUNT(CASE WHEN po.actual_delivery_date <= po.requested_delivery_date THEN 1 END) * 100.0 / COUNT(po.po_id) >= 95 THEN 4.8
@@ -362,7 +363,7 @@ async def get_supplier_performance(
             FROM suppliers s
             LEFT JOIN purchase_orders po ON s.supplier_id = po.supplier_id
                 AND po.created_at >= ? AND po.created_at <= ?
-            GROUP BY s.supplier_id, s.name
+            GROUP BY s.supplier_id, s.name, s.avg_lead_time
             HAVING COUNT(po.po_id) > 0
             ORDER BY orders DESC
         """,
@@ -373,7 +374,7 @@ async def get_supplier_performance(
 
         performance = []
         for row in results:
-            name, orders, on_time_orders, avg_delay, rating = row
+            name, orders, on_time_orders, avg_delay, avg_lead_time, rating = row
             on_time_percentage = (
                 (on_time_orders / max(orders, 1)) * 100 if orders > 0 else 0
             )
@@ -384,6 +385,7 @@ async def get_supplier_performance(
                     "orders": orders,
                     "onTime": round(on_time_percentage, 1),
                     "avgDelay": round(avg_delay or 0, 1),
+                    "leadTime": round(avg_lead_time or 7.0, 1),
                     "rating": round(rating, 1),
                 }
             )

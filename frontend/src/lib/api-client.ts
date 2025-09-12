@@ -68,7 +68,24 @@ class ApiClient {
     const queryString = params.toString()
     const endpoint = `/inventory${queryString ? `?${queryString}` : ''}`
 
-    return this.request<InventoryResponse>(endpoint)
+    // Normalize backend field names to frontend expectations
+    const res = await this.request<any>(endpoint)
+
+    const totalItems = res.total ?? res.total_items ?? (Array.isArray(res.items) ? res.items.length : 0)
+    const pageSize = res.page_size ?? filters.page_size ?? 20
+    const page = res.page ?? res.current_page ?? 1
+    const totalPages = res.total_pages ?? Math.max(1, Math.ceil(totalItems / pageSize))
+
+    const normalized: InventoryResponse = {
+      items: res.items ?? [],
+      total: totalItems,
+      page,
+      page_size: pageSize,
+      total_pages: totalPages,
+      filters_applied: filters,
+    }
+
+    return normalized
   }
 
   async getMedication(id: string): Promise<Medication> {
@@ -155,17 +172,19 @@ class ApiClient {
     }>(endpoint)
 
     // Map the API response to the expected format
-    const mappedItems: PurchaseOrder[] = response.purchase_orders.map(po => ({
+    const mappedItems: PurchaseOrder[] = (response.purchase_orders || []).map(po => ({
       id: po.po_id || po.id,
       supplier: po.supplier_name || po.supplier,
       status: po.status,
       created_date: po.created_at || po.created_date,
-      delivery_date: po.delivery_date,
+      delivery_date: po.delivery_date || po.expected_delivery_date,
       total_amount: Number(po.total_amount || 0),
       line_items: po.line_items || [],
       buyer_name: po.buyer_name,
       notes: po.notes,
       ai_generated: po.ai_generated,
+      total_lines: po.total_lines,
+      expected_delivery_date: po.expected_delivery_date,
     }))
 
     return {
@@ -381,11 +400,11 @@ class ApiClient {
     } catch (error) {
       // Return mock data for development
       return [
-        { name: 'PharmaCorp', orders: 45, onTime: 96.2, avgDelay: 1.2, rating: 4.8 },
-        { name: 'MedSupply Pro', orders: 38, onTime: 94.1, avgDelay: 2.1, rating: 4.6 },
-        { name: 'HealthDist Inc', orders: 32, onTime: 91.8, avgDelay: 3.2, rating: 4.3 },
-        { name: 'BioPharma Ltd', orders: 28, onTime: 98.5, avgDelay: 0.8, rating: 4.9 },
-        { name: 'MediCore Systems', orders: 25, onTime: 89.3, avgDelay: 4.1, rating: 4.1 },
+        { name: 'PharmaCorp', orders: 45, onTime: 96.2, avgDelay: 1.2, leadTime: 6.5, rating: 4.8 },
+        { name: 'MedSupply Pro', orders: 38, onTime: 94.1, avgDelay: 2.1, leadTime: 7.2, rating: 4.6 },
+        { name: 'HealthDist Inc', orders: 32, onTime: 91.8, avgDelay: 3.2, leadTime: 8.1, rating: 4.3 },
+        { name: 'BioPharma Ltd', orders: 28, onTime: 98.5, avgDelay: 0.8, leadTime: 5.9, rating: 4.9 },
+        { name: 'MediCore Systems', orders: 25, onTime: 89.3, avgDelay: 4.1, leadTime: 9.3, rating: 4.1 },
       ]
     }
   }

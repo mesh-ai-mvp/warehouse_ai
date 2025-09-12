@@ -93,7 +93,7 @@ const getPriorityBadge = (priority: string = 'medium') => {
 
 export default function DeliveryTimeline({
   tasks,
-  title = 'Delivery Timeline',
+  title = 'Lead Timeline',
   subtitle = 'Track purchase orders and delivery schedules',
   height = 400,
   showToday = true,

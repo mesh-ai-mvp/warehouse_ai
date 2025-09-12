@@ -44,17 +44,15 @@ interface AIPOGenerationParams {
   store_ids?: number[]
   category_filter?: string
   days_forecast?: number
-  urgency_threshold?: number
 }
 
 export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => void }) {
   const [open, setOpen] = useState(false)
   const [params, setParams] = useState<AIPOGenerationParams>({
     days_forecast: 30,
-    urgency_threshold: 0.5,
   })
 
-  const { generatePO, isGenerating, progress, status, result, error, resetGeneration } =
+  const { generatePO, isGenerating, progress, status, result, error, resetGeneration, progressDetails } =
     useAIPOGeneration()
 
   const handleGenerate = () => {
@@ -88,7 +86,7 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
     if (progress < 50) return 'Calculating demand forecasts...'
     if (progress < 75) return 'Evaluating supplier options...'
     if (progress < 100) return 'Optimizing purchase recommendations...'
-    return 'AI analysis complete!'
+    return 'Analysis complete!'
   }
 
   return (
@@ -96,7 +94,7 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
       <DrawerTrigger asChild>
         <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
           <Bot className="mr-2 h-4 w-4" />
-          AI Generate PO
+          Generate PO
           <Sparkles className="ml-2 h-4 w-4" />
         </Button>
       </DrawerTrigger>
@@ -105,62 +103,41 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
         <DrawerHeader>
           <DrawerTitle className="flex items-center gap-2">
             <Bot className="h-5 w-5" />
-            AI Purchase Order Generation
+            Purchase Order Generation
           </DrawerTitle>
           <DrawerDescription>
-            Let our AI analyze your inventory and generate optimal purchase orders
+            Let our system analyze your inventory and generate optimal purchase orders
           </DrawerDescription>
         </DrawerHeader>
 
         <div className="px-4 pb-4 space-y-6">
           {!isGenerating && !result && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="forecast-days">Forecast Period (days)</Label>
-                  <Input
-                    id="forecast-days"
-                    type="number"
-                    value={params.days_forecast}
-                    onChange={e =>
-                      setParams(prev => ({ ...prev, days_forecast: parseInt(e.target.value) }))
-                    }
-                    min="7"
-                    max="90"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="urgency">Urgency Threshold</Label>
-                  <Select
-                    value={params.urgency_threshold?.toString()}
-                    onValueChange={value =>
-                      setParams(prev => ({ ...prev, urgency_threshold: parseFloat(value) }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0.25">High Priority (25% stock)</SelectItem>
-                      <SelectItem value="0.5">Normal (50% stock)</SelectItem>
-                      <SelectItem value="0.75">Low Priority (75% stock)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="forecast-days">Forecast Period (days)</Label>
+                <Input
+                  id="forecast-days"
+                  type="number"
+                  value={params.days_forecast}
+                  onChange={e =>
+                    setParams(prev => ({ ...prev, days_forecast: parseInt(e.target.value) }))
+                  }
+                  min="7"
+                  max="90"
+                />
               </div>
 
               <Alert>
                 <TrendingUp className="h-4 w-4" />
                 <AlertDescription>
-                  Our AI will analyze consumption patterns, supplier performance, and stock levels
+                  Our system will analyze consumption patterns, supplier performance, and stock levels
                   to generate optimal purchase recommendations.
                 </AlertDescription>
               </Alert>
 
               <Button onClick={handleGenerate} disabled={isGenerating} className="w-full" size="lg">
                 <Bot className="mr-2 h-4 w-4" />
-                Generate AI Recommendations
+                Generate Recommendations
               </Button>
             </div>
           )}
@@ -170,9 +147,9 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   {getStatusIcon()}
-                  AI Analysis in Progress
+                  Analysis in Progress
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="flex items-center gap-2">
                   {status === 'generating' ? getStatusMessage() : 'Working...'}
                 </CardDescription>
               </CardHeader>
@@ -185,9 +162,25 @@ export function AIPOGenerator({ onGenerated }: { onGenerated?: (result: any) => 
                   <Progress value={progress} className="w-full" />
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  This usually takes 1-2 minutes
+                <div className="text-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span className="capitalize">{progressDetails.current_agent?.replace('_', ' ') || 'initializing'}</span>
+                    <span>•</span>
+                    <span>{progressDetails.current_action || 'Working...'}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    {(progressDetails.steps_completed || []).map(s => (
+                      <Badge key={s} variant="secondary" className="capitalize">
+                        {s}
+                      </Badge>
+                    ))}
+                    {(progressDetails.steps_remaining || []).map(s => (
+                      <Badge key={s} variant="outline" className="capitalize opacity-70">
+                        {s}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>

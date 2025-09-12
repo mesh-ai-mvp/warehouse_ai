@@ -32,8 +32,8 @@ class SupplierAgent:
             f"Starting supplier optimization for {len(state.get('adjusted_quantities', {}))} items"
         )
 
-        # Update progress
-        state = update_progress(state, "supplier_agent", "Evaluating suppliers", 10)
+        # Update progress (align with workflow ~85%)
+        state = update_progress(state, "supplier_agent", "Evaluating suppliers", 88)
 
         supplier_allocations = {}
         reasoning_points = []

@@ -80,7 +80,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function ConsumptionForecastChart({
   historicalData,
   forecastData,
-  title = 'Consumption Forecast with AI',
+  title = 'Demand Forecast',
   subtitle = 'Historical data with predictive analytics',
   height = 350,
 }: ConsumptionForecastChartProps) {

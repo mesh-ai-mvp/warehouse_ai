@@ -49,6 +49,7 @@ import {
 } from 'lucide-react'
 
 import { useSuppliers, useMedication, useInventory, useCreatePurchaseOrder } from '@/hooks/use-api'
+import { useAIPOGeneration } from '@/hooks/use-ai-po'
 import type { PurchaseOrderCreate, LineItem } from '@/types/api'
 
 interface POStep {
@@ -84,19 +85,19 @@ const steps: POStep[] = [
   {
     id: 'selection',
     title: 'Item Selection',
-    description: 'Choose medications or use AI recommendations',
+    description: 'Choose medications or use smart recommendations',
     completed: false,
   },
   {
     id: 'ai-analysis',
-    title: 'AI Analysis',
+    title: 'Analysis',
     description: 'Generate intelligent purchase recommendations',
     completed: false,
   },
   {
     id: 'review',
     title: 'Review & Adjust',
-    description: 'Review AI suggestions and make adjustments',
+    description: 'Review suggestions and make adjustments',
     completed: false,
   },
   {
@@ -136,6 +137,16 @@ export function CreatePO() {
     !!preselectedMedication
   )
   const createPOMutation = useCreatePurchaseOrder()
+  
+  // AI PO Generation hook
+  const {
+    generatePO: generateAIPO,
+    isGenerating: isAIGenerating,
+    progress: aiProgress,
+    result: aiResult,
+    status: aiStatus,
+    resetGeneration: resetAI
+  } = useAIPOGeneration()
 
   // Auto-advance to AI analysis if medication is preselected
   useEffect(() => {
@@ -148,69 +159,54 @@ export function CreatePO() {
     }
   }, [preselectedMedication, medicationDetail, state.step])
 
-  const simulateAIGeneration = useCallback(async () => {
-    setState(prev => ({ ...prev, isAiGenerating: true, aiProgress: 0 }))
+  const startAIGeneration = useCallback(async () => {
+    // Reset AI state and trigger real AI generation
+    resetAI()
+    
+    // Convert selected medication IDs to numbers for the API
+    const medicationIds = state.selectedMedications.map(id => parseInt(id))
+    
+    // Start real AI generation with selected medications
+    generateAIPO({
+      days_forecast: 30,
+      category_filter: undefined,
+      store_ids: undefined,
+    })
+  }, [state.selectedMedications, generateAIPO, resetAI])
 
-    // Simulate AI processing steps
-    const steps = [
-      { progress: 20, message: 'Analyzing inventory levels...' },
-      { progress: 40, message: 'Forecasting demand patterns...' },
-      { progress: 60, message: 'Optimizing quantities...' },
-      { progress: 80, message: 'Selecting best suppliers...' },
-      { progress: 100, message: 'Generating recommendations...' },
-    ]
-
-    for (const step of steps) {
-      await new Promise(resolve => setTimeout(resolve, 800))
-      setState(prev => ({ ...prev, aiProgress: step.progress }))
+  // Update state when AI generation completes
+  useEffect(() => {
+    if (aiResult && aiStatus === 'completed') {
+      setState(prev => ({
+        ...prev,
+        isAiGenerating: false,
+        aiProgress: 100,
+        aiRecommendations: aiResult,
+        lineItems: aiResult.items.map(item => ({
+          medication_id: item.medication_id.toString(),
+          quantity: item.suggested_quantity,
+          unit_price: inventory?.items?.find(m => m.id.toString() === item.medication_id.toString())?.unit_cost || 10,
+          total:
+            item.suggested_quantity *
+            (inventory?.items?.find(m => m.id.toString() === item.medication_id.toString())?.unit_cost || 10),
+        })),
+        supplier: aiResult.supplier_suggestion || suppliers?.[0]?.name || 'PharmaCorp Supply',
+      }))
     }
+  }, [aiResult, aiStatus, inventory, suppliers])
 
-    // Mock AI recommendations based on selected medications
-    const mockRecommendations = {
-      items: state.selectedMedications.map(medId => {
-        const med = inventory?.items?.find(item => item.id === medId)
-        return {
-          medication_id: medId,
-          medication_name: med?.name || `Medication ${medId}`,
-          suggested_quantity: Math.max(med?.reorder_point || 100, med?.current_stock || 0) * 2,
-          reason:
-            med?.current_stock && med?.current_stock <= med?.reorder_point
-              ? 'Critical stock level - immediate reorder needed'
-              : 'Preventive restocking based on consumption patterns',
-          priority: (med?.current_stock && med?.current_stock <= med?.reorder_point * 0.5
-            ? 'high'
-            : 'medium') as 'high' | 'medium' | 'low',
-        }
-      }),
-      supplier_suggestion: suppliers?.[0]?.name || 'PharmaCorp Supply',
-      estimated_total: 0,
-    }
-
-    mockRecommendations.estimated_total = mockRecommendations.items.reduce((total, item) => {
-      const med = inventory?.items?.find(m => m.id === item.medication_id)
-      return total + item.suggested_quantity * (med?.unit_cost || 10)
-    }, 0)
-
+  // Sync AI generation state with component state
+  useEffect(() => {
     setState(prev => ({
       ...prev,
-      isAiGenerating: false,
-      aiProgress: 100,
-      aiRecommendations: mockRecommendations,
-      lineItems: mockRecommendations.items.map(item => ({
-        medication_id: item.medication_id,
-        quantity: item.suggested_quantity,
-        unit_price: inventory?.items?.find(m => m.id === item.medication_id)?.unit_cost || 10,
-        total:
-          item.suggested_quantity *
-          (inventory?.items?.find(m => m.id === item.medication_id)?.unit_cost || 10),
-      })),
-      supplier: mockRecommendations.supplier_suggestion,
+      isAiGenerating: isAIGenerating,
+      aiProgress: aiProgress,
     }))
-  }, [state.selectedMedications, inventory, suppliers])
+  }, [isAIGenerating, aiProgress])
 
   const handleNext = async () => {
     if (state.step === 1 && !state.aiRecommendations) {
-      await simulateAIGeneration()
+      await startAIGeneration()
     }
     setState(prev => ({ ...prev, step: Math.min(prev.step + 1, steps.length - 1) }))
   }
@@ -268,20 +264,16 @@ export function CreatePO() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              <Brain className="h-8 w-8 text-blue-600" />
+              <ShoppingCart className="h-8 w-8 text-blue-600" />
               Create Purchase Order
             </h1>
             <p className="text-muted-foreground">
-              AI-powered purchase order generation and optimization
+              Intelligent purchase order generation and optimization
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-blue-600 border-blue-200">
-            <Sparkles className="h-3 w-3 mr-1" />
-            AI Enhanced
-          </Badge>
           <Button variant="outline" onClick={() => navigate('/purchase-orders')}>
             <FileText className="h-4 w-4 mr-2" />
             View Orders
@@ -358,7 +350,7 @@ export function CreatePO() {
             ) : (
               <div className="space-y-4">
                 <p className="text-muted-foreground">
-                  Select medications for your purchase order, or let our AI analyze your inventory
+                  Select medications for your purchase order, or analyze your inventory
                   and recommend items that need restocking.
                 </p>
 
@@ -429,8 +421,8 @@ export function CreatePO() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5 text-blue-600" />
-              AI Analysis & Recommendations
+              <Sparkles className="h-5 w-5 text-blue-600" />
+              Analysis & Recommendations
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -438,14 +430,14 @@ export function CreatePO() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-                  <span className="font-medium">AI is analyzing your inventory...</span>
+                  <span className="font-medium">Processing your inventory...</span>
                 </div>
                 <Progress value={state.aiProgress} className="h-2" />
                 <div className="grid gap-2 text-sm text-muted-foreground">
-                  <div>🔍 Analyzing current stock levels and consumption patterns</div>
-                  <div>📊 Forecasting future demand using historical data</div>
+                  <div>🔍 Reviewing current stock levels and usage patterns</div>
+                  <div>📊 Calculating future demand based on historical data</div>
                   <div>⚡ Optimizing quantities for cost efficiency</div>
-                  <div>🏪 Selecting best suppliers based on pricing and lead times</div>
+                  <div>🏪 Selecting optimal suppliers based on pricing and lead times</div>
                 </div>
               </div>
             ) : state.aiRecommendations ? (
@@ -453,7 +445,7 @@ export function CreatePO() {
                 <Alert>
                   <Sparkles className="h-4 w-4" />
                   <AlertDescription>
-                    AI has analyzed your inventory and generated smart recommendations
+                    Analysis complete - recommendations generated
                   </AlertDescription>
                 </Alert>
 
@@ -506,9 +498,9 @@ export function CreatePO() {
                 </div>
               </div>
             ) : (
-              <Button onClick={simulateAIGeneration} size="lg" className="w-full">
-                <Brain className="h-5 w-5 mr-2" />
-                Generate AI Recommendations
+              <Button onClick={startAIGeneration} size="lg" className="w-full">
+                <Sparkles className="h-5 w-5 mr-2" />
+                Generate Recommendations
               </Button>
             )}
           </CardContent>
@@ -743,9 +735,9 @@ export function CreatePO() {
             )}
 
             <Alert>
-              <Brain className="h-4 w-4" />
+              <CheckCircle2 className="h-4 w-4" />
               <AlertDescription>
-                This purchase order was generated with AI assistance for optimal inventory
+                This purchase order was generated with intelligent optimization for optimal inventory
                 management.
               </AlertDescription>
             </Alert>

@@ -7,7 +7,6 @@ export interface AIPOGenerationParams {
   store_ids?: number[]
   category_filter?: string
   days_forecast?: number
-  urgency_threshold?: number
 }
 
 export interface AIPOGenerationResult {
@@ -37,6 +36,12 @@ export function useAIPOGeneration() {
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState<'idle' | 'generating' | 'completed' | 'error'>('idle')
   const [result, setResult] = useState<AIPOGenerationResult | null>(null)
+  const [progressDetails, setProgressDetails] = useState<{
+    current_agent?: string
+    current_action?: string
+    steps_completed?: string[]
+    steps_remaining?: string[]
+  }>({})
 
   const queryClient = useQueryClient()
 
@@ -45,12 +50,12 @@ export function useAIPOGeneration() {
       setStatus('generating')
       setProgress(0)
       setResult(null)
+      setProgressDetails({})
 
       try {
         // Map UI params to backend request
         const request = {
           days_forecast: params.days_forecast ?? 30,
-          urgency_threshold: params.urgency_threshold ?? 0.5,
           category_filter: params.category_filter,
           store_ids: params.store_ids,
           // allow backend to auto-select meds based on urgency if none provided
@@ -63,15 +68,53 @@ export function useAIPOGeneration() {
         setCurrentSession(response.session_id)
 
         // Poll status
+        let lastPct = 0
         const progressInterval = setInterval(async () => {
           try {
             const statusResponse = await apiClient.getAIStatus(response.session_id)
+            console.log('🔄 Status response:', statusResponse)
 
             // Normalize progress percent from various shapes
             const raw = (statusResponse as any).progress
-            const pctValue = typeof raw === 'object' ? (raw?.percent_complete ?? 0) : raw
-            const pctNum = Number.isFinite(Number(pctValue)) ? Number(pctValue) : 0
-            setProgress(Math.min(100, Math.max(0, Math.round(pctNum))))
+            console.log('📊 Progress raw:', raw)
+            setProgressDetails({
+              current_agent: raw?.current_agent,
+              current_action: raw?.current_action,
+              steps_completed: raw?.steps_completed,
+              steps_remaining: raw?.steps_remaining,
+            })
+            let pctNum: number
+            if (typeof raw === 'object') {
+              const pc = (raw as any)?.percent_complete
+              if (pc !== undefined && pc !== null) {
+                pctNum = Number(pc)
+              } else {
+                const completed = Array.isArray((raw as any).steps_completed)
+                  ? (raw as any).steps_completed.length
+                  : 0
+                const total = completed + (Array.isArray((raw as any).steps_remaining) ? (raw as any).steps_remaining.length : 0)
+                pctNum = total > 0 ? Math.round((completed / total) * 100) : 0
+              }
+            } else {
+              pctNum = Number(raw)
+            }
+            pctNum = Number.isFinite(pctNum) ? pctNum : 0
+            console.log('📈 Progress calculated:', pctNum)
+
+            // Tween progress a bit for smoother movement
+            const nextTarget = Math.min(100, Math.max(lastPct, Math.round(pctNum)))
+            if (nextTarget > lastPct) {
+              const step = Math.max(1, Math.round((nextTarget - lastPct) / 3))
+              let current = lastPct
+              const tween = setInterval(() => {
+                current = Math.min(nextTarget, current + step)
+                setProgress(current)
+                if (current >= nextTarget) {
+                  clearInterval(tween)
+                }
+              }, 150)
+              lastPct = nextTarget
+            }
 
             const isDone =
               (statusResponse as any).status === 'completed' ||
@@ -123,7 +166,7 @@ export function useAIPOGeneration() {
             setStatus('error')
             throw error
           }
-        }, 1200)
+        }, 800)
 
         return response
       } catch (error) {
@@ -139,6 +182,7 @@ export function useAIPOGeneration() {
     setProgress(0)
     setStatus('idle')
     setResult(null)
+    setProgressDetails({})
   }
 
   return {
@@ -150,5 +194,6 @@ export function useAIPOGeneration() {
     error: generatePO.error,
     resetGeneration,
     isLoading: generatePO.isPending,
+    progressDetails,
   }
 }

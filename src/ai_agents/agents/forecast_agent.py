@@ -52,7 +52,7 @@ class ForecastAgent:
 
             # Calculate base forecast using moving average
             base_forecast = self._calculate_base_forecast(
-                history, med, state["current_stock"].get(med_id, 0)
+                history, med, state["current_stock"].get(med_id, 0), state
             )
 
             # Optionally use LLM to provide qualitative insights only (no numeric adjustments here)
@@ -83,7 +83,7 @@ class ForecastAgent:
                 safety_percent = int((safety_multiplier - 1) * 100)
 
                 med_reasoning.append(
-                    f"Base forecast: {avg_consumption:.1f} units/day average × {self.config.forecast_horizon_months * 30} days × {trend_factor:.2f} trend factor = {base_qty:.0f} units"
+                    f"Base forecast: {avg_consumption:.1f} units/day average × {state['days_forecast']} days × {trend_factor:.2f} trend factor = {base_qty:.0f} units"
                 )
                 med_reasoning.append(
                     f"Consumption trend: {trend_direction} ({trend_factor:.2f}x)"
@@ -143,7 +143,7 @@ class ForecastAgent:
         return state
 
     def _calculate_base_forecast(
-        self, history: Dict[str, Any], med: Dict[str, Any], current_stock: float
+        self, history: Dict[str, Any], med: Dict[str, Any], current_stock: float, state: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Calculate base forecast using statistical methods"""
 
@@ -152,7 +152,7 @@ class ForecastAgent:
         if not historical_data:
             # Fallback to simple calculation
             avg_daily = med.get("avg_daily_consumption", 10)
-            forecast_quantity = avg_daily * 30 * self.config.forecast_horizon_months
+            forecast_quantity = avg_daily * state["days_forecast"]
 
             return {
                 "base_quantity": forecast_quantity,
@@ -168,7 +168,7 @@ class ForecastAgent:
 
         if not consumptions:
             avg_daily = med.get("avg_daily_consumption", 10)
-            forecast_quantity = avg_daily * 30 * self.config.forecast_horizon_months
+            forecast_quantity = avg_daily * state["days_forecast"]
 
             return {
                 "base_quantity": forecast_quantity,
@@ -189,7 +189,7 @@ class ForecastAgent:
             trend_factor = 1.0
 
         # Calculate forecast quantity
-        days_in_period = 30 * self.config.forecast_horizon_months
+        days_in_period = state["days_forecast"]
         base_quantity = avg_consumption * days_in_period * trend_factor
 
         # Add safety stock based on variability
