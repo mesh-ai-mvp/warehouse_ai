@@ -744,6 +744,224 @@ class DataLoader:
         finally:
             conn.close()
 
+    def get_warehouse_zones(self) -> List[Dict[str, Any]]:
+        """Get all warehouse zones with their details"""
+        conn = self.get_connection()
+        try:
+            query = """
+                SELECT z.*, COUNT(DISTINCT a.aisle_id) as aisle_count
+                FROM warehouse_zones z
+                LEFT JOIN warehouse_aisles a ON z.zone_id = a.zone_id
+                GROUP BY z.zone_id
+            """
+            df = pd.read_sql_query(query, conn)
+            return clean_nan_values(df.to_dict('records'))
+        finally:
+            conn.close()
+
+    def get_warehouse_aisles(self, zone_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get warehouse aisles, optionally filtered by zone"""
+        conn = self.get_connection()
+        try:
+            if zone_id:
+                query = """
+                    SELECT a.*, COUNT(s.shelf_id) as shelf_count,
+                           AVG(s.utilization_percent) as avg_utilization
+                    FROM warehouse_aisles a
+                    LEFT JOIN warehouse_shelves s ON a.aisle_id = s.aisle_id
+                    WHERE a.zone_id = ?
+                    GROUP BY a.aisle_id
+                """
+                df = pd.read_sql_query(query, conn, params=[zone_id])
+            else:
+                query = """
+                    SELECT a.*, COUNT(s.shelf_id) as shelf_count,
+                           AVG(s.utilization_percent) as avg_utilization
+                    FROM warehouse_aisles a
+                    LEFT JOIN warehouse_shelves s ON a.aisle_id = s.aisle_id
+                    GROUP BY a.aisle_id
+                """
+                df = pd.read_sql_query(query, conn)
+            return clean_nan_values(df.to_dict('records'))
+        finally:
+            conn.close()
+
+    def get_warehouse_shelves(self, aisle_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get warehouse shelves, optionally filtered by aisle"""
+        conn = self.get_connection()
+        try:
+            if aisle_id:
+                query = """
+                    SELECT s.*,
+                           COUNT(DISTINCT mp.med_id) as medication_count,
+                           SUM(mp.quantity) as total_items
+                    FROM warehouse_shelves s
+                    LEFT JOIN shelf_positions sp ON s.shelf_id = sp.shelf_id
+                    LEFT JOIN medication_placements mp ON sp.position_id = mp.position_id
+                        AND mp.is_active = 1
+                    WHERE s.aisle_id = ?
+                    GROUP BY s.shelf_id
+                    ORDER BY s.position, s.level
+                """
+                df = pd.read_sql_query(query, conn, params=[aisle_id])
+            else:
+                query = """
+                    SELECT s.*,
+                           COUNT(DISTINCT mp.med_id) as medication_count,
+                           SUM(mp.quantity) as total_items
+                    FROM warehouse_shelves s
+                    LEFT JOIN shelf_positions sp ON s.shelf_id = sp.shelf_id
+                    LEFT JOIN medication_placements mp ON sp.position_id = mp.position_id
+                        AND mp.is_active = 1
+                    GROUP BY s.shelf_id
+                    ORDER BY s.aisle_id, s.position, s.level
+                """
+                df = pd.read_sql_query(query, conn)
+            return clean_nan_values(df.to_dict('records'))
+        finally:
+            conn.close()
+
+    def get_shelf_positions(self, shelf_id: int) -> pd.DataFrame:
+        """Get all positions for a specific shelf with medication details"""
+        conn = self.get_connection()
+        try:
+            query = """
+                SELECT p.*,
+                       mp.med_id, mp.batch_id, mp.quantity, mp.expiry_date,
+                       m.name as med_name, m.category as med_category,
+                       ma.velocity_score, ma.movement_category,
+                       b.lot_number
+                FROM shelf_positions p
+                LEFT JOIN medication_placements mp ON p.position_id = mp.position_id
+                    AND mp.is_active = 1
+                LEFT JOIN medications m ON mp.med_id = m.med_id
+                LEFT JOIN medication_attributes ma ON m.med_id = ma.med_id
+                LEFT JOIN batch_info b ON mp.batch_id = b.batch_id
+                WHERE p.shelf_id = ?
+                ORDER BY p.grid_y, p.grid_x
+            """
+            return pd.read_sql_query(query, conn, params=[shelf_id])
+        finally:
+            conn.close()
+
+    def get_medication_placements(self, med_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get medication placements across the warehouse"""
+        conn = self.get_connection()
+        try:
+            if med_id:
+                query = """
+                    SELECT mp.*, sp.shelf_id, sp.grid_x, sp.grid_y,
+                           s.shelf_code, a.aisle_name, z.zone_name
+                    FROM medication_placements mp
+                    JOIN shelf_positions sp ON mp.position_id = sp.position_id
+                    JOIN warehouse_shelves s ON sp.shelf_id = s.shelf_id
+                    JOIN warehouse_aisles a ON s.aisle_id = a.aisle_id
+                    JOIN warehouse_zones z ON a.zone_id = z.zone_id
+                    WHERE mp.med_id = ? AND mp.is_active = 1
+                """
+                df = pd.read_sql_query(query, conn, params=[med_id])
+            else:
+                query = """
+                    SELECT mp.*, sp.shelf_id, sp.grid_x, sp.grid_y,
+                           s.shelf_code, a.aisle_name, z.zone_name,
+                           m.name as med_name
+                    FROM medication_placements mp
+                    JOIN shelf_positions sp ON mp.position_id = sp.position_id
+                    JOIN warehouse_shelves s ON sp.shelf_id = s.shelf_id
+                    JOIN warehouse_aisles a ON s.aisle_id = a.aisle_id
+                    JOIN warehouse_zones z ON a.zone_id = z.zone_id
+                    JOIN medications m ON mp.med_id = m.med_id
+                    WHERE mp.is_active = 1
+                """
+                df = pd.read_sql_query(query, conn)
+            return clean_nan_values(df.to_dict('records'))
+        finally:
+            conn.close()
+
+    def get_warehouse_alerts(self, days_ahead: int = 30) -> Dict[str, List[Dict[str, Any]]]:
+        """Get warehouse alerts for expiring items, temperature issues, and capacity warnings"""
+        conn = self.get_connection()
+        try:
+            alerts = {'expiry': [], 'temperature': [], 'capacity': []}
+
+            # Expiry alerts
+            expiry_query = f"""
+                SELECT m.name, b.lot_number, b.expiry_date,
+                       s.shelf_code, a.aisle_name,
+                       julianday(b.expiry_date) - julianday('now') as days_until_expiry
+                FROM batch_info b
+                JOIN medication_placements mp ON b.batch_id = mp.batch_id
+                JOIN medications m ON mp.med_id = m.med_id
+                JOIN shelf_positions sp ON mp.position_id = sp.position_id
+                JOIN warehouse_shelves s ON sp.shelf_id = s.shelf_id
+                JOIN warehouse_aisles a ON s.aisle_id = a.aisle_id
+                WHERE mp.is_active = 1
+                    AND b.expiry_date <= date('now', '+{days_ahead} days')
+                ORDER BY b.expiry_date
+            """
+            expiry_df = pd.read_sql_query(expiry_query, conn)
+            alerts['expiry'] = clean_nan_values(expiry_df.to_dict('records'))
+
+            # Temperature alerts (last hour)
+            temp_query = """
+                SELECT t.*, a.aisle_name
+                FROM temperature_readings t
+                JOIN warehouse_aisles a ON t.aisle_id = a.aisle_id
+                WHERE t.alert_triggered = 1
+                    AND t.reading_time >= datetime('now', '-1 hour')
+            """
+            temp_df = pd.read_sql_query(temp_query, conn)
+            alerts['temperature'] = clean_nan_values(temp_df.to_dict('records'))
+
+            # Capacity alerts
+            capacity_query = """
+                SELECT s.shelf_id, s.shelf_code, a.aisle_name,
+                       s.utilization_percent
+                FROM warehouse_shelves s
+                JOIN warehouse_aisles a ON s.aisle_id = a.aisle_id
+                WHERE s.utilization_percent > 90
+            """
+            capacity_df = pd.read_sql_query(capacity_query, conn)
+            alerts['capacity'] = clean_nan_values(capacity_df.to_dict('records'))
+
+            return alerts
+        finally:
+            conn.close()
+
+    def get_movement_history(self, days: int = 7, med_id: Optional[int] = None) -> pd.DataFrame:
+        """Get movement history for the warehouse"""
+        conn = self.get_connection()
+        try:
+            if med_id:
+                query = f"""
+                    SELECT mh.*, m.name as med_name,
+                           sp.shelf_id, s.shelf_code, a.aisle_name
+                    FROM movement_history mh
+                    JOIN medications m ON mh.med_id = m.med_id
+                    LEFT JOIN shelf_positions sp ON mh.position_id = sp.position_id
+                    LEFT JOIN warehouse_shelves s ON sp.shelf_id = s.shelf_id
+                    LEFT JOIN warehouse_aisles a ON s.aisle_id = a.aisle_id
+                    WHERE mh.movement_date >= datetime('now', '-{days} days')
+                        AND mh.med_id = ?
+                    ORDER BY mh.movement_date DESC
+                """
+                return pd.read_sql_query(query, conn, params=[med_id])
+            else:
+                query = f"""
+                    SELECT mh.*, m.name as med_name,
+                           sp.shelf_id, s.shelf_code, a.aisle_name
+                    FROM movement_history mh
+                    JOIN medications m ON mh.med_id = m.med_id
+                    LEFT JOIN shelf_positions sp ON mh.position_id = sp.position_id
+                    LEFT JOIN warehouse_shelves s ON sp.shelf_id = s.shelf_id
+                    LEFT JOIN warehouse_aisles a ON s.aisle_id = a.aisle_id
+                    WHERE mh.movement_date >= datetime('now', '-{days} days')
+                    ORDER BY mh.movement_date DESC
+                """
+                return pd.read_sql_query(query, conn)
+        finally:
+            conn.close()
+
     def __del__(self):
         """Close database connection when object is destroyed"""
         if hasattr(self, "_conn") and self._conn:

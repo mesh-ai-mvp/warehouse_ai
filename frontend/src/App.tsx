@@ -11,6 +11,7 @@ import { CreatePO } from './pages/create-po'
 import { CreatePOEnhanced } from './pages/create-po-enhanced'
 import { Analytics } from './pages/analytics'
 import { Reports } from './pages/reports'
+import { WarehouseUI } from './pages/warehouse-ui'
 import { Toaster } from '@/components/ui/sonner'
 import './App.css'
 
@@ -41,6 +42,7 @@ function App() {
                 <Route path="/create-po-legacy" element={<CreatePO />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/reports" element={<Reports />} />
+                <Route path="/warehouse-ui" element={<WarehouseUI />} />
                 <Route
                   path="/settings"
                   element={<div className="p-4">Settings Page Coming Soon</div>}

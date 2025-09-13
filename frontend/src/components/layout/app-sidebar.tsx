@@ -1,4 +1,4 @@
-import { BarChart3, Package, ShoppingCart, FileText, Home, Settings } from 'lucide-react'
+import { BarChart3, Package, ShoppingCart, FileText, Home, Settings, Warehouse } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
 import {
@@ -43,6 +43,11 @@ const menuItems = [
     title: 'Reports',
     url: '/reports',
     icon: FileText,
+  },
+  {
+    title: 'Warehouse UI',
+    url: '/warehouse-ui',
+    icon: Warehouse,
   },
   {
     title: 'Settings',
