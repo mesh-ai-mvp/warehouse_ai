@@ -49,6 +49,7 @@ import {
 } from 'lucide-react'
 
 import { useSuppliers, useMedication, useInventory, useCreatePurchaseOrder } from '@/hooks/use-api'
+import { useAIPOGeneration } from '@/hooks/use-ai-po'
 import type { PurchaseOrderCreate, LineItem } from '@/types/api'
 
 interface POStep {
@@ -84,19 +85,19 @@ const steps: POStep[] = [
   {
     id: 'selection',
     title: 'Item Selection',
-    description: 'Choose medications or use AI recommendations',
+    description: 'Choose medications or use smart recommendations',
     completed: false,
   },
   {
     id: 'ai-analysis',
-    title: 'AI Analysis',
+    title: 'Analysis',
     description: 'Generate intelligent purchase recommendations',
     completed: false,
   },
   {
     id: 'review',
     title: 'Review & Adjust',
-    description: 'Review AI suggestions and make adjustments',
+    description: 'Review suggestions and make adjustments',
     completed: false,
   },
   {
@@ -117,17 +118,180 @@ export function CreatePO() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const preselectedMedication = searchParams.get('medication')
+  const medicationIdsParam = searchParams.get('medication_ids')
+  const fromInventory = searchParams.get('from') === 'inventory'
+  const withAIResult = searchParams.get('with_ai_result') === 'true'
+  
+  console.log('🔍 Debug - CreatePO component mounted with search params:')
+  console.log('  - preselectedMedication:', preselectedMedication)
+  console.log('  - medicationIdsParam:', medicationIdsParam)
+  console.log('  - fromInventory:', fromInventory)
+  console.log('  - withAIResult:', withAIResult)
+  console.log('  - Full URL:', window.location.href)
+  console.log('  - Search params string:', searchParams.toString())
+  
+  // Debug sessionStorage state
+  console.log('🔍 Debug - CreatePO: Checking sessionStorage...')
+  const sessionStorageCheck = sessionStorage.getItem('aiGenerationResult')
+  console.log('🔍 Debug - CreatePO: SessionStorage has aiGenerationResult:', !!sessionStorageCheck)
+  if (sessionStorageCheck) {
+    console.log('🔍 Debug - CreatePO: SessionStorage data length:', sessionStorageCheck.length)
+    try {
+      const parsed = JSON.parse(sessionStorageCheck)
+      console.log('🔍 Debug - CreatePO: SessionStorage data structure:', {
+        hasItems: !!parsed.items,
+        itemsCount: parsed.items?.length,
+        hasSupplier: !!parsed.supplier_suggestion
+      })
+    } catch (e) {
+      console.error('❌ CreatePO: Failed to parse sessionStorage data:', e)
+    }
+  }
+  
+  // Get preselected medication IDs from URL params or session storage
+  const getPreselectedMedications = () => {
+    console.log('🔍 Debug - URL params:', {
+      preselectedMedication,
+      medicationIdsParam,
+      fromInventory
+    })
+    
+    if (preselectedMedication) {
+      console.log('🔍 Debug - Using single preselected medication:', preselectedMedication)
+      return [preselectedMedication]
+    }
+    
+    if (medicationIdsParam) {
+      const ids = medicationIdsParam.split(',').filter(id => id.trim())
+      console.log('🔍 Debug - Using medication IDs from URL:', ids)
+      return ids
+    }
+    
+    if (fromInventory) {
+      try {
+        const stored = sessionStorage.getItem('selectedMedicationIds')
+        const parsed = stored ? JSON.parse(stored) : []
+        console.log('🔍 Debug - Using medication IDs from session storage:', parsed)
+        return parsed
+      } catch {
+        console.log('🔍 Debug - Failed to parse session storage')
+        return []
+      }
+    }
+    
+    console.log('🔍 Debug - No preselected medications found')
+    return []
+  }
 
-  const [state, setState] = useState<POGenerationState>({
-    step: 0,
-    isAiGenerating: false,
-    aiProgress: 0,
-    selectedMedications: preselectedMedication ? [preselectedMedication] : [],
-    supplier: '',
-    deliveryDate: '',
-    notes: '',
-    lineItems: [],
-  })
+  // Load AI results from session storage if available
+  const getAIResults = () => {
+    console.log('🔍 Debug - getAIResults called, withAIResult:', withAIResult)
+    if (withAIResult) {
+      try {
+        const stored = sessionStorage.getItem('aiGenerationResult')
+        console.log('🔍 Debug - Raw sessionStorage data:', stored ? 'DATA_FOUND' : 'NO_DATA')
+        if (stored) {
+          const result = JSON.parse(stored)
+          console.log('🔍 Debug - Parsed AI result from session storage:', result)
+          console.log('🔍 Debug - AI result structure validation:', {
+            hasItems: !!result.items,
+            itemsLength: result.items?.length,
+            hasSupplier: !!result.supplier_suggestion,
+            hasReasoning: !!result.reasoning,
+            itemsArray: result.items
+          })
+          
+          // Validate critical structure
+          if (!result.items || !Array.isArray(result.items) || result.items.length === 0) {
+            console.error('❌ AI result has invalid items structure:', result)
+            return null
+          }
+          
+          // Don't remove immediately - keep for potential re-renders
+          // Will be cleaned up after successful PO creation or component unmount
+          return result
+        } else {
+          console.error('🚨 No AI result found in sessionStorage despite withAIResult=true')
+          console.log('🔍 Debug - All sessionStorage keys:', Object.keys(sessionStorage))
+        }
+      } catch (error) {
+        console.error('❌ Failed to load AI result from session storage:', error)
+      }
+    } else {
+      console.log('🔍 Debug - withAIResult is false, skipping AI result loading')
+    }
+    return null
+  }
+
+  // Function to initialize state based on current URL params
+  const initializeState = useCallback((): POGenerationState => {
+    console.log('🔍 Debug - initializeState called')
+    const preselectedMeds = getPreselectedMedications()
+    const aiResult = getAIResults()
+    
+    console.log('🔍 Debug - State initialization with preselected:', preselectedMeds)
+    console.log('🔍 Debug - State initialization with AI result:', aiResult)
+    
+    // If we have AI results from inventory, initialize with completed analysis
+    if (aiResult && aiResult.items && aiResult.items.length > 0) {
+      console.log('🔍 Debug - Initializing state with AI results for step 2')
+      console.log('🔍 Debug - AI items:', aiResult.items)
+      
+      const today = new Date()
+      const deliveryDate = new Date(today)
+      deliveryDate.setDate(today.getDate() + 10) // 10 days from today
+      
+      const lineItems = aiResult.items.map((item, index) => {
+        const unitPrice = 10 // Default unit price
+        const quantity = item.suggested_quantity || 1
+        const totalPrice = quantity * unitPrice
+        
+        console.log(`🔍 Debug - Creating line item ${index + 1}:`, {
+          medication_id: item.medication_id,
+          quantity,
+          unit_price: unitPrice,
+          total_price: totalPrice
+        })
+        
+        return {
+          medication_id: item.medication_id.toString(),
+          quantity,
+          unit_price: unitPrice,
+          total_price: totalPrice, // Fixed: use total_price instead of total
+        }
+      })
+      
+      console.log('🔍 Debug - Final lineItems:', lineItems)
+      
+      return {
+        step: 2, // Skip to review step
+        isAiGenerating: false,
+        aiProgress: 100,
+        selectedMedications: preselectedMeds,
+        supplier: aiResult.supplier_suggestion || 'Manager', // Default supplier
+        deliveryDate: deliveryDate.toISOString().split('T')[0], // YYYY-MM-DD format
+        notes: `AI-generated PO from inventory selection. ${aiResult.reasoning || ''}`.trim(),
+        lineItems,
+        aiRecommendations: aiResult,
+      }
+    } else if (aiResult) {
+      console.warn('🚨 AI result exists but has no items or empty items array:', aiResult)
+    }
+    
+    return {
+      step: preselectedMeds.length > 0 ? 1 : 0, // Skip to AI analysis if meds preselected
+      isAiGenerating: false,
+      aiProgress: 0,
+      selectedMedications: preselectedMeds,
+      supplier: '',
+      deliveryDate: '',
+      notes: '',
+      lineItems: [],
+    }
+  }, [withAIResult, fromInventory])
+
+  // Initialize state with medication IDs from URL
+  const [state, setState] = useState<POGenerationState>(initializeState)
 
   const { data: suppliers } = useSuppliers()
   const { data: inventory } = useInventory()
@@ -136,81 +300,152 @@ export function CreatePO() {
     !!preselectedMedication
   )
   const createPOMutation = useCreatePurchaseOrder()
+  
+  // AI PO Generation hook
+  const {
+    generatePO: generateAIPO,
+    isGenerating: isAIGenerating,
+    progress: aiProgress,
+    result: aiResult,
+    status: aiStatus,
+    resetGeneration: resetAI
+  } = useAIPOGeneration()
 
-  // Auto-advance to AI analysis if medication is preselected
+  // Watch for URL parameter changes and re-initialize state
   useEffect(() => {
-    if (preselectedMedication && medicationDetail && state.step === 0) {
+    console.log('🔍 Debug - URL params changed, checking if re-initialization needed')
+    console.log('🔍 Debug - fromInventory:', fromInventory, 'withAIResult:', withAIResult)
+    
+    // Re-initialize state when navigating from inventory with AI results
+    if (fromInventory && withAIResult) {
+      console.log('🔍 Debug - Re-initializing state due to inventory navigation with AI results')
+      const newState = initializeState()
+      setState(newState)
+    }
+  }, [fromInventory, withAIResult, initializeState])
+
+  // Auto-advance to AI analysis if medications are preselected, and auto-trigger AI if from inventory
+  useEffect(() => {
+    console.log('🔍 Debug - useEffect triggered')
+    console.log('  - state.selectedMedications:', state.selectedMedications)
+    console.log('  - state.step:', state.step)
+    console.log('  - fromInventory:', fromInventory)
+    console.log('  - withAIResult:', withAIResult)
+    
+    // Auto-advance to step 1 if medications are preselected but no AI results yet
+    if (state.selectedMedications.length > 0 && state.step === 0) {
+      console.log('🔍 Debug - Auto-advancing to step 1 because we have preselected medications')
       setState(prev => ({
         ...prev,
         step: 1,
-        selectedMedications: [preselectedMedication],
       }))
     }
-  }, [preselectedMedication, medicationDetail, state.step])
-
-  const simulateAIGeneration = useCallback(async () => {
-    setState(prev => ({ ...prev, isAiGenerating: true, aiProgress: 0 }))
-
-    // Simulate AI processing steps
-    const steps = [
-      { progress: 20, message: 'Analyzing inventory levels...' },
-      { progress: 40, message: 'Forecasting demand patterns...' },
-      { progress: 60, message: 'Optimizing quantities...' },
-      { progress: 80, message: 'Selecting best suppliers...' },
-      { progress: 100, message: 'Generating recommendations...' },
-    ]
-
-    for (const step of steps) {
-      await new Promise(resolve => setTimeout(resolve, 800))
-      setState(prev => ({ ...prev, aiProgress: step.progress }))
+    
+    // Auto-trigger AI generation if we're coming from inventory with medications but no results
+    if (fromInventory && !withAIResult && state.selectedMedications.length > 0 && state.step === 1 && !state.aiRecommendations && !state.isAiGenerating) {
+      console.log('🔍 Debug - Auto-triggering AI generation for inventory selection')
+      startAIGeneration()
     }
+  }, [state.selectedMedications, state.step, fromInventory, withAIResult, state.aiRecommendations, state.isAiGenerating, startAIGeneration])
 
-    // Mock AI recommendations based on selected medications
-    const mockRecommendations = {
-      items: state.selectedMedications.map(medId => {
-        const med = inventory?.items?.find(item => item.id === medId)
-        return {
-          medication_id: medId,
-          medication_name: med?.name || `Medication ${medId}`,
-          suggested_quantity: Math.max(med?.reorder_point || 100, med?.current_stock || 0) * 2,
-          reason:
-            med?.current_stock && med?.current_stock <= med?.reorder_point
-              ? 'Critical stock level - immediate reorder needed'
-              : 'Preventive restocking based on consumption patterns',
-          priority: (med?.current_stock && med?.current_stock <= med?.reorder_point * 0.5
-            ? 'high'
-            : 'medium') as 'high' | 'medium' | 'low',
-        }
-      }),
-      supplier_suggestion: suppliers?.[0]?.name || 'PharmaCorp Supply',
-      estimated_total: 0,
+  const startAIGeneration = useCallback(async () => {
+    console.log('🔍 Debug - startAIGeneration called')
+    console.log('  - state.selectedMedications:', state.selectedMedications)
+    console.log('  - state.selectedMedications length:', state.selectedMedications?.length)
+    
+    // Validate that we have medication IDs
+    if (!state.selectedMedications || state.selectedMedications.length === 0) {
+      console.error('❌ No medications selected for AI generation')
+      return
     }
+    
+    // Reset AI state and trigger real AI generation
+    resetAI()
+    
+    // Convert selected medication IDs to numbers for the API
+    const medicationIds = state.selectedMedications.map(id => parseInt(id))
+    
+    console.log('🔍 Debug - Converted medication IDs for API:', medicationIds)
+    
+    // Validate converted IDs
+    const validIds = medicationIds.filter(id => !isNaN(id) && id > 0)
+    if (validIds.length === 0) {
+      console.error('❌ No valid medication IDs after conversion')
+      return
+    }
+    
+    console.log('🔍 Debug - Sending valid medication_ids to API:', validIds)
+    
+    // Start real AI generation with selected medications
+    generateAIPO({
+      days_forecast: 30,
+      category_filter: undefined,
+      store_ids: undefined,
+      medication_ids: validIds,
+    })
+  }, [state.selectedMedications, generateAIPO, resetAI])
 
-    mockRecommendations.estimated_total = mockRecommendations.items.reduce((total, item) => {
-      const med = inventory?.items?.find(m => m.id === item.medication_id)
-      return total + item.suggested_quantity * (med?.unit_cost || 10)
-    }, 0)
+  // Update state when AI generation completes
+  useEffect(() => {
+    if (aiResult && aiStatus === 'completed') {
+      setState(prev => ({
+        ...prev,
+        isAiGenerating: false,
+        aiProgress: 100,
+        aiRecommendations: aiResult,
+        lineItems: aiResult.items.map(item => ({
+          medication_id: item.medication_id.toString(),
+          quantity: item.suggested_quantity,
+          unit_price: inventory?.items?.find(m => m.id.toString() === item.medication_id.toString())?.unit_cost || 10,
+          total:
+            item.suggested_quantity *
+            (inventory?.items?.find(m => m.id.toString() === item.medication_id.toString())?.unit_cost || 10),
+        })),
+        supplier: aiResult.supplier_suggestion || suppliers?.[0]?.name || 'PharmaCorp Supply',
+      }))
+      
+      // Clean up session storage after using the data
+      if (fromInventory) {
+        sessionStorage.removeItem('selectedMedicationIds')
+      }
+    }
+  }, [aiResult, aiStatus, inventory, suppliers, fromInventory])
 
+  // Sync AI generation state with component state
+  useEffect(() => {
     setState(prev => ({
       ...prev,
-      isAiGenerating: false,
-      aiProgress: 100,
-      aiRecommendations: mockRecommendations,
-      lineItems: mockRecommendations.items.map(item => ({
-        medication_id: item.medication_id,
-        quantity: item.suggested_quantity,
-        unit_price: inventory?.items?.find(m => m.id === item.medication_id)?.unit_cost || 10,
-        total:
-          item.suggested_quantity *
-          (inventory?.items?.find(m => m.id === item.medication_id)?.unit_cost || 10),
-      })),
-      supplier: mockRecommendations.supplier_suggestion,
+      isAiGenerating: isAIGenerating,
+      aiProgress: aiProgress,
     }))
-  }, [state.selectedMedications, inventory, suppliers])
+  }, [isAIGenerating, aiProgress])
+
+  // Auto-submit PO when coming from inventory with complete AI results
+  useEffect(() => {
+    if (fromInventory && withAIResult && state.step === 2 && state.lineItems.length > 0 && !createPOMutation.isPending) {
+      console.log('🔍 Debug - Auto-submitting PO from inventory flow')
+      // Small delay to show the results briefly before auto-submitting
+      const timer = setTimeout(() => {
+        handleSubmit()
+      }, 2000) // 2 second delay
+      
+      return () => clearTimeout(timer)
+    }
+  }, [fromInventory, withAIResult, state.step, state.lineItems.length, createPOMutation.isPending])
+
+  // Cleanup effect - remove sessionStorage on component unmount
+  useEffect(() => {
+    return () => {
+      if (withAIResult && sessionStorage.getItem('aiGenerationResult')) {
+        sessionStorage.removeItem('aiGenerationResult')
+        console.log('🔍 Debug - Cleaned up AI result from sessionStorage on component unmount')
+      }
+    }
+  }, [withAIResult])
 
   const handleNext = async () => {
     if (state.step === 1 && !state.aiRecommendations) {
-      await simulateAIGeneration()
+      await startAIGeneration()
     }
     setState(prev => ({ ...prev, step: Math.min(prev.step + 1, steps.length - 1) }))
   }
@@ -221,15 +456,30 @@ export function CreatePO() {
 
   const handleSubmit = async () => {
     try {
+      // Use hardcoded defaults for inventory-generated POs
+      const today = new Date()
+      const defaultDeliveryDate = new Date(today)
+      defaultDeliveryDate.setDate(today.getDate() + 10) // 10 days from today
+      
       const poData: PurchaseOrderCreate = {
-        supplier: state.supplier,
+        supplier: state.supplier || 'Manager', // Hardcoded default
         line_items: state.lineItems,
-        notes: state.notes,
-        delivery_date: state.deliveryDate || undefined,
+        notes: state.notes || 'AI-generated purchase order from inventory selection',
+        delivery_date: state.deliveryDate || defaultDeliveryDate.toISOString().split('T')[0],
         ai_generated: true,
       }
 
+      console.log('🔍 Debug - Creating PO with data:', poData)
       const result = await createPOMutation.mutateAsync(poData)
+      
+      // Clean up session storage on successful PO creation
+      if (withAIResult) {
+        sessionStorage.removeItem('aiGenerationResult')
+        console.log('🔍 Debug - Cleaned up AI result from sessionStorage after successful PO creation')
+      }
+      
+      // Show success message
+      console.log('✅ PO created successfully:', result)
       navigate(`/purchase-orders/${result.id}`)
     } catch (error) {
       console.error('Failed to create purchase order:', error)
@@ -268,20 +518,16 @@ export function CreatePO() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              <Brain className="h-8 w-8 text-blue-600" />
+              <ShoppingCart className="h-8 w-8 text-blue-600" />
               Create Purchase Order
             </h1>
             <p className="text-muted-foreground">
-              AI-powered purchase order generation and optimization
+              Intelligent purchase order generation and optimization
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-blue-600 border-blue-200">
-            <Sparkles className="h-3 w-3 mr-1" />
-            AI Enhanced
-          </Badge>
           <Button variant="outline" onClick={() => navigate('/purchase-orders')}>
             <FileText className="h-4 w-4 mr-2" />
             View Orders
@@ -358,7 +604,7 @@ export function CreatePO() {
             ) : (
               <div className="space-y-4">
                 <p className="text-muted-foreground">
-                  Select medications for your purchase order, or let our AI analyze your inventory
+                  Select medications for your purchase order, or analyze your inventory
                   and recommend items that need restocking.
                 </p>
 
@@ -429,8 +675,8 @@ export function CreatePO() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5 text-blue-600" />
-              AI Analysis & Recommendations
+              <Sparkles className="h-5 w-5 text-blue-600" />
+              Analysis & Recommendations
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -438,14 +684,14 @@ export function CreatePO() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-                  <span className="font-medium">AI is analyzing your inventory...</span>
+                  <span className="font-medium">Processing your inventory...</span>
                 </div>
                 <Progress value={state.aiProgress} className="h-2" />
                 <div className="grid gap-2 text-sm text-muted-foreground">
-                  <div>🔍 Analyzing current stock levels and consumption patterns</div>
-                  <div>📊 Forecasting future demand using historical data</div>
+                  <div>🔍 Reviewing current stock levels and usage patterns</div>
+                  <div>📊 Calculating future demand based on historical data</div>
                   <div>⚡ Optimizing quantities for cost efficiency</div>
-                  <div>🏪 Selecting best suppliers based on pricing and lead times</div>
+                  <div>🏪 Selecting optimal suppliers based on pricing and lead times</div>
                 </div>
               </div>
             ) : state.aiRecommendations ? (
@@ -453,7 +699,7 @@ export function CreatePO() {
                 <Alert>
                   <Sparkles className="h-4 w-4" />
                   <AlertDescription>
-                    AI has analyzed your inventory and generated smart recommendations
+                    Analysis complete - recommendations generated
                   </AlertDescription>
                 </Alert>
 
@@ -506,9 +752,9 @@ export function CreatePO() {
                 </div>
               </div>
             ) : (
-              <Button onClick={simulateAIGeneration} size="lg" className="w-full">
-                <Brain className="h-5 w-5 mr-2" />
-                Generate AI Recommendations
+              <Button onClick={startAIGeneration} size="lg" className="w-full">
+                <Sparkles className="h-5 w-5 mr-2" />
+                Generate Recommendations
               </Button>
             )}
           </CardContent>
@@ -521,9 +767,23 @@ export function CreatePO() {
             <CardTitle className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5" />
               Review & Adjust Quantities
+              {fromInventory && withAIResult && (
+                <Badge variant="secondary" className="ml-2">
+                  Auto-Generated from Inventory
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Auto-submission indicator */}
+            {fromInventory && withAIResult && (
+              <Alert className="mb-4">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <AlertDescription>
+                  AI analysis complete! Auto-submitting purchase order in a few seconds...
+                </AlertDescription>
+              </Alert>
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
@@ -743,9 +1003,9 @@ export function CreatePO() {
             )}
 
             <Alert>
-              <Brain className="h-4 w-4" />
+              <CheckCircle2 className="h-4 w-4" />
               <AlertDescription>
-                This purchase order was generated with AI assistance for optimal inventory
+                This purchase order was generated with intelligent optimization for optimal inventory
                 management.
               </AlertDescription>
             </Alert>

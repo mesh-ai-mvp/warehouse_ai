@@ -68,7 +68,24 @@ class ApiClient {
     const queryString = params.toString()
     const endpoint = `/inventory${queryString ? `?${queryString}` : ''}`
 
-    return this.request<InventoryResponse>(endpoint)
+    // Normalize backend field names to frontend expectations
+    const res = await this.request<any>(endpoint)
+
+    const totalItems = res.total ?? res.total_items ?? (Array.isArray(res.items) ? res.items.length : 0)
+    const pageSize = res.page_size ?? filters.page_size ?? 20
+    const page = res.page ?? res.current_page ?? 1
+    const totalPages = res.total_pages ?? Math.max(1, Math.ceil(totalItems / pageSize))
+
+    const normalized: InventoryResponse = {
+      items: res.items ?? [],
+      total: totalItems,
+      page,
+      page_size: pageSize,
+      total_pages: totalPages,
+      filters_applied: filters,
+    }
+
+    return normalized
   }
 
   async getMedication(id: string): Promise<Medication> {
@@ -155,17 +172,19 @@ class ApiClient {
     }>(endpoint)
 
     // Map the API response to the expected format
-    const mappedItems: PurchaseOrder[] = response.purchase_orders.map(po => ({
+    const mappedItems: PurchaseOrder[] = (response.purchase_orders || []).map(po => ({
       id: po.po_id || po.id,
       supplier: po.supplier_name || po.supplier,
       status: po.status,
       created_date: po.created_at || po.created_date,
-      delivery_date: po.delivery_date,
+      delivery_date: po.delivery_date || po.expected_delivery_date,
       total_amount: Number(po.total_amount || 0),
       line_items: po.line_items || [],
       buyer_name: po.buyer_name,
       notes: po.notes,
       ai_generated: po.ai_generated,
+      total_lines: po.total_lines,
+      expected_delivery_date: po.expected_delivery_date,
     }))
 
     return {
@@ -298,28 +317,14 @@ class ApiClient {
 
   // Dashboard stats
   async getDashboardStats(): Promise<DashboardStats> {
-    try {
-      const stats = await this.request('/dashboard/stats')
+    const stats = await this.request('/dashboard/stats')
 
-      // Add extra mock fields for UI compatibility
-      return {
-        ...stats,
-        revenue_mtd: stats.total_value * 0.1, // Mock calculation
-        trending_up_count: Math.floor(stats.total_medications * 0.3),
-        trending_down_count: Math.floor(stats.total_medications * 0.2),
-      }
-    } catch (error) {
-      // Return mock data if real data fails
-      return {
-        total_medications: 2450,
-        low_stock_count: 15,
-        critical_stock_count: 5,
-        total_value: 125000,
-        orders_today: 8,
-        revenue_mtd: 45200,
-        trending_up_count: 735,
-        trending_down_count: 490,
-      }
+    // Add extra calculated fields for UI compatibility
+    return {
+      ...stats,
+      revenue_mtd: stats.total_value * 0.1, // Calculated from total value
+      trending_up_count: Math.floor(stats.total_medications * 0.3),
+      trending_down_count: Math.floor(stats.total_medications * 0.2),
     }
   }
 
@@ -328,29 +333,8 @@ class ApiClient {
     const params = new URLSearchParams({ time_range: timeRange, ...filters })
     const endpoint = `/analytics/kpis?${params}`
 
-    try {
-      return await this.request(endpoint)
-    } catch (error) {
-      // Return mock data for development
-      return {
-        kpis: {
-          totalRevenue: 2450000,
-          totalOrders: 1247,
-          avgOrderValue: 1965,
-          lowStockItems: 23,
-          criticalStockItems: 8,
-          totalSuppliers: 45,
-          onTimeDeliveries: 94.5,
-          inventoryTurnover: 8.2,
-        },
-        trends: {
-          revenueChange: 12.5,
-          ordersChange: 8.3,
-          avgOrderChange: 3.7,
-          stockAlertsChange: -15.2,
-        },
-      }
-    }
+    // Remove mock fallback - let errors propagate for proper error handling
+    return await this.request(endpoint)
   }
 
   async getConsumptionTrends(timeRange: string = '6m', medicationId?: string): Promise<any[]> {
@@ -358,81 +342,29 @@ class ApiClient {
     if (medicationId) params.append('medication_id', medicationId)
     const endpoint = `/analytics/consumption-trends?${params}`
 
-    try {
-      return await this.request(endpoint)
-    } catch (error) {
-      // Return mock data for development
-      return [
-        { month: 'Jan', consumption: 450000, orders: 120, forecast: 460000 },
-        { month: 'Feb', consumption: 520000, orders: 135, forecast: 530000 },
-        { month: 'Mar', consumption: 480000, orders: 128, forecast: 485000 },
-        { month: 'Apr', consumption: 590000, orders: 155, forecast: 580000 },
-        { month: 'May', consumption: 610000, orders: 162, forecast: 615000 },
-        { month: 'Jun', consumption: 580000, orders: 148, forecast: 570000 },
-      ]
-    }
+    // Remove mock fallback - let errors propagate for proper error handling
+    return await this.request(endpoint)
   }
 
   async getSupplierPerformanceAnalytics(timeRange: string = '3m'): Promise<any[]> {
     const endpoint = `/analytics/supplier-performance?time_range=${timeRange}`
 
-    try {
-      return await this.request(endpoint)
-    } catch (error) {
-      // Return mock data for development
-      return [
-        { name: 'PharmaCorp', orders: 45, onTime: 96.2, avgDelay: 1.2, rating: 4.8 },
-        { name: 'MedSupply Pro', orders: 38, onTime: 94.1, avgDelay: 2.1, rating: 4.6 },
-        { name: 'HealthDist Inc', orders: 32, onTime: 91.8, avgDelay: 3.2, rating: 4.3 },
-        { name: 'BioPharma Ltd', orders: 28, onTime: 98.5, avgDelay: 0.8, rating: 4.9 },
-        { name: 'MediCore Systems', orders: 25, onTime: 89.3, avgDelay: 4.1, rating: 4.1 },
-      ]
-    }
+    // Remove mock fallback - let errors propagate for proper error handling
+    return await this.request(endpoint)
   }
 
   async getCategoryBreakdown(): Promise<any[]> {
     const endpoint = '/analytics/category-breakdown'
 
-    try {
-      return await this.request(endpoint)
-    } catch (error) {
-      // Return mock data for development
-      return [
-        { name: 'Antibiotics', value: 35, color: '#0088FE' },
-        { name: 'Pain Relief', value: 25, color: '#00C49F' },
-        { name: 'Cardiovascular', value: 20, color: '#FFBB28' },
-        { name: 'Respiratory', value: 12, color: '#FF8042' },
-        { name: 'Other', value: 8, color: '#8884D8' },
-      ]
-    }
+    // Remove mock fallback - let errors propagate for proper error handling
+    return await this.request(endpoint)
   }
 
   async getStockAlerts(): Promise<any[]> {
     const endpoint = '/analytics/stock-alerts'
 
-    try {
-      return await this.request(endpoint)
-    } catch (error) {
-      // Return mock data for development
-      return [
-        {
-          medication: 'Amoxicillin 500mg',
-          current: 45,
-          reorder: 100,
-          daysLeft: 3,
-          priority: 'critical',
-        },
-        { medication: 'Ibuprofen 200mg', current: 78, reorder: 150, daysLeft: 5, priority: 'low' },
-        { medication: 'Lisinopril 10mg', current: 32, reorder: 80, daysLeft: 4, priority: 'low' },
-        {
-          medication: 'Metformin 500mg',
-          current: 15,
-          reorder: 120,
-          daysLeft: 2,
-          priority: 'critical',
-        },
-      ]
-    }
+    // Remove mock fallback - let errors propagate for proper error handling
+    return await this.request(endpoint)
   }
 
   async getStockLevelTrends(medicationId?: number, timeRange: string = '7d'): Promise<any> {
@@ -444,10 +376,11 @@ class ApiClient {
     return await this.request(endpoint)
   }
 
-  async getConsumptionForecast(medicationId?: number, forecastDays: number = 7): Promise<any> {
+  async getConsumptionForecast(medicationId?: number, forecastDays: number = 7, timeScale: string = 'weekly'): Promise<any> {
     const params = new URLSearchParams()
     if (medicationId) params.append('medication_id', medicationId.toString())
     params.append('forecast_days', forecastDays.toString())
+    params.append('time_scale', timeScale)
 
     const endpoint = `/analytics/consumption-forecast?${params}`
     return await this.request(endpoint)
@@ -462,12 +395,8 @@ class ApiClient {
   async getReportTemplates(): Promise<any[]> {
     const endpoint = '/reports/templates'
 
-    try {
-      return await this.request(endpoint)
-    } catch (error) {
-      // Return mock data for development - handled in the component
-      return []
-    }
+    // Remove mock fallback - let errors propagate for proper error handling
+    return await this.request(endpoint)
   }
 
   async createReportTemplate(template: any): Promise<any> {
@@ -508,12 +437,8 @@ class ApiClient {
 
     const endpoint = `/reports/history${params.toString() ? `?${params}` : ''}`
 
-    try {
-      return await this.request(endpoint)
-    } catch (error) {
-      // Return mock data for development - handled in the component
-      return []
-    }
+    // Remove mock fallback - let errors propagate for proper error handling
+    return await this.request(endpoint)
   }
 
   async deleteReportTemplate(templateId: string): Promise<void> {

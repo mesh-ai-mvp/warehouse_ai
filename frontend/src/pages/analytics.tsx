@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -42,6 +42,14 @@ import {
   Cell,
 } from 'recharts'
 import { apiClient } from '@/lib/api-client'
+import { 
+  useSupplierPerformance,
+  useAnalyticsKPIs,
+  useConsumptionTrends,
+  useCategoryBreakdown,
+  useStockAlerts
+} from '@/hooks/useAnalytics'
+import { ENV } from '@/lib/env'
 
 // Mock data for analytics - will be replaced with real API calls
 const mockAnalyticsData = {
@@ -70,11 +78,11 @@ const mockAnalyticsData = {
     { month: 'Jun', consumption: 580000, orders: 148, forecast: 570000 },
   ],
   supplierPerformance: [
-    { name: 'PharmaCorp', orders: 45, onTime: 96.2, avgDelay: 1.2, rating: 4.8 },
-    { name: 'MedSupply Pro', orders: 38, onTime: 94.1, avgDelay: 2.1, rating: 4.6 },
-    { name: 'HealthDist Inc', orders: 32, onTime: 91.8, avgDelay: 3.2, rating: 4.3 },
-    { name: 'BioPharma Ltd', orders: 28, onTime: 98.5, avgDelay: 0.8, rating: 4.9 },
-    { name: 'MediCore Systems', orders: 25, onTime: 89.3, avgDelay: 4.1, rating: 4.1 },
+    { name: 'PharmaCorp', orders: 45, onTime: 96.2, avgDelay: 1.2, leadTime: 6.5, rating: 4.8 },
+    { name: 'MedSupply Pro', orders: 38, onTime: 94.1, avgDelay: 2.1, leadTime: 7.2, rating: 4.6 },
+    { name: 'HealthDist Inc', orders: 32, onTime: 91.8, avgDelay: 3.2, leadTime: 8.1, rating: 4.3 },
+    { name: 'BioPharma Ltd', orders: 28, onTime: 98.5, avgDelay: 0.8, leadTime: 5.9, rating: 4.9 },
+    { name: 'MediCore Systems', orders: 25, onTime: 89.3, avgDelay: 4.1, leadTime: 9.3, rating: 4.1 },
   ],
   categoryBreakdown: [
     { name: 'Antibiotics', value: 35, color: '#0088FE' },
@@ -101,16 +109,42 @@ export function Analytics() {
   const [timeRange, setTimeRange] = useState('30d')
   const [selectedCategory, setSelectedCategory] = useState('all')
 
-  // This would be replaced with actual API calls
-  const {
-    data: analyticsData,
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryKey: ['analytics', timeRange, selectedCategory],
-    queryFn: () => Promise.resolve(mockAnalyticsData),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  })
+  // Use real API calls instead of mock data
+  const { data: kpisData, isLoading: kpisLoading } = useAnalyticsKPIs(timeRange)
+  const { data: consumptionData, isLoading: consumptionLoading } = useConsumptionTrends('6m')
+  const { data: categoryData, isLoading: categoryLoading } = useCategoryBreakdown()
+  const { data: stockAlertsData, isLoading: stockAlertsLoading } = useStockAlerts()
+  
+  const isLoading = kpisLoading || consumptionLoading || categoryLoading || stockAlertsLoading
+
+  // Combine real API data into the expected structure
+  const analyticsData = React.useMemo(() => {
+    // Only use mock data if environment flag is enabled and no real data is available
+    const useFallback = ENV.enableMockFallbacks && !kpisData
+    
+    if (useFallback) {
+      console.warn('[Analytics] Using mock fallback data - set VITE_ENABLE_MOCK_FALLBACKS=false to disable')
+      return mockAnalyticsData
+    }
+    
+    // Return real data or null if not available (instead of falling back to mock data)
+    return {
+      kpis: kpisData?.kpis || null,
+      trends: kpisData?.trends || null,
+      consumptionData: consumptionData || null,
+      categoryBreakdown: categoryData || null,
+      stockAlerts: stockAlertsData || null,
+      supplierPerformance: null, // Will be handled by the separate hook
+    }
+  }, [kpisData, consumptionData, categoryData, stockAlertsData])
+
+  const refetch = () => {
+    // Refetch all analytics data
+    window.location.reload()
+  }
+
+  // Get real supplier performance data
+  const { data: supplierPerformanceData } = useSupplierPerformance(timeRange === '30d' ? '1m' : timeRange === '90d' ? '3m' : timeRange)
 
   const handleExportReport = () => {
     // Implementation for exporting analytics data
@@ -382,7 +416,7 @@ export function Analytics() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {analyticsData?.supplierPerformance.map((supplier, index) => (
+                {(supplierPerformanceData || analyticsData?.supplierPerformance).map((supplier, index) => (
                   <div
                     key={index}
                     className="flex items-center justify-between p-4 border rounded-lg"
@@ -390,9 +424,10 @@ export function Analytics() {
                     <div className="flex-1">
                       <h4 className="font-semibold">{supplier.name}</h4>
                       <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <span>{supplier.orders} orders</span>
-                        <span>{supplier.onTime}% on-time</span>
-                        <span>{supplier.avgDelay} days avg delay</span>
+                        <span>{supplier.orders} Orders</span>
+                        <span>{supplier.onTime}% On-Time</span>
+                        <span>{supplier.avgDelay} Days Avg Delay</span>
+                        <span>{supplier.leadTime} Days Lead Time</span>
                       </div>
                     </div>
                     <div className="text-right">

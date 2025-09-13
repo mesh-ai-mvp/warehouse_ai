@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -69,6 +70,7 @@ const STEPS = [
 
 export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void }) {
   const [currentStep, setCurrentStep] = useState(0)
+  const [searchParams] = useSearchParams()
   const [formData, setFormData] = useState<POFormData>({
     supplier: '',
     delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
@@ -92,6 +94,58 @@ export function CreatePOWizard({ onComplete }: { onComplete?: (po: any) => void 
   const updateFormData = (updates: Partial<POFormData>) => {
     setFormData(prev => ({ ...prev, ...updates }))
   }
+
+  // Initialize from AI results when navigated from inventory
+  useEffect(() => {
+    const fromInventory = searchParams.get('from') === 'inventory'
+    const withAIResult = searchParams.get('with_ai_result') === 'true'
+    if (!withAIResult) return
+
+    const stored = sessionStorage.getItem('aiGenerationResult')
+    if (!stored) return
+
+    try {
+      const ai = JSON.parse(stored)
+      if (!ai || !Array.isArray(ai.items) || ai.items.length === 0) return
+
+      const byId: Record<number, any> = {}
+      ;(inventory?.items || []).forEach((m: any) => {
+        byId[m.med_id] = m
+      })
+
+      const aiLineItems: POLineItem[] = ai.items.map((item: any) => {
+        const med = byId[item.medication_id] || {}
+        const name = item.medication_name || med.name || `Medication ${item.medication_id}`
+        const price = med.current_price || 0
+        const quantity = Math.max(1, Math.round(item.suggested_quantity || 0))
+        return {
+          medication_id: item.medication_id,
+          medication_name: name,
+          quantity,
+          unit_price: price,
+          total_price: price * quantity,
+        }
+      })
+
+      const today = new Date()
+      const delivery = new Date(today)
+      delivery.setDate(today.getDate() + 10)
+
+      setFormData(prev => ({
+        ...prev,
+        supplier: ai.supplier_suggestion || prev.supplier,
+        buyer_name: 'Manager',
+        delivery_date: delivery,
+        notes: prev.notes,
+        line_items: aiLineItems,
+      }))
+
+      // Jump directly to the Medications step (Step 2 in user terms)
+      setCurrentStep(1)
+    } catch {
+      // ignore parse errors
+    }
+  }, [searchParams, inventory])
 
   const addLineItem = (medication: any, qty: number = 1) => {
     const existing = formData.line_items.find(item => item.medication_id === medication.med_id)

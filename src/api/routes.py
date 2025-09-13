@@ -168,6 +168,7 @@ async def list_purchase_orders():
                     "supplier_name": po["supplier_name"],
                     "status": po["status"],
                     "created_at": po["created_at"],
+                    "expected_delivery_date": po.get("expected_delivery_date"),
                     "total_lines": po.get("item_count", 0),
                     "total_amount": po.get("total_amount", 0),
                 }
@@ -289,7 +290,19 @@ async def create_purchase_orders(payload: dict):
                 f"PO creation email flow success | suppliers_notified={len(supplier_to_lines)}"
             )
 
-        return {"created": [po["po_id"] for po in created_pos]}
+        # Return format expected by frontend (with 'id' field)
+        if len(created_pos) == 1:
+            # Single PO - return as expected by frontend
+            return {
+                "id": created_pos[0]["po_id"],
+                "created": [po["po_id"] for po in created_pos],
+            }
+        else:
+            # Multiple POs - return first one's ID for toast, but keep all IDs
+            return {
+                "id": created_pos[0]["po_id"],
+                "created": [po["po_id"] for po in created_pos],
+            }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -584,7 +597,9 @@ async def generate_po_with_ai(
             raise HTTPException(status_code=400, detail="No medications selected")
 
         # Start background generation and return session id immediately
-        kick = ai_po_handler.start_generation_async(medication_ids, background_tasks)
+        kick = ai_po_handler.start_generation_async(
+            medication_ids, background_tasks, days_forecast
+        )
         # Echo back normalized params for client display
         kick.update(
             {

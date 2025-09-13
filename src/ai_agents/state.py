@@ -86,6 +86,9 @@ class POGenerationState(TypedDict):
     consumption_history: Dict[int, Dict[str, Any]]  # Historical consumption by med_id
     suppliers: List[Dict[str, Any]]  # Available suppliers
 
+    # Configuration parameters
+    days_forecast: int  # Number of days to forecast demand
+
     # Agent outputs
     forecast_data: Dict[int, Dict[str, Any]]  # Forecast by med_id
     adjusted_quantities: Dict[int, Dict[str, Any]]  # Adjusted quantities by med_id
@@ -125,6 +128,7 @@ def create_initial_state(
     consumption_history: Dict[int, Dict[str, Any]],
     suppliers: List[Dict[str, Any]],
     session_id: str,
+    days_forecast: int = 30,
 ) -> POGenerationState:
     """Create initial state for workflow"""
 
@@ -136,6 +140,8 @@ def create_initial_state(
         current_stock=current_stock,
         consumption_history=consumption_history,
         suppliers=suppliers,
+        # Configuration parameters
+        days_forecast=days_forecast,
         # Agent outputs (empty initially)
         forecast_data={},
         adjusted_quantities={},
@@ -187,17 +193,23 @@ def update_progress(
             }
         )
 
-    # Update steps completed/remaining
-    if agent_name == "forecast_agent" and percent_complete >= 100:
-        state["progress"]["steps_completed"].append("forecast")
+    # Update steps completed/remaining using thresholds per stage
+    # Forecast considered complete at >=33%
+    if agent_name == "forecast_agent" and percent_complete >= 33:
+        if "forecast" not in state["progress"]["steps_completed"]:
+            state["progress"]["steps_completed"].append("forecast")
         if "forecast" in state["progress"]["steps_remaining"]:
             state["progress"]["steps_remaining"].remove("forecast")
-    elif agent_name == "adjustment_agent" and percent_complete >= 100:
-        state["progress"]["steps_completed"].append("adjustment")
+    # Adjustment considered complete at >=66%
+    elif agent_name == "adjustment_agent" and percent_complete >= 66:
+        if "adjustment" not in state["progress"]["steps_completed"]:
+            state["progress"]["steps_completed"].append("adjustment")
         if "adjustment" in state["progress"]["steps_remaining"]:
             state["progress"]["steps_remaining"].remove("adjustment")
-    elif agent_name == "supplier_agent" and percent_complete >= 100:
-        state["progress"]["steps_completed"].append("supplier")
+    # Supplier considered complete at >=95%
+    elif agent_name == "supplier_agent" and percent_complete >= 95:
+        if "supplier" not in state["progress"]["steps_completed"]:
+            state["progress"]["steps_completed"].append("supplier")
         if "supplier" in state["progress"]["steps_remaining"]:
             state["progress"]["steps_remaining"].remove("supplier")
 

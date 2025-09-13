@@ -74,6 +74,7 @@ class POGenerationWorkflow:
         suppliers: List[Dict[str, Any]],
         session_id: Optional[str] = None,
         progress_callback: Optional[callable] = None,
+        days_forecast: int = 30,
     ) -> Dict[str, Any]:
         """Generate purchase orders using multi-agent workflow"""
 
@@ -105,6 +106,7 @@ class POGenerationWorkflow:
             consumption_history=consumption_history,
             suppliers=suppliers,
             session_id=session_id,
+            days_forecast=days_forecast,
         )
 
         try:
@@ -172,11 +174,32 @@ class POGenerationWorkflow:
         # Run workflow steps with progress updates
         state = initial_state
 
-        # Forecast
+        # Forecast step
         state = update_progress(
             state, "forecast_agent", "Running demand forecasting", 15
         )
+        if self._progress_callback:
+            logger.info(
+                f"🔄 Invoking progress callback at forecast start (15%): {state['progress']}"
+            )
+            self._progress_callback(state["progress"])
+        else:
+            logger.warning("⚠️ No progress callback available at forecast start")
+
+        # Execute the entire LangGraph workflow which will call individual node methods
         state = await asyncio.to_thread(self.workflow.invoke, state, config)
+
+        # Ensure final completion
+        state = update_progress(
+            state, "finalize", "Purchase order generation complete", 100
+        )
+        if self._progress_callback:
+            logger.info(
+                f"🔄 Invoking progress callback at workflow completion (100%): {state['progress']}"
+            )
+            self._progress_callback(state["progress"])
+        else:
+            logger.warning("⚠️ No progress callback available at workflow completion")
 
         return state
 
@@ -185,14 +208,26 @@ class POGenerationWorkflow:
             state, "forecast_agent", "Analyzing consumption patterns", 25
         )
         if self._progress_callback:
+            logger.info(
+                f"🔄 Invoking progress callback in forecast node (25%): {state['progress']}"
+            )
             self._progress_callback(state["progress"])
+        else:
+            logger.warning("⚠️ No progress callback available in forecast node (25%)")
 
         state = self.forecast_agent(state)
         state = update_progress(
             state, "forecast_agent", "Forecast generation complete", 33
         )
         if self._progress_callback:
+            logger.info(
+                f"🔄 Invoking progress callback in forecast node completion (33%): {state['progress']}"
+            )
             self._progress_callback(state["progress"])
+        else:
+            logger.warning(
+                "⚠️ No progress callback available in forecast node completion (33%)"
+            )
 
         return state
 
@@ -201,12 +236,24 @@ class POGenerationWorkflow:
             state, "adjustment_agent", "Applying US context adjustments", 50
         )
         if self._progress_callback:
+            logger.info(
+                f"🔄 Invoking progress callback in adjustment node (50%): {state['progress']}"
+            )
             self._progress_callback(state["progress"])
+        else:
+            logger.warning("⚠️ No progress callback available in adjustment node (50%)")
 
         state = self.adjustment_agent(state)
         state = update_progress(state, "adjustment_agent", "Adjustment complete", 66)
         if self._progress_callback:
+            logger.info(
+                f"🔄 Invoking progress callback in adjustment node completion (66%): {state['progress']}"
+            )
             self._progress_callback(state["progress"])
+        else:
+            logger.warning(
+                "⚠️ No progress callback available in adjustment node completion (66%)"
+            )
 
         return state
 
@@ -215,14 +262,26 @@ class POGenerationWorkflow:
             state, "supplier_agent", "Optimizing supplier selection", 85
         )
         if self._progress_callback:
+            logger.info(
+                f"🔄 Invoking progress callback in supplier node (85%): {state['progress']}"
+            )
             self._progress_callback(state["progress"])
+        else:
+            logger.warning("⚠️ No progress callback available in supplier node (85%)")
 
         state = self.supplier_agent(state)
         state = update_progress(
             state, "supplier_agent", "Supplier optimization complete", 95
         )
         if self._progress_callback:
+            logger.info(
+                f"🔄 Invoking progress callback in supplier node completion (95%): {state['progress']}"
+            )
             self._progress_callback(state["progress"])
+        else:
+            logger.warning(
+                "⚠️ No progress callback available in supplier node completion (95%)"
+            )
 
         return state
 
@@ -240,7 +299,12 @@ class POGenerationWorkflow:
                 state, "system", "PO generation completed successfully", 100
             )
             if self._progress_callback:
+                logger.info(
+                    f"🔄 Invoking progress callback in finalize (success 100%): {state['progress']}"
+                )
                 self._progress_callback(state["progress"])
+            else:
+                logger.warning("⚠️ No progress callback available in finalize (success)")
         else:
             missing = []
             if not has_forecast:
@@ -256,7 +320,12 @@ class POGenerationWorkflow:
                 error=f"Missing required data: {', '.join(missing)}",
             )
             if self._progress_callback:
+                logger.info(
+                    f"🔄 Invoking progress callback in finalize (error): {state['progress']}"
+                )
                 self._progress_callback(state["progress"])
+            else:
+                logger.warning("⚠️ No progress callback available in finalize (error)")
 
         return state
 

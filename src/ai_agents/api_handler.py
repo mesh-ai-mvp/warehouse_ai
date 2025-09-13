@@ -187,6 +187,7 @@ class AIPoHandler:
         self,
         medication_ids: List[int],
         background_tasks: BackgroundTasks,
+        days_forecast: int = 30,
     ) -> Dict[str, Any]:
         """Kick off generation in the background and return a session id immediately"""
         # Minimal validation here; the heavy validation will happen in the background task
@@ -211,7 +212,9 @@ class AIPoHandler:
             "medication_ids": medication_ids,
         }
 
-        background_tasks.add_task(self._background_generate, temp_session_id)
+        background_tasks.add_task(
+            self._background_generate, temp_session_id, days_forecast
+        )
         return {"session_id": temp_session_id, "status": "processing"}
 
     def _prepare_inputs(self, medication_ids: List[int]):
@@ -270,7 +273,7 @@ class AIPoHandler:
         suppliers = self.data_loader.get_suppliers()
         return medications, current_stock, consumption_history, suppliers
 
-    def _background_generate(self, temp_session_id: str):
+    def _background_generate(self, temp_session_id: str, days_forecast: int = 30):
         """Background task that runs the workflow and stores the result"""
         try:
             entry = self.active_sessions.get(temp_session_id)
@@ -285,10 +288,18 @@ class AIPoHandler:
 
             # Define progress callback to update active_sessions in real-time
             def progress_callback(progress_data):
+                logger.info(
+                    f"🔄 Progress callback invoked: session={temp_session_id}, data={progress_data}"
+                )
                 if temp_session_id in self.active_sessions:
                     self.active_sessions[temp_session_id]["progress"] = progress_data
                     self.active_sessions[temp_session_id]["updated_at"] = (
                         datetime.utcnow().isoformat() + "Z"
+                    )
+                    logger.info(f"📊 Updated session progress: {progress_data}")
+                else:
+                    logger.warning(
+                        f"⚠️ Session {temp_session_id} not found in active_sessions"
                     )
 
             # Run workflow (synchronously inside this task)
@@ -302,7 +313,9 @@ class AIPoHandler:
                     current_stock=current_stock,
                     consumption_history=consumption_history,
                     suppliers=suppliers,
+                    session_id=temp_session_id,  # CRITICAL: Use same session ID
                     progress_callback=progress_callback,
+                    days_forecast=days_forecast,
                 )
             )
             loop.close()

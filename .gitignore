@@ -1,6 +1,7 @@
 data/
 *.db
 *__pycache__
+src/api/__pycache__/
 
 # Environment files
 .env
@@ -14,6 +15,7 @@ data/
 docs/
 .vscode/
 .venv/
+Enhance Warehouse UI Design/
 
 # Node.js
 node_modules/

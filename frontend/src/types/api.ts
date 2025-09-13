@@ -60,6 +60,8 @@ export interface PurchaseOrder {
   buyer_name?: string
   notes?: string
   ai_generated?: boolean
+  total_lines?: number
+  expected_delivery_date?: string
 }
 
 export interface POLineItem {
@@ -116,6 +118,114 @@ export interface DashboardStats {
   revenue_mtd: number
   trending_up_count: number
   trending_down_count: number
+}
+
+// Analytics Types
+export interface AnalyticsKPIs {
+  totalRevenue: number
+  totalOrders: number
+  avgOrderValue: number
+  lowStockItems: number
+  criticalStockItems: number
+  totalSuppliers: number
+  onTimeDeliveries: number
+  inventoryTurnover: number
+}
+
+export interface AnalyticsTrends {
+  revenueChange: number
+  ordersChange: number
+  avgOrderChange: number
+  stockAlertsChange: number
+}
+
+export interface AnalyticsKPIResponse {
+  kpis: AnalyticsKPIs
+  trends: AnalyticsTrends
+}
+
+export interface ConsumptionTrendData {
+  month: string
+  consumption: number
+  orders: number
+  forecast: number
+}
+
+export interface SupplierPerformanceData {
+  name: string
+  orders: number
+  onTime: number
+  avgDelay: number
+  leadTime: number
+  rating: number
+}
+
+export interface CategoryBreakdownData {
+  name: string
+  value: number
+  count?: number
+  dispensed?: number
+  color: string
+}
+
+export interface StockAlertData {
+  medication: string
+  current: number
+  reorder: number
+  daysLeft: number
+  priority: 'critical' | 'low' | 'medium'
+}
+
+export interface ConsumptionForecastData {
+  date: string
+  consumption: number
+}
+
+export interface ConsumptionForecastResponse {
+  medication_name: string
+  historical_data: ConsumptionForecastData[]
+  forecast_data: Array<{
+    date: string
+    predicted: number
+    upper_bound: number
+    lower_bound: number
+  }>
+  forecast_days: number
+  avg_consumption: number
+  trend: number
+  time_scale: string
+}
+
+export interface StockLevelTrendData {
+  date: string
+  stock_level: number
+  reorder_point: number
+}
+
+export interface StockLevelTrendsResponse {
+  medication_name: string
+  reorder_point: number
+  data: StockLevelTrendData[]
+  time_range: string
+  start_date: string
+  end_date: string
+}
+
+export interface DeliveryTimelineTask {
+  id: string
+  title: string
+  description: string
+  startDate: string
+  endDate: string
+  status: 'pending' | 'in-progress' | 'completed'
+  type: 'delivery' | 'manufacturing' | 'logistics'
+  progress: number
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  metadata?: {
+    supplier?: string
+    amount?: number
+    items?: number
+  }
 }
 
 export interface FilterOptions {
@@ -192,7 +302,6 @@ export interface AIGenerationRequest {
   confidence_threshold?: number
   // Extended fields used by AI PO UI and backend
   days_forecast?: number
-  urgency_threshold?: number // 0..1 fraction of reorder point
   category_filter?: string
   store_ids?: number[]
   medication_ids?: number[]

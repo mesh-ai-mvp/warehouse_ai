@@ -1,9 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
+import type {
+  AnalyticsKPIResponse,
+  ConsumptionTrendData,
+  SupplierPerformanceData,
+  CategoryBreakdownData,
+  StockAlertData,
+  ConsumptionForecastResponse,
+  StockLevelTrendsResponse,
+  DeliveryTimelineTask,
+} from '@/types/api'
 
 // Analytics hooks
 export function useAnalyticsKPIs(timeRange: string = '30d', filters: any = {}) {
-  return useQuery({
+  return useQuery<AnalyticsKPIResponse>({
     queryKey: ['analytics', 'kpis', timeRange, filters],
     queryFn: () => apiClient.getAnalyticsKPIs(timeRange, filters),
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -12,7 +22,7 @@ export function useAnalyticsKPIs(timeRange: string = '30d', filters: any = {}) {
 }
 
 export function useConsumptionTrends(timeRange: string = '6m', medicationId?: string) {
-  return useQuery({
+  return useQuery<ConsumptionTrendData[]>({
     queryKey: ['analytics', 'consumption-trends', timeRange, medicationId],
     queryFn: () => apiClient.getConsumptionTrends(timeRange, medicationId),
     staleTime: 5 * 60 * 1000,
@@ -21,7 +31,7 @@ export function useConsumptionTrends(timeRange: string = '6m', medicationId?: st
 }
 
 export function useSupplierPerformance(timeRange: string = '3m') {
-  return useQuery({
+  return useQuery<SupplierPerformanceData[]>({
     queryKey: ['analytics', 'supplier-performance', timeRange],
     queryFn: () => apiClient.getSupplierPerformanceAnalytics(timeRange),
     staleTime: 5 * 60 * 1000,
@@ -30,7 +40,7 @@ export function useSupplierPerformance(timeRange: string = '3m') {
 }
 
 export function useCategoryBreakdown() {
-  return useQuery({
+  return useQuery<CategoryBreakdownData[]>({
     queryKey: ['analytics', 'category-breakdown'],
     queryFn: () => apiClient.getCategoryBreakdown(),
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -39,7 +49,7 @@ export function useCategoryBreakdown() {
 }
 
 export function useStockAlerts() {
-  return useQuery({
+  return useQuery<StockAlertData[]>({
     queryKey: ['analytics', 'stock-alerts'],
     queryFn: () => apiClient.getStockAlerts(),
     staleTime: 2 * 60 * 1000, // 2 minutes for critical data
@@ -125,7 +135,7 @@ export function useDeleteReportTemplate() {
 // Combined analytics hook for dashboard
 // New analytics hooks for updated charts
 export function useStockLevelTrends(medicationId?: number, timeRange: string = '7d') {
-  return useQuery({
+  return useQuery<StockLevelTrendsResponse>({
     queryKey: ['analytics', 'stock-level-trends', medicationId, timeRange],
     queryFn: () => apiClient.getStockLevelTrends(medicationId, timeRange),
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -133,17 +143,17 @@ export function useStockLevelTrends(medicationId?: number, timeRange: string = '
   })
 }
 
-export function useConsumptionForecast(medicationId?: number, forecastDays: number = 7) {
-  return useQuery({
-    queryKey: ['analytics', 'consumption-forecast', medicationId, forecastDays],
-    queryFn: () => apiClient.getConsumptionForecast(medicationId, forecastDays),
+export function useConsumptionForecast(medicationId?: number, forecastDays: number = 7, timeScale: string = 'weekly') {
+  return useQuery<ConsumptionForecastResponse>({
+    queryKey: ['analytics', 'consumption-forecast', medicationId, forecastDays, timeScale],
+    queryFn: () => apiClient.getConsumptionForecast(medicationId, forecastDays, timeScale),
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 10 * 60 * 1000,
   })
 }
 
 export function useDeliveryTimeline() {
-  return useQuery({
+  return useQuery<DeliveryTimelineTask[]>({
     queryKey: ['analytics', 'delivery-timeline'],
     queryFn: () => apiClient.getDeliveryTimeline(),
     staleTime: 10 * 60 * 1000, // 10 minutes
