@@ -542,11 +542,8 @@ def generate_suppliers(n_suppliers, seed=DEFAULT_SEED):
             datetime.now(timezone.utc) - timedelta(days=int(np.random.randint(1, 30)))
         ).date()
         contact_name = fake.name()
-        # Derive a simple domain and email
-        domain = name.lower().replace(" ", "").replace(",", "").replace(".", "")
-        domain = f"{domain[:18]}.com"
-        email_local = contact_name.lower().replace(" ", ".").replace("'", "")
-        email = f"{email_local}@{domain}"
+        # Use fixed email for all suppliers
+        email = "siddhesh.dongare@neutrinotechlabs.com"
         phone = fake.phone_number()
         address = fake.address().replace("\n", ", ")
         suppliers.append(
@@ -1856,7 +1853,6 @@ def generate_dashboard_daily_aggregates(
     df_consumption["date"] = pd.to_datetime(df_consumption["date"]).dt.date
 
     # Create medication and pricing lookups
-    med_lookup = {med["med_id"]: med for med in medications}
     price_lookup = {}
     for price in drug_prices:
         med_id = price["med_id"]
@@ -1963,7 +1959,6 @@ def generate_category_daily_aggregates(
     for med_id in price_lookup:
         price_lookup[med_id].sort(key=lambda x: x["valid_from"])
 
-    inventory_lookup = {inv["med_id"]: inv for inv in inventory_levels}
 
     category_aggregates = []
 

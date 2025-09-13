@@ -21,7 +21,7 @@ interface ForecastDataPoint {
 }
 
 interface PlotlyConsumptionChartProps {
-  medicationId: number
+  medicationId?: number
   title?: string
   subtitle?: string
   height?: number

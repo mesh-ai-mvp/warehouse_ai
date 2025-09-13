@@ -11,6 +11,7 @@ import { GanttChart, PharmaGanttPresets } from '@/components/charts/gantt-chart'
 import TimeScaleChart from '@/components/time-scale-chart'
 import StockLevelChart from '@/components/stock-level-chart'
 import DeliveryTimeline from '@/components/delivery-timeline'
+import PlotlyConsumptionChart from '@/components/plotly-consumption-chart'
 import {
   Package,
   AlertTriangle,
@@ -130,19 +131,29 @@ export function Dashboard() {
       return []
     }
 
-    // Get last 7 days of historical data and format with day names
-    const last7Days = weeklyForecastData.historical_data
-      .slice(-7)
-      .map((item: any) => {
-        const date = new Date(item.date)
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
-        return {
-          date: dayName,
-          consumption: Math.round(item.consumption || 0)
-        }
-      })
+    // Calculate average consumption by weekday from all historical data
+    const weekdayTotals = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
+    const weekdayCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
     
-    return last7Days
+    weeklyForecastData.historical_data.forEach((item: any) => {
+      const date = new Date(item.date)
+      const weekday = date.getDay() // 0 = Sunday, 1 = Monday, etc.
+      const consumption = item.consumption || 0
+      
+      weekdayTotals[weekday] += consumption
+      weekdayCounts[weekday] += 1
+    })
+    
+    // Calculate averages and format with day names
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    return dayNames.map((dayName, index) => ({
+      date: dayName,
+      consumption: Math.round(
+        weekdayCounts[index] > 0 
+          ? weekdayTotals[index] / weekdayCounts[index]
+          : 0
+      )
+    }))
   }, [weeklyForecastData?.historical_data])
 
   return (
@@ -309,11 +320,10 @@ export function Dashboard() {
 
           {/* Enhanced Analytics Charts */}
           <div className="grid gap-6">
-            <TimeScaleChart
+            <PlotlyConsumptionChart
               title="Demand Forecast Analytics"
               subtitle="Historical consumption data with AI-powered forecasting"
-              height={350}
-              defaultTimeScale="weekly"
+              height={400}
             />
 
             <StockLevelChart

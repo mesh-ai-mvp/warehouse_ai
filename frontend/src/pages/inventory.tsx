@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useState, useMemo, useEffect } from 'react'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import {
   flexRender,
   getCoreRowModel,
@@ -59,10 +59,12 @@ import {
   AlertTriangle,
   TrendingUp,
   TrendingDown,
+  Brain,
 } from 'lucide-react'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 
 import { useInventory, useFilterOptions } from '@/hooks/use-api'
+import { useAIPOGeneration } from '@/hooks/use-ai-po'
 import type { Medication, InventoryFilters } from '@/types/api'
 
 function getStockLevelInfo(medication: Medication) {
@@ -84,10 +86,19 @@ function getStockLevelInfo(medication: Medication) {
 
 export function Inventory() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = useState({})
+  
+  // AI PO Generation hook
+  const {
+    generatePO: generateAIPO,
+    isGenerating: isAIGenerating,
+    result: aiResult,
+    status: aiStatus,
+  } = useAIPOGeneration()
 
   // Extract filters from URL params
   const filters: InventoryFilters = useMemo(
@@ -107,6 +118,47 @@ export function Inventory() {
   const { data, isLoading, error, refetch } = useInventory(filters)
   const { data: filterOptions } = useFilterOptions()
 
+  // Handle AI generation completion
+  useEffect(() => {
+    if (aiStatus === 'completed' && aiResult) {
+      console.log('🔍 Debug - Inventory: AI generation completed')
+      console.log('🔍 Debug - Inventory: AI status:', aiStatus)
+      console.log('🔍 Debug - Inventory: AI result structure:', {
+        hasResult: !!aiResult,
+        hasItems: !!aiResult?.items,
+        itemsCount: aiResult?.items?.length,
+        hasSupplier: !!aiResult?.supplier_suggestion,
+        hasReasoning: !!aiResult?.reasoning,
+        fullResult: aiResult
+      })
+      
+      // Verify AI result has required structure before storing
+      if (!aiResult.items || aiResult.items.length === 0) {
+        console.error('❌ AI result missing items array or empty:', aiResult)
+        return
+      }
+      
+      // Store AI result in session storage for create-po page
+      const serializedResult = JSON.stringify(aiResult)
+      sessionStorage.setItem('aiGenerationResult', serializedResult)
+      
+      // Verify storage was successful
+      const storedResult = sessionStorage.getItem('aiGenerationResult')
+      console.log('🔍 Debug - Inventory: SessionStorage set successfully:', !!storedResult)
+      console.log('🔍 Debug - Inventory: Stored data length:', storedResult?.length)
+      
+      // Navigate to create-po page with results
+      const params = new URLSearchParams({
+        from: 'inventory',
+        with_ai_result: 'true'
+      })
+      
+      const navUrl = `/create-po?${params.toString()}`
+      console.log('🔍 Debug - Inventory: Navigating to:', navUrl)
+      navigate(navUrl)
+    }
+  }, [aiStatus, aiResult, navigate])
+
   const updateFilters = (newFilters: Partial<InventoryFilters>) => {
     const params = new URLSearchParams(searchParams)
 
@@ -119,6 +171,30 @@ export function Inventory() {
     })
 
     setSearchParams(params)
+  }
+
+  const handleGeneratePO = async () => {
+    if (selectedMedications.length === 0) return
+
+    try {
+      // Extract medication IDs from selected medications
+      const medicationIds = selectedMedications.map(med => med.med_id)
+      
+      console.log('🔍 Debug - Selected medications in inventory:', selectedMedications)
+      console.log('🔍 Debug - Extracted medication IDs:', medicationIds)
+      
+      // Directly generate AI PO with selected medications
+      await generateAIPO({
+        days_forecast: 30,
+        medication_ids: medicationIds,
+      })
+      
+      // The hook handles progress tracking, when complete it will have results
+      // We can optionally navigate or show results inline
+      
+    } catch (error) {
+      console.error('Failed to generate AI PO:', error)
+    }
   }
 
   const columns: ColumnDef<Medication>[] = [
@@ -385,6 +461,17 @@ export function Inventory() {
         </div>
 
         <div className="flex items-center gap-2">
+          {selectedMedications.length > 0 && (
+            <Button 
+              onClick={handleGeneratePO} 
+              variant="default" 
+              size="sm"
+              disabled={isAIGenerating}
+            >
+              <Brain className={`${isAIGenerating ? 'animate-pulse' : ''} h-4 w-4 mr-2`} />
+              {isAIGenerating ? 'Generating...' : 'Generate PO'}
+            </Button>
+          )}
           <Button onClick={() => refetch()} variant="outline" size="sm">
             <RefreshCw className={`${isLoading ? 'animate-spin' : ''} h-4 w-4 mr-2`} />
             Refresh
@@ -488,15 +575,33 @@ export function Inventory() {
               <span className="text-sm text-muted-foreground">
                 {selectedMedications.length} items selected
               </span>
-              <Button size="sm" variant="secondary">
-                <Package className="h-4 w-4 mr-2" />
-                Create PO for Selected
+              <Button 
+                size="sm" 
+                variant="secondary"
+                onClick={handleGeneratePO}
+                disabled={isAIGenerating}
+              >
+                <Brain className={`${isAIGenerating ? 'animate-pulse' : ''} h-4 w-4 mr-2`} />
+                {isAIGenerating ? 'Generating AI PO...' : 'Generate PO for Selected'}
               </Button>
               <Button size="sm" variant="outline">
                 <Download className="h-4 w-4 mr-2" />
                 Export Selected
               </Button>
             </div>
+            
+            {/* AI Generation Progress */}
+            {isAIGenerating && (
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                  <span>Analyzing selected medications with AI...</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Generating optimized purchase recommendations for {selectedMedications.length} selected medications
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

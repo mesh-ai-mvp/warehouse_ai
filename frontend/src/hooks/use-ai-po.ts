@@ -7,6 +7,7 @@ export interface AIPOGenerationParams {
   store_ids?: number[]
   category_filter?: string
   days_forecast?: number
+  medication_ids?: number[]
 }
 
 export interface AIPOGenerationResult {
@@ -58,9 +59,15 @@ export function useAIPOGeneration() {
           days_forecast: params.days_forecast ?? 30,
           category_filter: params.category_filter,
           store_ids: params.store_ids,
-          // allow backend to auto-select meds based on urgency if none provided
-          medication_ids: [],
         } as any
+
+        // Only include medication_ids if specifically provided (don't default to empty array)
+        if (params.medication_ids && params.medication_ids.length > 0) {
+          request.medication_ids = params.medication_ids
+        }
+
+        console.log('🔍 Debug - AI PO generation request:', request)
+        console.log('🔍 Debug - Medication IDs being sent to API:', params.medication_ids)
 
         // Start AI PO generation (backend async kickoff)
         const response = await apiClient.generateAIPO(request)
