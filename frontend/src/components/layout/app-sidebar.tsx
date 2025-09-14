@@ -1,4 +1,4 @@
-import { BarChart3, Package, ShoppingCart, FileText, Home, Settings } from 'lucide-react'
+import { BarChart3, Package, ShoppingCart, FileText, Home, Settings, Warehouse } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
 import {
@@ -11,6 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarTrigger,
 } from '@/components/ui/sidebar'
 
 const menuItems = [
@@ -45,6 +46,11 @@ const menuItems = [
     icon: FileText,
   },
   {
+    title: 'Warehouse UI',
+    url: '/warehouse-ui',
+    icon: Warehouse,
+  },
+  {
     title: 'Settings',
     url: '/settings',
     icon: Settings,
@@ -57,12 +63,19 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-4 py-4">
-          <Package className="h-6 w-6 text-sidebar-primary" />
-          <div className="group-data-[collapsible=icon]:hidden">
-            <h2 className="text-lg font-semibold text-sidebar-foreground">PharmaWMS</h2>
-            <p className="text-xs text-sidebar-foreground/60">Warehouse Management</p>
+        <div className="flex items-center justify-between gap-2 px-3 py-3">
+          <div className="flex items-center gap-2">
+            <img
+              src="/@new-logo.png"
+              onError={(e) => { e.currentTarget.src = '/logo.png' }}
+              alt="Suppl.AI"
+              className="h-7 w-auto"
+            />
+            <div className="group-data-[collapsible=icon]:hidden">
+              <h2 className="text-base font-semibold text-sidebar-foreground">Suppl.AI</h2>
+            </div>
           </div>
+          <SidebarTrigger className="h-8 w-8" />
         </div>
       </SidebarHeader>
       <SidebarContent>

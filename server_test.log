@@ -1,0 +1,11 @@
+2025-09-14 06:07:49 | INFO     | ai_agents.api_handler:__init__:17 | Initializing AIPoHandler
+2025-09-14 06:07:49 | INFO     | ai_agents.workflow:__init__:29 | Initializing POGenerationWorkflow
+2025-09-14 06:07:50 | DEBUG    | ai_agents.workflow:_build_workflow:47 | Building LangGraph workflow
+2025-09-14 06:07:50 | INFO     | ai_agents.workflow:__init__:43 | POGenerationWorkflow initialized successfully
+2025-09-14 06:07:50 | WARNING  | ai_agents.api_handler:__init__:27 | Medications not loaded, attempting to load data
+2025-09-14 06:07:50 | INFO     | ai_agents.api_handler:__init__:30 | Successfully loaded 50 medications
+2025-09-14 06:07:50 | INFO     | __main__:<module>:136 | Starting Inventory Management POC
+2025-09-14 06:07:50 | INFO     | __main__:<module>:137 | Server will be available at: http://localhost:8000
+2025-09-14 06:07:50 | INFO     | __main__:<module>:138 | API documentation at: http://localhost:8000/docs
+INFO:     Will watch for changes in these directories: ['/home/sid/dev/hackathon-warehouse-management']
+ERROR:    [Errno 98] Address already in use
