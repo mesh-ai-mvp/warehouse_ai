@@ -13,6 +13,7 @@ import { Analytics } from './pages/analytics'
 import { Reports } from './pages/reports'
 import { WarehouseUI } from './pages/warehouse-ui'
 import { Toaster } from '@/components/ui/sonner'
+import { Chatbot } from '@/components/chat/chatbot'
 import './App.css'
 
 // Create a client
@@ -50,6 +51,7 @@ function App() {
               </Route>
             </Routes>
             <Toaster />
+            <Chatbot />
           </div>
         </BrowserRouter>
       </QueryClientProvider>
