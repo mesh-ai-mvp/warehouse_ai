@@ -97,7 +97,7 @@ export function MedicationSearch({ onResultClick, onAisleNavigate, currentAisles
                 quantity: med.quantity,
                 expiryDate: med.expiryDate,
                 category: aisle.category,
-                temperature: aisle.temperature || 22
+                temperature: aisle.temperature !== undefined ? aisle.temperature : 22
               });
             }
           });

@@ -68,7 +68,7 @@ export function CapacityWarnings({ compactView = false, autoRefresh = false }: C
     // Check zones for overall capacity
     warehouseLayout.zones.forEach(zone => {
       const totalMedications = warehouseLayout.stats?.total_medications || 0;
-      const zoneCapacity = zone.capacity || 1000;
+      const zoneCapacity = zone.capacity || zone.total_capacity || 1000; // Use API capacity
       const zoneUtilization = (totalMedications / (warehouseLayout.zones.length * zoneCapacity)) * 100;
 
       if (zoneUtilization >= 85) {

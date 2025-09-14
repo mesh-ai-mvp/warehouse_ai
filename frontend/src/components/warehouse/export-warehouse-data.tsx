@@ -72,8 +72,9 @@ export function ExportWarehouseData() {
       csv += 'Zone,Total Capacity,Used Capacity,Available,Utilization %\n';
 
       warehouseLayout.zones.forEach(zone => {
-        const capacity = zone.capacity || 1000;
-        const used = Math.round(capacity * 0.75); // Simulated data
+        const capacity = zone.capacity || zone.total_capacity || 1000;
+        // Use actual occupied positions from API
+        const used = zone.occupied_positions || zone.total_items || Math.round(capacity * 0.75);
         csv += `"${zone.zone_name}",${capacity},${used},${capacity - used},${((used/capacity)*100).toFixed(1)}\n`;
       });
     }
@@ -108,7 +109,7 @@ export function ExportWarehouseData() {
     if (exportOptions.includeCapacity) {
       exportData.capacity = warehouseLayout.zones.map(zone => ({
         zoneName: zone.zone_name,
-        capacity: zone.capacity || 1000,
+        capacity: zone.capacity || zone.total_capacity || 1000,
         utilization: 75 // Simulated
       }));
     }

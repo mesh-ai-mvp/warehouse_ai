@@ -17,10 +17,12 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
   const [hoveredAisle, setHoveredAisle] = useState<string | null>(null);
 
   const getAisleStatus = (aisle: Aisle) => {
-    const totalMedications = (aisle as any).medicationCount ?? aisle.shelves.reduce((acc, shelf) => acc + shelf.medications.length, 0);
-    const shelfCount = ((aisle as any).shelfCount ?? aisle.shelves.length) || 8;
-    const maxCapacity = shelfCount * 50; // Assume 50 items per shelf average capacity
-    const fillPercentage = maxCapacity > 0 ? (totalMedications / maxCapacity) * 100 : 0;
+    // Calculate based on actual quantities from medications
+    const totalQuantity = aisle.shelves.reduce((acc, shelf) =>
+      acc + shelf.medications.reduce((sum, med) => sum + (med.quantity || 0), 0), 0);
+    // Use actual capacity from shelves
+    const maxCapacity = aisle.shelves.reduce((acc, shelf) => acc + (shelf.capacity || 0), 0);
+    const fillPercentage = maxCapacity > 0 ? (totalQuantity / maxCapacity) * 100 : 0;
 
     if (fillPercentage > 80) return 'high';
     if (fillPercentage > 40) return 'medium';

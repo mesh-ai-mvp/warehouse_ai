@@ -91,7 +91,7 @@ export function ShelfDetail({ shelf, aisleName, onBack }: ShelfDetailProps) {
           <Card className="p-4">
             <div className="text-center">
               <div className="text-2xl font-bold">
-                {shelf.medications.length}/{Math.floor(shelf.capacity / 100)}
+                {shelf.medications.length}/{shelf.capacity}
               </div>
               <div className="text-sm text-muted-foreground">Capacity</div>
             </div>
@@ -123,7 +123,7 @@ export function ShelfDetail({ shelf, aisleName, onBack }: ShelfDetailProps) {
                 <div className="text-muted-foreground text-sm">Available Space</div>
                 <div className="text-2xl font-bold">
                   {(() => {
-                    const totalSlots = Math.max(1, Math.floor(shelf.capacity / 100));
+                    const totalSlots = Math.max(1, shelf.capacity);
                     return Math.max(0, totalSlots - shelf.medications.length);
                   })()}
                 </div>

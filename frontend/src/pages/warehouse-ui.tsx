@@ -52,10 +52,10 @@ const transformApiToComponentMedication = (apiMed: ShelfMedication): Medication 
     id: apiMed.med_id.toString(),
     name: apiMed.name,
     quantity: apiMed.quantity,
-    maxCapacity: 300, // Default capacity, could be enhanced
+    maxCapacity: apiMed.max_capacity || apiMed.quantity || 300, // Use API capacity or fallback
     expiryDate: apiMed.expiry_date || '2025-12-31',
-    batchNumber: apiMed.batch_id?.toString() || 'N/A',
-    temperature: 22 // Default temperature, could be from aisle
+    batchNumber: apiMed.batch_number || apiMed.batch_id?.toString() || 'N/A',
+    temperature: apiMed.temperature || 22 // Use API temperature or default
   };
 };
 

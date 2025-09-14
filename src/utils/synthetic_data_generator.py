@@ -684,6 +684,45 @@ def create_tables(conn):
         if col_name not in cols:
             cur.execute(f"ALTER TABLE suppliers ADD COLUMN {col_name} {col_type}")
 
+    # ========== SOURCE OF TRUTH TABLES FOR OPTIMIZATION ==========
+    # Optimal batch placement rules
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS optimal_batch_placement (
+            med_id INTEGER PRIMARY KEY,
+            optimal_locations INTEGER DEFAULT 1,
+            consolidation_strategy TEXT DEFAULT 'single_location',
+            min_batch_quantity INTEGER DEFAULT 10,
+            FOREIGN KEY (med_id) REFERENCES medications(med_id)
+        )
+    """)
+
+    # Velocity zone mapping for optimal placement
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS velocity_zone_mapping (
+            velocity_category TEXT PRIMARY KEY,
+            optimal_grid_y INTEGER,
+            optimal_shelf_level INTEGER,
+            accessibility_target REAL
+        )
+    """)
+
+    # Warehouse chaos metrics for tracking problems
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS warehouse_chaos_metrics (
+            metric_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            metric_name TEXT UNIQUE,
+            current_chaos_score REAL,
+            optimal_score REAL DEFAULT 0,
+            improvement_potential REAL,
+            last_measured TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            measurement_query TEXT
+        )
+    """)
+
+    # Create indexes for source of truth tables
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_optimal_batch_med ON optimal_batch_placement(med_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_chaos_metrics_name ON warehouse_chaos_metrics(metric_name)")
+
     conn.commit()
 
 
@@ -2341,46 +2380,49 @@ def generate_new_warehouse_zones(seed=DEFAULT_SEED):
 
 
 def generate_warehouse_aisles(zones, seed=DEFAULT_SEED):
-    """Generate warehouse aisle structure"""
+    """Generate warehouse aisle structure matching frontend expectations"""
     random.seed(seed)
     np.random.seed(seed)
 
+    # Generate exactly 6 aisles (A-F) to match frontend
     aisles = []
-    aisle_counter = 0
 
-    zone_mappings = {
-        1: ("Controlled", "restricted", 1),  # Zone R1
-        2: ("Refrigerated", "cold", 2),  # Zone C1
-        3: ("General", "ambient", 2),  # Zone A1
-        4: ("General", "ambient", 1),  # Zone A2
-        5: ("General", "ambient", 0),  # Zone A3 (no aisles for now)
-    }
+    # Define aisle configuration matching frontend expectations
+    aisle_configs = [
+        # Aisle A & B - General storage
+        {"aisle_id": 1, "zone_id": 3, "aisle_code": "A", "category": "General", "zone_type": "ambient"},
+        {"aisle_id": 2, "zone_id": 3, "aisle_code": "B", "category": "General", "zone_type": "ambient"},
+        # Aisle C & D - Refrigerated storage
+        {"aisle_id": 3, "zone_id": 2, "aisle_code": "C", "category": "Refrigerated", "zone_type": "cold"},
+        {"aisle_id": 4, "zone_id": 2, "aisle_code": "D", "category": "Refrigerated", "zone_type": "cold"},
+        # Aisle E - Controlled substances
+        {"aisle_id": 5, "zone_id": 1, "aisle_code": "E", "category": "Controlled", "zone_type": "restricted"},
+        # Aisle F - Quarantine area
+        {"aisle_id": 6, "zone_id": 4, "aisle_code": "F", "category": "Quarantine", "zone_type": "ambient"},
+    ]
 
-    for zone_id, (category, zone_type, num_aisles) in zone_mappings.items():
-        for i in range(num_aisles):
-            aisle_counter += 1
+    for config in aisle_configs:
+        # Set temperature based on zone type
+        if config["zone_type"] == "cold":
+            temperature = np.random.uniform(2, 8)
+        elif config["zone_type"] == "restricted":
+            temperature = np.random.uniform(20, 22)
+        else:
+            temperature = np.random.uniform(18, 24)
 
-            # Set temperature based on zone type
-            if zone_type == "cold":
-                temperature = np.random.uniform(2, 8)
-            elif zone_type == "restricted":
-                temperature = np.random.uniform(20, 22)
-            else:
-                temperature = np.random.uniform(18, 24)
-
-            aisle = {
-                "aisle_id": aisle_counter,
-                "zone_id": zone_id,
-                "aisle_code": chr(64 + aisle_counter),  # A, B, C...
-                "aisle_name": f"{category} Pharmaceuticals {chr(64 + aisle_counter)}",
-                "position_x": (aisle_counter - 1) % 3,
-                "position_z": (aisle_counter - 1) // 3,
-                "temperature": round(temperature, 1),
-                "humidity": np.random.uniform(30, 60),
-                "category": category,
-                "max_shelves": 8,
-            }
-            aisles.append(aisle)
+        aisle = {
+            "aisle_id": config["aisle_id"],
+            "zone_id": config["zone_id"],
+            "aisle_code": config["aisle_code"],
+            "aisle_name": f"{config['category']} Pharmaceuticals {config['aisle_code']}",
+            "position_x": (config["aisle_id"] - 1) % 3,
+            "position_z": (config["aisle_id"] - 1) // 3,
+            "temperature": round(temperature, 1),
+            "humidity": round(np.random.uniform(30, 60), 1),
+            "category": config["category"],
+            "max_shelves": 8,
+        }
+        aisles.append(aisle)
 
     return aisles
 
@@ -2678,7 +2720,7 @@ def generate_medication_placements(
     aisles,
     seed=DEFAULT_SEED,
 ):
-    """Generate intelligent medication placements with FIFO"""
+    """Generate chaotic medication placements with intentional problems"""
     random.seed(seed)
     np.random.seed(seed)
 
@@ -2700,7 +2742,7 @@ def generate_medication_placements(
             batches_by_med[med_id] = []
         batches_by_med[med_id].append(batch)
 
-    # Sort batches by expiry date for FIFO
+    # Sort batches by expiry date for FIFO (but we'll intentionally violate this)
     for med_id in batches_by_med:
         batches_by_med[med_id].sort(key=lambda x: x["expiry_date"])
 
@@ -2723,23 +2765,93 @@ def generate_medication_placements(
 
         med_batches = batches_by_med[med_id]
 
-        # Find best positions for this medication
-        best_positions = []
+        # CHAOS: Batch fragmentation - 40% chance to fragment batches
+        if random.random() < 0.40 and len(med_batches) > 0:
+            # Fragment first batch across multiple locations
+            batch_to_fragment = med_batches[0]
+            available_positions = [p for p in position_lookup.keys() if p not in used_positions]
+            num_fragments = random.randint(3, min(5, len(available_positions))) if available_positions else 0
 
-        for pos_id, pos in position_lookup.items():
-            if pos_id in used_positions:
-                continue
+            if num_fragments > 1:
+                fragment_qty = batch_to_fragment["quantity_remaining"] // num_fragments
+                remaining_qty = batch_to_fragment["quantity_remaining"]
 
-            shelf = shelf_lookup[pos["shelf_id"]]
-            aisle = aisle_lookup[shelf["aisle_id"]]
+                for frag_idx in range(num_fragments):
+                    # Find random available position
+                    available_pos = [p for p in position_lookup.keys() if p not in used_positions]
+                    if not available_pos:
+                        break
 
-            score = calculate_placement_score(med_attr, pos, aisle["category"])
-            best_positions.append((score, pos_id))
+                    random_pos_id = random.choice(available_pos)
+                    qty_to_place = min(fragment_qty, remaining_qty)
 
-        # Sort positions by score and take as many as needed for batches
+                    if qty_to_place > 0:
+                        placements.append({
+                            "placement_id": placement_id,
+                            "position_id": random_pos_id,
+                            "med_id": med_id,
+                            "batch_id": batch_to_fragment["batch_id"],
+                            "quantity": qty_to_place,
+                            "placement_date": datetime.now().isoformat(),
+                            "placed_by": "system",
+                            "placement_reason": "batch_fragmentation_chaos",
+                            "expiry_date": batch_to_fragment["expiry_date"],
+                            "is_active": True,
+                        })
+                        used_positions.add(random_pos_id)
+                        placement_id += 1
+                        remaining_qty -= qty_to_place
+
+                # Remove this batch from regular placement
+                med_batches = med_batches[1:]
+
+        # CHAOS: Velocity mismatch - 30% chance to misplace based on velocity
+        velocity_chaos = random.random() < 0.30
+
+        # Find positions (with chaos logic)
+        if velocity_chaos:
+            # Intentionally find wrong positions
+            chaos_positions = []
+            for pos_id, pos in position_lookup.items():
+                if pos_id in used_positions:
+                    continue
+
+                # Reverse the logic - fast movers in back, slow in front
+                chaos_score = 0
+                if med_attr["movement_category"] == "Fast" and pos["grid_y"] == 3:
+                    chaos_score = 100  # Put fast movers in back
+                elif med_attr["movement_category"] == "Slow" and pos["grid_y"] == 1:
+                    chaos_score = 100  # Put slow movers in front
+                elif med_attr["movement_category"] == "Medium" and pos["is_golden_zone"]:
+                    chaos_score = 50  # Waste golden zone on medium movers
+
+                if chaos_score > 0:
+                    chaos_positions.append((chaos_score, pos_id))
+
+            best_positions = chaos_positions if chaos_positions else []
+        else:
+            # Normal placement logic (but still with some chaos)
+            best_positions = []
+            for pos_id, pos in position_lookup.items():
+                if pos_id in used_positions:
+                    continue
+
+                shelf = shelf_lookup[pos["shelf_id"]]
+                aisle = aisle_lookup[shelf["aisle_id"]]
+
+                score = calculate_placement_score(med_attr, pos, aisle["category"])
+                # Add some randomness to create imperfect placement
+                score += random.randint(-20, 20)
+                best_positions.append((score, pos_id))
+
+        # Sort positions by score
         best_positions.sort(reverse=True)
 
-        # Place batches in FIFO order (oldest in front)
+        # CHAOS: FIFO violations - 25% chance to reverse batch order
+        if random.random() < 0.25 and len(med_batches) > 1:
+            med_batches = list(reversed(med_batches))
+
+        # Place batches
         for i, batch in enumerate(
             med_batches[: min(len(med_batches), len(best_positions))]
         ):
@@ -2748,7 +2860,9 @@ def generate_medication_placements(
                 position = position_lookup[pos_id]
 
                 # Determine placement reason
-                if med_attr["requires_security"]:
+                if velocity_chaos:
+                    reason = "velocity_mismatch_chaos"
+                elif med_attr["requires_security"]:
                     reason = "controlled_substance"
                 elif med_attr["requires_refrigeration"]:
                     reason = "cold_chain"
@@ -2820,8 +2934,8 @@ def update_shelf_utilization(
                     # Estimate weight: quantity * weight per unit
                     # Use realistic unit weights (0.01 to 0.5 kg per unit)
                     base_weight = med_attr.get("weight_kg", 0.5)
-                    # Convert to realistic unit weight (divide by 100 to get per-unit weight)
-                    weight_per_unit = min(0.5, base_weight / 100)  # Cap at 0.5kg per unit
+                    # Weight per unit is already in kg, just cap at reasonable value
+                    weight_per_unit = min(0.5, base_weight)  # Cap at 0.5kg per unit
                     total_weight = placement["quantity"] * weight_per_unit
                     shelf_stats[shelf_id]["total_weight"] += total_weight
 
@@ -3700,6 +3814,101 @@ def generate_all(
 
     print("\n✅ Warehouse management data generation complete!")
     print("=" * 50)
+
+    # ========== POPULATE SOURCE OF TRUTH TABLES ==========
+    print("\nPopulating source of truth tables for optimization...")
+
+    # Populate optimal batch placement rules
+    cur.executemany("""
+        INSERT OR REPLACE INTO optimal_batch_placement (med_id, optimal_locations, consolidation_strategy)
+        SELECT med_id, 1, 'single_location' FROM medications
+    """, [])
+
+    # Populate velocity zone mapping
+    cur.execute("""
+        INSERT OR REPLACE INTO velocity_zone_mapping
+        (velocity_category, optimal_grid_y, optimal_shelf_level, accessibility_target)
+        VALUES
+        ('Fast', 1, 0, 1.0),    -- Front row, lower shelf, max accessibility
+        ('Medium', 2, 0, 0.8),  -- Middle row, lower shelf
+        ('Slow', 3, 1, 0.6)     -- Back row, upper shelf
+    """)
+
+    # Calculate and store chaos metrics
+    print("Calculating warehouse chaos metrics...")
+
+    # Batch fragmentation metric
+    cur.execute("""
+        INSERT OR REPLACE INTO warehouse_chaos_metrics
+        (metric_name, current_chaos_score, improvement_potential, measurement_query)
+        SELECT
+            'batch_fragmentation',
+            CAST(COUNT(*) AS REAL) / MAX(1, (SELECT COUNT(DISTINCT batch_id) FROM batch_info)) * 100,
+            CAST(COUNT(*) AS REAL) / MAX(1, (SELECT COUNT(DISTINCT batch_id) FROM batch_info)) * 100,
+            'SELECT COUNT(*) FROM (SELECT batch_id, COUNT(DISTINCT position_id) as locations FROM medication_placements WHERE is_active=1 GROUP BY batch_id HAVING locations > 1)'
+        FROM (
+            SELECT batch_id, COUNT(DISTINCT position_id) as locations
+            FROM medication_placements
+            WHERE is_active = 1
+            GROUP BY batch_id
+            HAVING locations > 1
+        )
+    """)
+
+    # Velocity mismatch metric
+    cur.execute("""
+        INSERT OR REPLACE INTO warehouse_chaos_metrics
+        (metric_name, current_chaos_score, improvement_potential, measurement_query)
+        SELECT
+            'velocity_mismatch',
+            CAST(COUNT(*) AS REAL) / MAX(1, (SELECT COUNT(*) FROM medication_placements WHERE is_active=1)) * 100,
+            CAST(COUNT(*) AS REAL) / MAX(1, (SELECT COUNT(*) FROM medication_placements WHERE is_active=1)) * 100,
+            'SELECT COUNT(*) FROM medication_placements mp JOIN medication_attributes ma ON mp.med_id = ma.med_id JOIN shelf_positions sp ON mp.position_id = sp.position_id WHERE mp.is_active=1 AND ((ma.movement_category="Fast" AND sp.grid_y=3) OR (ma.movement_category="Slow" AND sp.grid_y=1))'
+        FROM medication_placements mp
+        JOIN medication_attributes ma ON mp.med_id = ma.med_id
+        JOIN shelf_positions sp ON mp.position_id = sp.position_id
+        WHERE mp.is_active = 1
+        AND ((ma.movement_category = 'Fast' AND sp.grid_y = 3)
+             OR (ma.movement_category = 'Slow' AND sp.grid_y = 1))
+    """)
+
+    # FIFO violation metric
+    cur.execute("""
+        INSERT OR REPLACE INTO warehouse_chaos_metrics
+        (metric_name, current_chaos_score, improvement_potential, measurement_query)
+        VALUES (
+            'fifo_violations',
+            (SELECT COUNT(*) * 10.0 FROM (
+                SELECT 1 FROM medication_placements mp1
+                JOIN medication_placements mp2 ON mp1.med_id = mp2.med_id
+                JOIN shelf_positions sp1 ON mp1.position_id = sp1.position_id
+                JOIN shelf_positions sp2 ON mp2.position_id = sp2.position_id
+                WHERE mp1.is_active = 1 AND mp2.is_active = 1
+                AND mp1.batch_id != mp2.batch_id
+                AND sp1.shelf_id = sp2.shelf_id
+                AND mp1.expiry_date < mp2.expiry_date
+                AND sp1.grid_y > sp2.grid_y
+                LIMIT 10
+            )),
+            (SELECT COUNT(*) * 10.0 FROM (
+                SELECT 1 FROM medication_placements mp1
+                JOIN medication_placements mp2 ON mp1.med_id = mp2.med_id
+                JOIN shelf_positions sp1 ON mp1.position_id = sp1.position_id
+                JOIN shelf_positions sp2 ON mp2.position_id = sp2.position_id
+                WHERE mp1.is_active = 1 AND mp2.is_active = 1
+                AND mp1.batch_id != mp2.batch_id
+                AND sp1.shelf_id = sp2.shelf_id
+                AND mp1.expiry_date < mp2.expiry_date
+                AND sp1.grid_y > sp2.grid_y
+                LIMIT 10
+            )),
+            'FIFO violation query'
+        )
+    """)
+
+    conn.commit()
+    print("  ✅ Source of truth tables populated")
+    print("  ✅ Chaos metrics calculated")
 
     # final: export key CSVs (masters already done)
     print("Exporting CSVs and finishing …")

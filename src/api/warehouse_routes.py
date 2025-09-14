@@ -179,7 +179,8 @@ async def get_aisle_details(aisle_id: int):
 
         # Get medications in this aisle
         meds_query = """
-            SELECT DISTINCT m.*, mp.quantity, sp.shelf_id, b.expiry_date,
+            SELECT DISTINCT m.*, mp.quantity, mp.batch_id, sp.shelf_id, b.expiry_date,
+                   b.lot_number as batch_number,
                    ma.velocity_score, ma.movement_category
             FROM medication_placements mp
             JOIN medications m ON mp.med_id = m.med_id
@@ -1011,4 +1012,166 @@ async def get_movement_statistics(
 
     except Exception as e:
         logger.error(f"Error fetching movement statistics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/chaos/metrics")
+async def get_chaos_metrics():
+    """
+    Get current chaos metrics for the warehouse
+
+    Returns metrics showing warehouse inefficiencies and optimization potential
+    """
+    try:
+        from api.routes import data_loader
+
+        conn = data_loader.get_connection()
+
+        # Get all chaos metrics
+        metrics_query = """
+            SELECT
+                metric_name,
+                current_chaos_score,
+                optimal_score,
+                improvement_potential
+            FROM warehouse_chaos_metrics
+            ORDER BY improvement_potential DESC
+        """
+        metrics = pd.read_sql_query(metrics_query, conn).to_dict('records')
+
+        # Calculate overall chaos score
+        overall_chaos = 0
+        if metrics:
+            overall_chaos = sum(m['current_chaos_score'] for m in metrics if m['current_chaos_score']) / len(metrics)
+
+        return clean_nan_values({
+            "chaos_metrics": metrics,
+            "overall_chaos_score": round(overall_chaos, 2),
+            "total_improvement_potential": sum(m['improvement_potential'] for m in metrics if m['improvement_potential'])
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching chaos metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/chaos/batch-fragmentation")
+async def get_batch_fragmentation():
+    """
+    Get details of fragmented batches that need consolidation
+
+    Shows batches split across multiple locations
+    """
+    try:
+        from api.routes import data_loader
+
+        conn = data_loader.get_connection()
+
+        # Find fragmented batches
+        fragmentation_query = """
+            SELECT
+                b.lot_number,
+                m.name as medication_name,
+                b.batch_id,
+                COUNT(DISTINCT mp.position_id) as num_locations,
+                SUM(mp.quantity) as total_quantity,
+                GROUP_CONCAT(DISTINCT a.aisle_code || '-' || s.shelf_code) as locations,
+                b.expiry_date
+            FROM medication_placements mp
+            JOIN batch_info b ON mp.batch_id = b.batch_id
+            JOIN medications m ON mp.med_id = m.med_id
+            JOIN shelf_positions sp ON mp.position_id = sp.position_id
+            JOIN warehouse_shelves s ON sp.shelf_id = s.shelf_id
+            JOIN warehouse_aisles a ON s.aisle_id = a.aisle_id
+            WHERE mp.is_active = 1
+            GROUP BY b.batch_id
+            HAVING num_locations > 1
+            ORDER BY num_locations DESC, b.expiry_date
+        """
+
+        fragmented_batches = pd.read_sql_query(fragmentation_query, conn).to_dict('records')
+
+        # Calculate fragmentation statistics
+        total_batches_query = "SELECT COUNT(DISTINCT batch_id) as total FROM batch_info"
+        total_batches = pd.read_sql_query(total_batches_query, conn).iloc[0]['total']
+
+        fragmentation_rate = (len(fragmented_batches) / total_batches * 100) if total_batches > 0 else 0
+
+        return clean_nan_values({
+            "fragmented_batches": fragmented_batches[:20],  # Top 20 most fragmented
+            "total_fragmented": len(fragmented_batches),
+            "total_batches": int(total_batches),  # Convert numpy int64 to regular int
+            "fragmentation_rate": round(fragmentation_rate, 2),
+            "consolidation_opportunity": f"{len(fragmented_batches)} batches could be consolidated"
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching batch fragmentation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/chaos/velocity-mismatches")
+async def get_velocity_mismatches():
+    """
+    Get medications placed in wrong zones based on velocity
+
+    Shows fast-moving items in back zones and slow-moving items in prime locations
+    """
+    try:
+        from api.routes import data_loader
+
+        conn = data_loader.get_connection()
+
+        # Find velocity mismatches
+        mismatch_query = """
+            SELECT
+                m.name as medication_name,
+                ma.movement_category,
+                ma.velocity_score,
+                sp.grid_y,
+                CASE sp.grid_y
+                    WHEN 1 THEN 'Front'
+                    WHEN 2 THEN 'Middle'
+                    WHEN 3 THEN 'Back'
+                END as row_position,
+                a.aisle_code || '-' || s.shelf_code || '-' || sp.grid_label as location,
+                mp.quantity,
+                CASE
+                    WHEN ma.movement_category = 'Fast' AND sp.grid_y = 3 THEN 'Fast item in back'
+                    WHEN ma.movement_category = 'Slow' AND sp.grid_y = 1 THEN 'Slow item in front'
+                    WHEN ma.movement_category = 'Medium' AND sp.is_golden_zone = 1 THEN 'Medium item in golden zone'
+                END as issue
+            FROM medication_placements mp
+            JOIN medications m ON mp.med_id = m.med_id
+            JOIN medication_attributes ma ON m.med_id = ma.med_id
+            JOIN shelf_positions sp ON mp.position_id = sp.position_id
+            JOIN warehouse_shelves s ON sp.shelf_id = s.shelf_id
+            JOIN warehouse_aisles a ON s.aisle_id = a.aisle_id
+            WHERE mp.is_active = 1
+            AND (
+                (ma.movement_category = 'Fast' AND sp.grid_y = 3)
+                OR (ma.movement_category = 'Slow' AND sp.grid_y = 1)
+                OR (ma.movement_category = 'Medium' AND sp.is_golden_zone = 1)
+            )
+            ORDER BY ma.velocity_score DESC
+        """
+
+        mismatches = pd.read_sql_query(mismatch_query, conn).to_dict('records')
+
+        # Get optimal placement reference
+        optimal_query = """
+            SELECT * FROM velocity_zone_mapping
+            ORDER BY velocity_category
+        """
+        optimal_mapping = pd.read_sql_query(optimal_query, conn).to_dict('records')
+
+        return clean_nan_values({
+            "velocity_mismatches": mismatches[:30],  # Top 30 mismatches
+            "total_mismatches": len(mismatches),
+            "optimal_mapping": optimal_mapping,
+            "relocation_opportunity": f"{len(mismatches)} items could be relocated for better efficiency"
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching velocity mismatches: {e}")
         raise HTTPException(status_code=500, detail=str(e))

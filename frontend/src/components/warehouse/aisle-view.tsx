@@ -15,7 +15,9 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
   const [hoveredShelf, setHoveredShelf] = useState<string | null>(null);
 
   const getShelfFillLevel = (shelf: Shelf) => {
-    const fillPercentage = (shelf.medications.length / Math.max(1, shelf.capacity)) * 100;
+    // Calculate based on actual quantities, not just count
+    const totalQuantity = shelf.medications.reduce((sum, med) => sum + (med.quantity || 0), 0);
+    const fillPercentage = (totalQuantity / Math.max(1, shelf.capacity)) * 100;
     return Math.min(fillPercentage, 100);
   };
 
@@ -38,9 +40,11 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
     });
   };
 
-  const totalMedications = aisle.shelves.reduce((acc, shelf) => acc + shelf.medications.length, 0);
+  // Calculate based on actual quantities, not just item count
+  const totalQuantity = aisle.shelves.reduce((acc, shelf) =>
+    acc + shelf.medications.reduce((sum, med) => sum + (med.quantity || 0), 0), 0);
   const totalCapacity = aisle.shelves.reduce((acc, shelf) => acc + shelf.capacity, 0);
-  const utilizationRate = totalCapacity > 0 ? (totalMedications / totalCapacity) * 100 : 0;
+  const utilizationRate = totalCapacity > 0 ? (totalQuantity / totalCapacity) * 100 : 0;
 
   return (
     <div className="overflow-auto">
