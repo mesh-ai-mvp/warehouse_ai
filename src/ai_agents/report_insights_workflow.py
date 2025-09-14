@@ -59,7 +59,9 @@ class ReportInsightsWorkflow:
     def __init__(self, llm: ChatOpenAI = None):
         """Initialize workflow with LLM and agents"""
         # Use provided LLM or create default
-        self.llm = llm or ChatOpenAI(model="gpt-4", temperature=0.3, max_tokens=2000)
+        self.llm = llm or ChatOpenAI(
+            model="gpt-5-mini", temperature=0.3, max_tokens=2000
+        )
 
         # Initialize agents (same pattern as PO workflow)
         self.insights_agent = ReportInsightsAgent(self.llm)

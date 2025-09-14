@@ -253,7 +253,7 @@ class DataLoader:
                 )
                 self.warehouse_zones = zones_df.to_dict("records")
             except FileNotFoundError:
-                logger.warning("warehouse_zones.csv not found, using fallback data")
+                logger.debug("warehouse_zones.csv not found, using fallback data")
                 self.warehouse_zones = []
 
             try:

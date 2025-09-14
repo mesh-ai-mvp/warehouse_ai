@@ -24,7 +24,7 @@ class AIPoHandler:
 
         # Ensure data is loaded if not already
         if not self.data_loader.medications:
-            logger.warning("Medications not loaded, attempting to load data")
+            logger.debug("Medications not loaded, attempting to load data")
             try:
                 self.data_loader.load_all_data()
                 logger.info(
