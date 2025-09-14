@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { ArrowLeft, Package, Calendar, Thermometer, AlertTriangle, CheckCircle, Clock, ArrowRight } from 'lucide-react';
 import type { Shelf } from './warehouse-types';
 import { Button } from '@/components/ui/button';
@@ -54,20 +54,20 @@ export function ShelfDetail({ shelf, aisleName, onBack }: ShelfDetailProps) {
   };
 
   return (
-    <div className="h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto">
+    <div className="overflow-auto">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="p-6 border-b border-slate-700/50 bg-slate-800/50 backdrop-blur-sm z-10 mb-8"
+        className="p-6 border-b bg-card/50 backdrop-blur-sm z-10 mb-16"
       >
         <div className="flex items-center gap-4 mb-4">
           <Button
             variant="ghost"
             size="sm"
             onClick={onBack}
-            className="text-slate-300 hover:text-white hover:bg-slate-700/50"
+            className=""
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Aisle
@@ -76,10 +76,10 @@ export function ShelfDetail({ shelf, aisleName, onBack }: ShelfDetailProps) {
 
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl text-white mb-2">
+            <h1 className="text-3xl font-bold mb-2">
               Shelf {shelf.position + 1} - Level {shelf.level + 1}
             </h1>
-            <div className="flex items-center gap-4 text-slate-300">
+            <div className="flex items-center gap-4 text-muted-foreground">
               <span>{aisleName}</span>
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4" />
@@ -88,40 +88,40 @@ export function ShelfDetail({ shelf, aisleName, onBack }: ShelfDetailProps) {
             </div>
           </div>
 
-          <Card className="p-4 bg-slate-800/80 border-slate-700">
+          <Card className="p-4">
             <div className="text-center">
-              <div className="text-2xl text-white">
+              <div className="text-2xl font-bold">
                 {shelf.medications.length}/{Math.floor(shelf.capacity / 100)}
               </div>
-              <div className="text-sm text-slate-400">Capacity</div>
+              <div className="text-sm text-muted-foreground">Capacity</div>
             </div>
           </Card>
         </div>
       </motion.div>
 
-      <div className="p-6 space-y-6">
+      <div className="p-6 pt-12 space-y-8">
         {/* Shelf Overview */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <Card className="p-6 bg-slate-800/80 border-slate-700">
-            <h2 className="text-white text-xl mb-4">Shelf Overview</h2>
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-6">Shelf Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <div className="text-slate-400 text-sm">Total Medications</div>
-                <div className="text-2xl text-white">{shelf.medications.length}</div>
+                <div className="text-muted-foreground text-sm">Total Medications</div>
+                <div className="text-2xl font-bold">{shelf.medications.length}</div>
               </div>
               <div className="space-y-2">
-                <div className="text-slate-400 text-sm">Capacity Utilization</div>
-                <div className="text-2xl text-white">
+                <div className="text-muted-foreground text-sm">Capacity Utilization</div>
+                <div className="text-2xl font-bold">
                   {Math.round((shelf.medications.length / Math.max(1, shelf.capacity)) * 100)}%
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="text-slate-400 text-sm">Available Space</div>
-                <div className="text-2xl text-white">
+                <div className="text-muted-foreground text-sm">Available Space</div>
+                <div className="text-2xl font-bold">
                   {(() => {
                     const totalSlots = Math.max(1, Math.floor(shelf.capacity / 100));
                     return Math.max(0, totalSlots - shelf.medications.length);
@@ -139,7 +139,7 @@ export function ShelfDetail({ shelf, aisleName, onBack }: ShelfDetailProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
           >
-            <h2 className="text-white text-xl mb-4">Stored Medications</h2>
+            <h2 className="text-xl font-semibold mb-6">Stored Medications</h2>
             <div className="grid gap-4">
               {shelf.medications.map((medication, index) => {
                 const expiryStatus = getExpiryStatus(medication.expiryDate);

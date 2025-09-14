@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package,
   Calendar,
@@ -93,7 +93,7 @@ export function FloatingPanel({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: -400, opacity: 0 }}
           transition={{ duration: 0.3, ease: [0.23, 1, 0.320, 1] }}
-          className="fixed left-4 top-20 z-30 w-80 max-h-[calc(100vh-6rem)] bg-slate-900/95 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-2xl overflow-hidden flex flex-col"
+          className="fixed left-4 top-20 z-30 w-80 max-h-[calc(100vh-6rem)] bg-card/95 backdrop-blur-md rounded-xl border shadow-2xl overflow-hidden flex flex-col"
         >
           {/* Header */}
           <div className="p-4 border-b border-slate-700/50">

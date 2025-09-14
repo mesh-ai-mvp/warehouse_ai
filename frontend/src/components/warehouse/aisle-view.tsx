@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { ArrowLeft, Package, Thermometer, Calendar, AlertCircle } from 'lucide-react';
 import type { Aisle, Shelf } from './warehouse-types';
 import { Button } from '@/components/ui/button';
@@ -43,20 +43,20 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
   const utilizationRate = totalCapacity > 0 ? (totalMedications / totalCapacity) * 100 : 0;
 
   return (
-    <div className="h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto">
+    <div className="overflow-auto">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="p-6 border-b border-slate-700/50 bg-slate-800/50 backdrop-blur-sm z-10 mb-40"
+        className="p-6 border-b bg-card/50 backdrop-blur-sm z-10 mb-16"
       >
         <div className="flex items-center gap-4 mb-4 mt-2">
           <Button
             variant="ghost"
             size="sm"
             onClick={onBack}
-            className="text-slate-300 hover:text-white hover:bg-slate-700/50"
+            className=""
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Overview
@@ -65,8 +65,8 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
 
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl text-white mb-2">{aisle.name}</h1>
-            <div className="flex items-center gap-6 text-slate-300">
+            <h1 className="text-3xl font-bold mb-2">{aisle.name}</h1>
+            <div className="flex items-center gap-6 text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4" />
                 <span>{aisle.category}</span>
@@ -81,29 +81,29 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
             </div>
           </div>
 
-          <Card className="p-4 bg-slate-800/80 border-slate-700">
+          <Card className="p-4">
             <div className="text-center">
-              <div className="text-2xl text-white">{utilizationRate.toFixed(1)}%</div>
-              <div className="text-sm text-slate-400">Utilization</div>
+              <div className="text-2xl font-bold">{utilizationRate.toFixed(1)}%</div>
+              <div className="text-sm text-muted-foreground">Utilization</div>
             </div>
           </Card>
         </div>
       </motion.div>
 
       {/* 3D Aisle View */}
-      <div className="flex-1 flex items-center justify-center p-8 pt-52 pb-16 perspective-1000">
+      <div className="flex-1 flex items-center justify-center p-8 pt-32 pb-16 perspective-1000 min-h-[700px]">
         <motion.div
           initial={{ opacity: 0, rotateX: 60, z: -200 }}
           animate={{ opacity: 1, rotateX: 15, z: 0 }}
           transition={{ duration: 1, ease: [0.23, 1, 0.320, 1] }}
-          className="relative preserve-3d w-[900px] h-[600px]"
+          className="relative preserve-3d w-[900px] h-[600px] mt-16"
           style={{
             transformStyle: 'preserve-3d',
             transform: 'rotateX(15deg) rotateY(-5deg)'
           }}
         >
           {/* Left Shelf Unit */}
-          <div className="absolute left-16 top-1/2 -translate-y-1/2 z-10">
+          <div className="absolute left-16 top-1/2 -translate-y-1/2 z-10 mt-4">
             <motion.div
               initial={{ x: -100, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -210,7 +210,7 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
           </div>
 
           {/* Right Shelf Unit */}
-          <div className="absolute right-16 top-1/2 -translate-y-1/2 z-10">
+          <div className="absolute right-16 top-1/2 -translate-y-1/2 z-10 mt-4">
             <motion.div
               initial={{ x: 100, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -321,13 +321,13 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
             initial={{ opacity: 0, scaleY: 0 }}
             animate={{ opacity: 1, scaleY: 1 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="absolute top-16 left-32 right-32 bottom-16 bg-gradient-to-b from-slate-700/30 to-slate-800/50 rounded-lg border-2 border-slate-600/30 z-0 overflow-visible"
+            className="absolute top-16 left-32 right-32 bottom-16 bg-gradient-to-b from-muted/30 to-muted/50 rounded-lg border-2 border-border/30 z-0 overflow-visible"
             style={{ transform: 'rotateX(90deg) translateZ(-20px)' }}
           >
             {/* Aisle markings */}
             <div className="w-full h-full grid grid-cols-3 opacity-30">
-              <div className="border-r border-slate-500"></div>
-              <div className="border-r border-slate-500"></div>
+              <div className="border-r border-border"></div>
+              <div className="border-r border-border"></div>
               <div></div>
             </div>
           </motion.div>
@@ -341,7 +341,7 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
         transition={{ duration: 0.6, delay: 1 }}
         className="fixed bottom-6 right-6 text-right z-20"
       >
-        <div className="text-slate-400 text-sm bg-slate-800/60 backdrop-blur-sm px-4 py-2 rounded-full">
+        <div className="text-muted-foreground text-sm bg-card/60 backdrop-blur-sm px-4 py-2 rounded-full">
           Click on any shelf to view detailed medication inventory
         </div>
       </motion.div>

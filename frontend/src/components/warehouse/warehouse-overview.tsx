@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { Aisle } from './warehouse-types';
 import { Thermometer, Package, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface WarehouseOverviewProps {
   aisles: Aisle[];
@@ -73,30 +75,30 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
   };
 
   return (
-    <div className="h-full relative overflow-auto">
+    <div className="relative overflow-visible">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-slate-900/90 to-transparent p-6">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          <h1 className="text-white text-3xl mb-2">MediCore Warehouse</h1>
-          <p className="text-slate-300">Real-time pharmaceutical inventory management</p>
-        </motion.div>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.2 }}
+        className="mb-6"
+      >
+        <h1 className="text-3xl font-bold mb-2">MediCore Warehouse</h1>
+        <p className="text-muted-foreground">Real-time pharmaceutical inventory management</p>
+      </motion.div>
 
       {/* 3D Warehouse Floor */}
-      <div className="h-full flex items-center justify-center perspective-1000 p-10 pt-32 pb-20">
+      <div className="flex items-center justify-center perspective-1000 p-8 min-h-[700px]">
         <motion.div
           initial={{ opacity: 0, rotateX: 45 }}
           animate={{ opacity: 1, rotateX: 20 }}
           transition={{ duration: 1, ease: [0.23, 1, 0.320, 1] }}
-          className="relative preserve-3d w-full max-w-4xl h-full max-h-[600px]"
+          className="relative preserve-3d w-full max-w-5xl h-[650px]"
           style={{
             transformStyle: 'preserve-3d',
-            transform: 'rotateX(20deg) rotateY(-10deg)',
-            marginTop: '2rem'
+            transform: 'rotateX(15deg) rotateY(-10deg)',
+            marginTop: '2rem',
+            marginBottom: '4rem'
           }}
         >
           {/* Warehouse Building Outline */}
@@ -104,18 +106,18 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.2, ease: [0.23, 1, 0.320, 1] }}
-            className="absolute inset-0 bg-slate-800/30 border-4 border-slate-600/50 rounded-xl backdrop-blur-sm"
+            className="absolute inset-0 bg-card/50 border-4 border-border rounded-xl backdrop-blur-sm"
             style={{
               boxShadow: '0 25px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)'
             }}
           >
             {/* Building structure details */}
-            <div className="absolute inset-2 border border-slate-700/30 rounded-lg" />
-            <div className="absolute inset-4 border border-slate-700/20 rounded-lg" />
+            <div className="absolute inset-2 border border-border/30 rounded-lg" />
+            <div className="absolute inset-4 border border-border/20 rounded-lg" />
           </motion.div>
 
           {/* Main Storage Area Grid */}
-          <div className="absolute inset-8 grid grid-cols-3 grid-rows-2 gap-10 p-4">
+          <div className="absolute inset-8 grid grid-cols-3 grid-rows-2 gap-y-20 gap-x-12 p-8">
             {aisles.map((aisle, index) => {
               const status = getAisleStatus(aisle);
               const isHovered = hoveredAisle === aisle.id;
@@ -134,7 +136,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                     delay: index * 0.15,
                     ease: [0.23, 1, 0.320, 1]
                   }}
-                  className="relative cursor-pointer flex items-center justify-center w-full h-full"
+                  className="relative cursor-pointer flex items-center justify-center w-full h-full mb-4"
                   style={{
                     gridColumn: col + 1,
                     gridRow: row + 1,
@@ -155,11 +157,11 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                   whileTap={{ scale: 0.95 }}
                 >
                   {/* Zone Background - Full clickable area */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-slate-700/20 to-slate-800/40 rounded-lg border border-slate-600/30" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-muted/20 to-muted/40 rounded-lg border border-border/30" />
 
                   {/* Aisle Container */}
                   <div
-                    className={`relative w-full h-full bg-gradient-to-br ${getStatusColor(status, aisle.category)} rounded-lg shadow-2xl overflow-hidden min-h-[140px]`}
+                    className={`relative w-full h-full bg-gradient-to-br ${getStatusColor(status, aisle.category)} rounded-lg shadow-2xl overflow-hidden min-h-[180px]`}
                     style={{
                       boxShadow: isHovered
                         ? '0 25px 50px rgba(0,0,0,0.6), 0 0 40px rgba(59, 130, 246, 0.4)'
@@ -195,7 +197,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                     </div>
 
                     {/* Aisle Walkway */}
-                    <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-3/4 h-2 bg-slate-900/40 rounded-full" />
+                    <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-3/4 h-2 bg-background/40 rounded-full" />
 
                     {/* Temperature/Special indicators */}
                     {aisle.category === 'Refrigerated' && (
@@ -240,31 +242,31 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                       scale: isHovered ? 1 : 0.9
                     }}
                     transition={{ duration: 0.2 }}
-                    className="absolute -top-24 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-xl p-4 shadow-2xl border border-white/20 min-w-[240px] z-[100]"
+                    className="absolute -top-24 left-1/2 transform -translate-x-1/2 bg-card backdrop-blur-sm rounded-xl p-4 shadow-2xl border border-border min-w-[240px] z-[100]"
                     style={{ transformStyle: 'preserve-3d' }}
                   >
                     <div className="flex items-center gap-3 mb-3">
                       {getCategoryIcon(aisle.category)}
                       <div>
-                        <div className="font-medium text-slate-800">{aisle.name}</div>
-                        <div className="text-xs text-slate-600">Zone {String.fromCharCode(65 + index)}</div>
+                        <div className="font-medium">{aisle.name}</div>
+                        <div className="text-xs text-muted-foreground">Zone {String.fromCharCode(65 + index)}</div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 text-xs text-slate-600">
+                    <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
-                        <div className="text-slate-500">Category</div>
+                        <div className="text-muted-foreground">Category</div>
                         <div className="font-medium">{aisle.category}</div>
                       </div>
                       <div>
-                        <div className="text-slate-500">Temperature</div>
+                        <div className="text-muted-foreground">Temperature</div>
                         <div className="font-medium">{aisle.temperature}°C</div>
                       </div>
                       <div>
-                        <div className="text-slate-500">Shelves</div>
+                        <div className="text-muted-foreground">Shelves</div>
                         <div className="font-medium">{(aisle as any).shelfCount ?? aisle.shelves.length}</div>
                       </div>
                       <div>
-                        <div className="text-slate-500">Status</div>
+                        <div className="text-muted-foreground">Status</div>
                         <div className={`font-medium ${
                           status === 'high' ? 'text-green-600' :
                           status === 'medium' ? 'text-yellow-600' :
@@ -281,14 +283,15 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                   </motion.div>
 
                   {/* Zone Label */}
-                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-center">
-                    <div
-                      className="text-white text-sm font-medium bg-slate-800/80 backdrop-blur-sm px-3 py-1 rounded-full border border-slate-600/50 hover:bg-slate-700/80 transition-colors"
+                  <div className="absolute -bottom-12 left-1/2 transform -translate-x-1/2 text-center">
+                    <Badge
+                      variant="secondary"
+                      className="text-sm font-medium px-3 py-1 cursor-pointer"
                       onMouseEnter={() => setHoveredAisle(aisle.id)}
                       onMouseLeave={() => setHoveredAisle(null)}
                     >
                       Zone {String.fromCharCode(65 + index)}
-                    </div>
+                    </Badge>
                   </div>
                 </motion.div>
               );
@@ -302,15 +305,15 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
             transition={{ duration: 1, delay: 1.2 }}
             className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-2 pointer-events-none"
           >
-            <div className="bg-slate-700/80 backdrop-blur-sm px-6 py-3 rounded-t-xl border-t border-l border-r border-slate-600/50">
-              <div className="text-slate-300 text-sm font-medium mb-1">Main Entrance</div>
-              <div className="text-slate-400 text-xs">Loading & Receiving</div>
-            </div>
+            <Card className="backdrop-blur-sm px-6 py-3 rounded-t-xl">
+              <div className="text-sm font-medium mb-1">Main Entrance</div>
+              <div className="text-xs text-muted-foreground">Loading & Receiving</div>
+            </Card>
             {/* Entrance doors */}
             <div className="flex gap-2 justify-center mt-2">
-              <div className="w-8 h-1 bg-slate-600 rounded-full"></div>
-              <div className="w-8 h-1 bg-slate-600 rounded-full"></div>
-              <div className="w-8 h-1 bg-slate-600 rounded-full"></div>
+              <div className="w-8 h-1 bg-border rounded-full"></div>
+              <div className="w-8 h-1 bg-border rounded-full"></div>
+              <div className="w-8 h-1 bg-border rounded-full"></div>
             </div>
           </motion.div>
 
@@ -321,10 +324,10 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
             transition={{ duration: 1, delay: 1.4 }}
             className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-4 pointer-events-none"
           >
-            <div className="bg-slate-700/60 backdrop-blur-sm px-3 py-2 rounded-l-lg border-l border-t border-b border-slate-600/50">
-              <div className="text-slate-300 text-xs font-medium">Admin</div>
-              <div className="text-slate-400 text-xs">Office</div>
-            </div>
+            <Card className="backdrop-blur-sm px-3 py-2 rounded-l-lg">
+              <div className="text-xs font-medium">Admin</div>
+              <div className="text-xs text-muted-foreground">Office</div>
+            </Card>
           </motion.div>
 
           <motion.div
@@ -333,10 +336,10 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
             transition={{ duration: 1, delay: 1.6 }}
             className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-4 pointer-events-none"
           >
-            <div className="bg-slate-700/60 backdrop-blur-sm px-3 py-2 rounded-r-lg border-r border-t border-b border-slate-600/50">
-              <div className="text-slate-300 text-xs font-medium">Quality</div>
-              <div className="text-slate-400 text-xs">Control</div>
-            </div>
+            <Card className="backdrop-blur-sm px-3 py-2 rounded-r-lg">
+              <div className="text-xs font-medium">Quality</div>
+              <div className="text-xs text-muted-foreground">Control</div>
+            </Card>
           </motion.div>
         </motion.div>
       </div>
@@ -350,34 +353,35 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
           width: legendCollapsed ? '60px' : 'auto'
         }}
         transition={{ duration: 0.6, delay: 0.8 }}
-        className="absolute bottom-6 right-6 bg-slate-800/90 backdrop-blur-sm rounded-xl border border-slate-700 shadow-2xl overflow-hidden"
+        className="absolute bottom-6 right-6 overflow-hidden"
       >
-        {/* Legend Header */}
-        <div className="flex items-center justify-between p-3 border-b border-slate-700/50">
-          {!legendCollapsed && (
-            <motion.h3
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="text-white font-medium"
-            >
-              Zone Legend
-            </motion.h3>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggleLegend}
-            className="w-6 h-6 p-0 text-slate-400 hover:text-white"
-          >
-            {legendCollapsed ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
+        <Card className="backdrop-blur-sm shadow-2xl">
+          {/* Legend Header */}
+          <div className="flex items-center justify-between p-3 border-b">
+            {!legendCollapsed && (
+              <motion.h3
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="font-medium"
+              >
+                Zone Legend
+              </motion.h3>
             )}
-          </Button>
-        </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleLegend}
+              className="w-6 h-6 p-0"
+            >
+              {legendCollapsed ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
 
         {!legendCollapsed && (
           <motion.div
@@ -389,56 +393,57 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
           >
             {/* Inventory Status */}
             <div className="space-y-2 text-sm mb-4">
-              <div className="text-slate-400 text-xs uppercase tracking-wide font-medium mb-2">Stock Levels</div>
+              <div className="text-xs uppercase tracking-wide font-medium mb-2 text-muted-foreground">Stock Levels</div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded bg-gradient-to-r from-green-400 to-green-600"></div>
-                <span className="text-slate-300">Well Stocked (80%+)</span>
+                <span>Well Stocked (80%+)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded bg-gradient-to-r from-yellow-400 to-yellow-600"></div>
-                <span className="text-slate-300">Moderate (40-80%)</span>
+                <span>Moderate (40-80%)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded bg-gradient-to-r from-orange-400 to-orange-600"></div>
-                <span className="text-slate-300">Low Stock (1-40%)</span>
+                <span>Low Stock (1-40%)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded bg-gradient-to-r from-gray-400 to-gray-600"></div>
-                <span className="text-slate-300">Empty</span>
+                <span>Empty</span>
               </div>
             </div>
 
             {/* Zone Categories */}
-            <div className="space-y-2 text-sm border-t border-slate-700/50 pt-4">
-              <div className="text-slate-400 text-xs uppercase tracking-wide font-medium mb-2">Categories</div>
+            <div className="space-y-2 text-sm border-t pt-4">
+              <div className="text-xs uppercase tracking-wide font-medium mb-2 text-muted-foreground">Categories</div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-2 rounded bg-blue-400"></div>
-                <span className="text-slate-300">Refrigerated</span>
+                <span>Refrigerated</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-2 rounded bg-yellow-400"></div>
-                <span className="text-slate-300">Controlled</span>
+                <span>Controlled</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-2 rounded bg-red-400"></div>
-                <span className="text-slate-300">Quarantine</span>
+                <span>Quarantine</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-2 rounded bg-green-400"></div>
-                <span className="text-slate-300">General</span>
+                <span>General</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-2 rounded bg-purple-400"></div>
-                <span className="text-slate-300">Office</span>
+                <span>Office</span>
               </div>
             </div>
 
             {/* Instructions */}
-            <div className="mt-4 pt-4 border-t border-slate-700/50">
-              <div className="text-slate-400 text-xs">Click any zone to explore aisles and shelves</div>
+            <div className="mt-4 pt-4 border-t">
+              <div className="text-xs text-muted-foreground">Click any zone to explore aisles and shelves</div>
             </div>
           </motion.div>
         )}
+        </Card>
       </motion.div>
     </div>
   );

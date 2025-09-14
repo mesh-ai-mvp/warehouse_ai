@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { WarehouseOverview } from '@/components/warehouse/warehouse-overview';
 import { AisleView } from '@/components/warehouse/aisle-view';
 import { ShelfDetail } from '@/components/warehouse/shelf-detail';
@@ -8,7 +8,9 @@ import { FloatingPanel } from '@/components/warehouse/floating-panel';
 import { MonitoringOverlay } from '@/components/warehouse/monitoring-overlay';
 import { MedicationSearch } from '@/components/warehouse/medication-search';
 import { Card } from '@/components/ui/card';
-import { Loader2, AlertCircle, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, AlertCircle, Search, X } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ViewState, Medication, Shelf, Aisle } from '@/components/warehouse/warehouse-types';
 import { useWarehouseLayout, useAisleDetails, useDetailedShelfLayout } from '@/hooks/useWarehouseQueries';
@@ -480,10 +482,10 @@ export function WarehouseUI() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-gray-300 text-lg">Loading warehouse data...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground text-lg">Loading warehouse data...</p>
         </div>
       </div>
     );
@@ -492,13 +494,13 @@ export function WarehouseUI() {
   // Error state
   if (error) {
     return (
-      <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-8">
-        <Alert className="max-w-md bg-red-900/20 border-red-800">
-          <AlertCircle className="h-4 w-4 text-red-500" />
-          <AlertDescription className="text-gray-300">
+      <div className="flex items-center justify-center min-h-[60vh] p-8">
+        <Alert className="max-w-md" variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
             Failed to load warehouse data. Using demo data instead.
             <br />
-            <span className="text-xs text-gray-400 mt-2 block">
+            <span className="text-xs text-muted-foreground mt-2 block">
               Error: {(error as Error).message}
             </span>
           </AlertDescription>
@@ -508,21 +510,47 @@ export function WarehouseUI() {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative">
-      {/* Navigation Bar */}
-      <WarehouseNavigation
-        currentView={currentView}
-        selectedAisle={selectedAisle}
-        selectedShelf={selectedShelf}
-        onNavigateBack={navigateBack}
-        onNavigateHome={navigateHome}
-        isConnected={isConnected}
-        connectionStatus={connectionStatus}
-        onTogglePanel={() => setIsPanelOpen(!isPanelOpen)}
-        isPanelOpen={isPanelOpen}
-        onToggleMonitoring={() => setIsMonitoringOpen(!isMonitoringOpen)}
-        isMonitoringOpen={isMonitoringOpen}
-      />
+    <div className="relative space-y-6">
+      {/* Page Header with Breadcrumb Navigation */}
+      <div className="flex flex-col gap-4">
+        <WarehouseNavigation
+          currentView={currentView}
+          selectedAisle={selectedAisle}
+          selectedShelf={selectedShelf}
+          onNavigateBack={navigateBack}
+          onNavigateHome={navigateHome}
+          isConnected={isConnected}
+          connectionStatus={connectionStatus}
+        />
+
+        {/* Control Buttons */}
+        <div className="flex justify-between items-center">
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsPanelOpen(!isPanelOpen)}
+            >
+              {isPanelOpen ? 'Hide Panel' : 'Show Panel'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsMonitoringOpen(!isMonitoringOpen)}
+            >
+              {isMonitoringOpen ? 'Hide Monitoring' : 'Show Monitoring'}
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={isConnected ? 'default' : 'destructive'}>
+              <div className={`w-2 h-2 rounded-full mr-1 ${
+                isConnected ? 'bg-green-500' : 'bg-red-500'
+              }`} />
+              {connectionStatus}
+            </Badge>
+          </div>
+        </div>
+      </div>
 
       {/* Floating Control Panel */}
       <FloatingPanel
@@ -541,26 +569,26 @@ export function WarehouseUI() {
         onToggleExpand={() => setIsMonitoringExpanded(!isMonitoringExpanded)}
       />
 
-      {/* Floating Search Bar */}
+      {/* Search Bar */}
       <AnimatePresence>
         {currentView === 'warehouse' && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.3 }}
-                          className="fixed top-24 right-4 z-20"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
           >
             {!searchOpen ? (
-              <button
+              <Button
+                variant="outline"
+                className="w-full max-w-md mx-auto flex items-center gap-2"
                 onClick={() => setSearchOpen(true)}
-                className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 rounded-lg px-4 py-2 flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-700/90 transition-all"
               >
                 <Search className="w-4 h-4" />
-                <span className="text-sm">Search medications...</span>
-              </button>
+                <span>Search medications...</span>
+              </Button>
             ) : (
-              <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 rounded-lg p-2 relative">
+              <Card className="max-w-2xl mx-auto p-4 relative">
                 <MedicationSearch
                   onResultClick={handleSearchResultClick}
                   onAisleNavigate={(aisleId) => {
@@ -571,20 +599,22 @@ export function WarehouseUI() {
                   }}
                   currentAisles={aisles}
                 />
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2"
                   onClick={() => setSearchOpen(false)}
-                  className="absolute -top-2 -right-2 bg-slate-700 rounded-full w-6 h-6 flex items-center justify-center text-slate-400 hover:text-white"
                 >
-                  ×
-                </button>
-              </div>
+                  <X className="w-4 h-4" />
+                </Button>
+              </Card>
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Main Content Area */}
-      <main className="pt-16 relative h-[calc(100vh-4rem)] overflow-y-auto">
+      <div className="relative">
         <AnimatePresence mode="wait">
           {currentView === 'warehouse' && (
             <motion.div
@@ -593,7 +623,6 @@ export function WarehouseUI() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.1 }}
               transition={{ duration: 0.5, ease: [0.23, 1, 0.320, 1] }}
-              className="h-full"
             >
               <WarehouseOverview
                 aisles={aisles}
@@ -611,7 +640,6 @@ export function WarehouseUI() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -100 }}
               transition={{ duration: 0.5, ease: [0.23, 1, 0.320, 1] }}
-              className="h-full"
             >
               <AisleView
                 aisle={selectedAisleWithDetails}
@@ -628,7 +656,6 @@ export function WarehouseUI() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -50 }}
               transition={{ duration: 0.4, ease: [0.23, 1, 0.320, 1] }}
-              className="h-full"
             >
               <ShelfDetail
                 shelf={selectedShelf}
@@ -638,7 +665,7 @@ export function WarehouseUI() {
             </motion.div>
           )}
         </AnimatePresence>
-      </main>
+      </div>
     </div>
   );
 }
