@@ -1830,8 +1830,12 @@ def generate_batch_info(
                     "manufacture_date": manufacture_date.date().isoformat(),
                     "expiry_date": expiry_date.date().isoformat(),
                     "quantity": quantity,
-                    "received_date": received_date.date().isoformat(),
-                    "remaining_quantity": quantity if status == "active" else 0,
+                    "quantity_received": quantity,  # Add for DB compatibility
+                    "quantity_remaining": quantity if status == "active" else 0,
+                    "supplier_id": med.get("supplier_id"),  # Add supplier_id
+                    "receipt_date": received_date.date().isoformat(),
+                    "received_date": received_date.date().isoformat(),  # Keep for backward compatibility
+                    "remaining_quantity": quantity if status == "active" else 0,  # Keep for backward compatibility
                     "status": status,
                 }
             )
@@ -3141,9 +3145,49 @@ def generate_current_inventory(
                 "last_updated": datetime.now().isoformat(),
                 "days_until_stockout": days_until_stockout,
                 "stock_status": stock_status,
+                "avg_daily": avg_daily,  # Store for adjustment calculations
+                "safety_stock": safety_stock,  # Store for adjustment calculations
             }
         )
         inventory_id += 1
+
+    # Adjust distribution to ensure 30% low/critical stock
+    total_meds = len(inventory)
+    target_critical = int(total_meds * 0.15)  # 15% critical
+    target_low = int(total_meds * 0.20)  # 20% low
+
+    # Sort by current days supply and adjust the lowest stock items
+    inventory.sort(key=lambda x: x["days_until_stockout"])
+
+    # Force adjust the lowest items to be critical/low
+    for i in range(target_critical):
+        if i < len(inventory):
+            row = inventory[i]
+            # Set to critical levels (1-3 days supply)
+            avg_daily = row.get("avg_daily", 10)
+            new_stock = int(avg_daily * random.uniform(1, 3))
+            row["current_stock"] = max(1, new_stock)
+            row["days_until_stockout"] = max(
+                1, int(new_stock / max(avg_daily, 0.1))
+            )
+            row["stock_status"] = "critical"
+
+    for i in range(target_critical, target_critical + target_low):
+        if i < len(inventory):
+            row = inventory[i]
+            # Set to low levels (3-7 days supply)
+            avg_daily = row.get("avg_daily", 10)
+            new_stock = int(avg_daily * random.uniform(3, 7))
+            row["current_stock"] = max(1, new_stock)
+            row["days_until_stockout"] = max(
+                3, int(new_stock / max(avg_daily, 0.1))
+            )
+            row["stock_status"] = "low"
+
+    # Remove temporary fields before returning
+    for row in inventory:
+        row.pop("avg_daily", None)
+        row.pop("safety_stock", None)
 
     return inventory
 
@@ -3577,11 +3621,35 @@ def generate_all(
         os.path.join(output_dir, "batch_info.csv"), index=False
     )
 
-    print("Generating enhanced warehouse zones…")
-    warehouse_zones = generate_warehouse_zones(loc_rows, seed=seed + 42)
-    pd.DataFrame(warehouse_zones).to_csv(
-        os.path.join(output_dir, "warehouse_zones.csv"), index=False
-    )
+    # Insert batch info into database
+    print("Writing batch info to DB …")
+    if batch_info:
+        batch_db_rows = []
+        for batch in batch_info:
+            batch_db_rows.append({
+                "batch_id": batch["batch_id"],
+                "med_id": batch["med_id"],
+                "lot_number": batch["lot_number"],
+                "manufacture_date": batch.get("manufacture_date"),
+                "expiry_date": batch["expiry_date"],
+                "quantity_received": batch.get("quantity_received", batch.get("quantity")),
+                "quantity_remaining": batch.get("quantity_remaining", batch.get("remaining_quantity")),
+                "supplier_id": batch.get("supplier_id"),
+                "receipt_date": batch.get("receipt_date", batch.get("received_date")),
+                "status": batch.get("status", "active")
+            })
+
+        cur.executemany(
+            """INSERT OR REPLACE INTO batch_info (batch_id, med_id, lot_number, manufacture_date,
+               expiry_date, quantity_received, quantity_remaining, supplier_id, receipt_date, status)
+               VALUES (:batch_id, :med_id, :lot_number, :manufacture_date,
+               :expiry_date, :quantity_received, :quantity_remaining, :supplier_id, :receipt_date, :status)""",
+            batch_db_rows
+        )
+        conn.commit()
+        print(f"  ✅ Inserted {len(batch_db_rows)} batch records")
+
+    # Removed duplicate warehouse zones generation - already handled in warehouse management section
 
     print("Generating purchase order history…")
     purchase_orders = generate_purchase_orders(
@@ -3590,6 +3658,90 @@ def generate_all(
     pd.DataFrame(purchase_orders).to_csv(
         os.path.join(output_dir, "purchase_orders.csv"), index=False
     )
+
+    # Insert purchase orders into database
+    print("Writing purchase orders to DB …")
+    if purchase_orders:
+        from uuid import uuid4
+
+        # Transform and insert into purchase_orders and purchase_order_items tables
+        po_db_rows = []
+        po_items_db_rows = []
+
+        for po in purchase_orders:
+            # Generate proper TEXT po_id
+            po_id_text = f"PO-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid4())[:8].upper()}"
+
+            # Get supplier name
+            supplier_name = next(
+                (s["name"] for s in suppliers if s["supplier_id"] == po["supplier_id"]),
+                "Unknown Supplier"
+            )
+
+            # Get medication name
+            med_name = next(
+                (m["name"] for m in meds if m["med_id"] == po["med_id"]),
+                "Unknown Medication"
+            )
+
+            # Create timestamps
+            created_at = datetime.now(timezone.utc).isoformat()
+            updated_at = created_at
+
+            # Prepare purchase_orders row
+            po_db_rows.append({
+                "po_id": po_id_text,
+                "po_number": po["po_number"],
+                "supplier_id": po["supplier_id"],
+                "supplier_name": supplier_name,
+                "status": po["status"],
+                "total_amount": po["total_amount"],
+                "created_at": created_at,
+                "updated_at": updated_at,
+                "requested_delivery_date": po.get("expected_delivery"),
+                "actual_delivery_date": po.get("actual_delivery"),
+                "notes": po.get("notes", ""),
+                "created_by": "system",
+                "approved_by": "system" if po["status"] == "completed" else None,
+                "approved_at": created_at if po["status"] == "completed" else None
+            })
+
+            # Prepare purchase_order_items row
+            po_items_db_rows.append({
+                "po_id": po_id_text,
+                "med_id": po["med_id"],
+                "med_name": med_name,
+                "quantity": po["quantity_ordered"],
+                "unit_price": po["unit_price"],
+                "total_price": po["total_amount"],
+                "pack_size": next(
+                    (m["pack_size"] for m in meds if m["med_id"] == po["med_id"]),
+                    1
+                )
+            })
+
+        # Insert into purchase_orders table
+        cur.executemany(
+            """INSERT INTO purchase_orders (po_id, po_number, supplier_id, supplier_name,
+               status, total_amount, created_at, updated_at, requested_delivery_date,
+               actual_delivery_date, notes, created_by, approved_by, approved_at)
+               VALUES (:po_id, :po_number, :supplier_id, :supplier_name,
+               :status, :total_amount, :created_at, :updated_at, :requested_delivery_date,
+               :actual_delivery_date, :notes, :created_by, :approved_by, :approved_at)""",
+            po_db_rows
+        )
+
+        # Insert into purchase_order_items table
+        cur.executemany(
+            """INSERT INTO purchase_order_items (po_id, med_id, med_name, quantity,
+               unit_price, total_price, pack_size)
+               VALUES (:po_id, :med_id, :med_name, :quantity,
+               :unit_price, :total_price, :pack_size)""",
+            po_items_db_rows
+        )
+
+        conn.commit()
+        print(f"  ✅ Inserted {len(po_db_rows)} purchase orders with {len(po_items_db_rows)} items")
 
     # Generate pre-aggregated data for fast chart performance
     print("Generating pre-aggregated analytics data …")
