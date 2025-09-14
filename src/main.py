@@ -59,6 +59,9 @@ async def lifespan(app: FastAPI):
         logger.success("Data loaded successfully")
         logger.info(f"Loaded {len(data_loader.medications)} medications")
         logger.info(f"Loaded {len(data_loader.suppliers)} suppliers")
+
+        # Initialize report templates
+        data_loader.initialize_report_templates()
     except Exception as e:
         logger.error(f"Failed to load data: {e}")
         raise

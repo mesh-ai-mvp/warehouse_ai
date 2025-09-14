@@ -92,7 +92,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
         transition={{ duration: 0.6, delay: 0.2 }}
         className="mb-6"
       >
-        <h1 className="text-3xl font-bold mb-2">MediCore Warehouse</h1>
+        <h1 className="text-3xl font-bold mb-2">Suppl.AI Warehouse</h1>
         <p className="text-muted-foreground">Real-time pharmaceutical inventory management</p>
       </motion.div>
 

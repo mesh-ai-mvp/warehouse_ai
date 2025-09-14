@@ -1924,6 +1924,7 @@ def generate_purchase_orders(
     """
     Generate comprehensive purchase order history
     Creates realistic PO patterns with various statuses
+    Distributes orders over 1 year with max 50 orders per month
     """
     random.seed(seed)
     np.random.seed(seed)
@@ -1944,113 +1945,117 @@ def generate_purchase_orders(
     for med_id in price_lookup:
         price_lookup[med_id].sort(key=lambda x: x["valid_from"])
 
-    # Process receipts to create completed orders
-    for receipt in receipts_data:
-        med_id = receipt["med_id"]
-        med = next((m for m in medications if m["med_id"] == med_id), None)
-        if not med:
-            continue
+    # Generate orders distributed over 1 year
+    now = datetime.now(timezone.utc)
+    current_month = now.month
+    current_year = now.year
 
-        supplier = supplier_lookup.get(med["supplier_id"], {})
+    # Generate orders for the past 12 months
+    for months_ago in range(12, -1, -1):
+        # Calculate the month and year
+        order_month_date = now - timedelta(days=months_ago * 30)
+        month_year = (order_month_date.year, order_month_date.month)
 
-        # Get price for this date
-        order_date = pd.to_datetime(receipt["order_date"]).date()
-        unit_price = 10.0  # Default fallback
+        # Determine if this is the current month
+        is_current_month = (month_year[0] == current_year and month_year[1] == current_month)
 
-        if med_id in price_lookup:
-            # Find the most recent price before order date
-            applicable_prices = [
-                p
-                for p in price_lookup[med_id]
-                if pd.to_datetime(p["valid_from"]).date() <= order_date
-            ]
-            if applicable_prices:
-                unit_price = applicable_prices[-1]["price_per_unit"]
+        # Generate 20-50 orders per month (random)
+        num_orders = random.randint(20, 50)
 
-        quantity = receipt["qty_ordered"]
-        total_amount = round(quantity * unit_price, 2)
+        for _ in range(num_orders):
+            # Select random medication and supplier
+            med = random.choice(medications)
+            med_id = med["med_id"]
+            supplier = supplier_lookup.get(med["supplier_id"], {})
 
-        # Generate PO number
-        year = pd.to_datetime(receipt["order_date"]).year
-        po_number = f"PO-{year}-{po_counter:05d}"
+            # Generate random day within the month
+            days_in_month = 30 if order_month_date.month in [4, 6, 9, 11] else (28 if order_month_date.month == 2 else 31)
+            day_offset = random.randint(1, days_in_month)
+            order_date = order_month_date.replace(day=min(day_offset, days_in_month))
 
-        # Payment terms
-        payment_terms = random.choice(["NET30", "NET45", "NET60", "COD", "NET15"])
+            # Calculate expected delivery
+            lead_time = supplier.get("avg_lead_time", 7)
+            expected_delivery = order_date + timedelta(days=int(lead_time))
 
-        po_rows.append(
-            {
-                "po_id": po_counter,
-                "po_number": po_number,
-                "med_id": med_id,
-                "supplier_id": med["supplier_id"],
-                "quantity_ordered": quantity,
-                "unit_price": unit_price,
-                "total_amount": total_amount,
-                "order_date": receipt["order_date"],
-                "expected_delivery": receipt["arrival_date"],
-                "actual_delivery": receipt["arrival_date"],  # Matches receipts
-                "status": "completed",
-                "payment_terms": payment_terms,
-                "notes": "Regular replenishment order",
-            }
-        )
-        po_counter += 1
+            # Determine status based on whether it's current month
+            if is_current_month:
+                # Current month: mix of statuses
+                status_rand = random.random()
+                if status_rand < 0.40:  # 40% completed
+                    status = "completed"
+                    actual_delivery = expected_delivery - timedelta(days=random.randint(0, 2))
+                    notes = "Regular replenishment order - delivered"
+                elif status_rand < 0.55:  # 15% delivered
+                    status = "delivered"
+                    actual_delivery = expected_delivery - timedelta(days=random.randint(0, 1))
+                    notes = "Order delivered - awaiting confirmation"
+                elif status_rand < 0.70:  # 15% in_transit
+                    status = "in_transit"
+                    actual_delivery = None
+                    notes = "Order shipped - in transit"
+                elif status_rand < 0.85:  # 15% pending
+                    status = "pending"
+                    actual_delivery = None
+                    notes = "Order confirmed - awaiting shipment"
+                elif status_rand < 0.92:  # 7% draft
+                    status = "draft"
+                    actual_delivery = None
+                    notes = "Draft order - pending approval"
+                else:  # 8% cancelled
+                    status = "cancelled"
+                    actual_delivery = None
+                    notes = random.choice([
+                        "Cancelled due to supplier shortage",
+                        "Order cancelled - alternative source found",
+                        "Product discontinued by supplier",
+                    ])
+            else:
+                # Historical months: mostly completed with few delivered
+                status_rand = random.random()
+                if status_rand < 0.92:  # 92% completed
+                    status = "completed"
+                    # Add some variance to delivery dates
+                    delivery_variance = random.randint(-3, 3)
+                    actual_delivery = expected_delivery + timedelta(days=delivery_variance)
+                    if actual_delivery > now:
+                        actual_delivery = expected_delivery  # Don't allow future dates for historical orders
+                    notes = "Regular replenishment order - completed"
+                else:  # 8% delivered (but old)
+                    status = "delivered"
+                    actual_delivery = expected_delivery - timedelta(days=random.randint(0, 2))
+                    notes = "Order delivered - completed"
 
-    # Generate additional pending/in-transit orders (15% pending, 10% in-transit)
-    current_orders_count = len(po_rows)
-    additional_orders = int(current_orders_count * 0.35)  # 35% more orders
+            # Get inventory info for quantity
+            inv_info = next((inv for inv in inventory_levels if inv["med_id"] == med_id), {})
+            reorder_point = inv_info.get("reorder_point", 100)
 
-    for _ in range(additional_orders):
-        med = random.choice(medications)
-        med_id = med["med_id"]
-        supplier = supplier_lookup.get(med["supplier_id"], {})
+            # Vary quantities realistically
+            min_qty = max(10, reorder_point // 3)
+            max_qty = max(min_qty + 10, min(500, reorder_point * 2))
+            quantity = random.randint(min_qty, max_qty)
 
-        # Generate order details
-        order_date = datetime.now(timezone.utc) - timedelta(days=random.randint(1, 30))
-        lead_time = supplier.get("avg_lead_time", 7)
-        expected_delivery = order_date + timedelta(days=int(lead_time))
-
-        # Determine status
-        status_rand = random.random()
-        if status_rand < 0.05:  # 5% cancelled
-            status = "cancelled"
-            actual_delivery = None
-            notes = random.choice(
-                [
-                    "Cancelled due to supplier shortage",
-                    "Order cancelled - alternative source found",
-                    "Product discontinued by supplier",
+            # Get price for this date
+            unit_price = 10.0
+            if med_id in price_lookup:
+                applicable_prices = [
+                    p for p in price_lookup[med_id]
+                    if pd.to_datetime(p["valid_from"]).date() <= order_date.date()
                 ]
-            )
-        elif status_rand < 0.15:  # 10% in transit
-            status = "in_transit"
-            actual_delivery = None
-            notes = "Order shipped - in transit"
-        else:  # 15% pending
-            status = "pending"
-            actual_delivery = None
-            notes = "Order confirmed - awaiting shipment"
+                if applicable_prices:
+                    unit_price = applicable_prices[-1]["price_per_unit"]
+                elif price_lookup[med_id]:
+                    unit_price = price_lookup[med_id][0]["price_per_unit"]
 
-        # Get inventory info for quantity
-        inv_info = next(
-            (inv for inv in inventory_levels if inv["med_id"] == med_id), {}
-        )
-        reorder_point = inv_info.get("reorder_point", 100)
-        quantity = random.randint(reorder_point // 2, reorder_point * 2)
+            total_amount = round(quantity * unit_price, 2)
 
-        # Get current price
-        unit_price = 10.0
-        if med_id in price_lookup and price_lookup[med_id]:
-            unit_price = price_lookup[med_id][-1]["price_per_unit"]
+            # Generate PO number
+            year = order_date.year
+            po_number = f"PO-{year}-{po_counter:05d}"
 
-        total_amount = round(quantity * unit_price, 2)
+            # Payment terms
+            payment_terms = random.choice(["NET30", "NET45", "NET60", "COD", "NET15"])
 
-        year = order_date.year
-        po_number = f"PO-{year}-{po_counter:05d}"
-        payment_terms = random.choice(["NET30", "NET45", "NET60"])
-
-        po_rows.append(
-            {
+            po_rows.append({
                 "po_id": po_counter,
                 "po_number": po_number,
                 "med_id": med_id,
@@ -2060,15 +2065,13 @@ def generate_purchase_orders(
                 "total_amount": total_amount,
                 "order_date": order_date.date().isoformat(),
                 "expected_delivery": expected_delivery.date().isoformat(),
-                "actual_delivery": actual_delivery.date().isoformat()
-                if actual_delivery
-                else None,
+                "actual_delivery": actual_delivery.date().isoformat() if actual_delivery else None,
                 "status": status,
                 "payment_terms": payment_terms,
                 "notes": notes,
-            }
-        )
-        po_counter += 1
+                "created_at": order_date.isoformat(),  # Add for DB insertion
+            })
+            po_counter += 1
 
     return po_rows
 
@@ -3684,8 +3687,8 @@ def generate_all(
                 "Unknown Medication"
             )
 
-            # Create timestamps
-            created_at = datetime.now(timezone.utc).isoformat()
+            # Use timestamps from the purchase order data
+            created_at = po.get("created_at", datetime.now(timezone.utc).isoformat())
             updated_at = created_at
 
             # Prepare purchase_orders row

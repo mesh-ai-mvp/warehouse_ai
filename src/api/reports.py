@@ -19,12 +19,18 @@ from pydantic import BaseModel
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data_loader import DataLoader
+from services.report_ai_handler import ReportAIHandler
+from services.pdf_generator import PDFReportGenerator
 
 # Initialize router
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 # Global data loader instance
 data_loader = DataLoader()
+
+# Initialize AI handler and PDF generator
+report_ai_handler = ReportAIHandler()
+pdf_generator = PDFReportGenerator()
 
 # Logger
 reports_logger = logger.bind(name="reports")
@@ -649,23 +655,76 @@ async def run_report(template_id: int, request: RunReportRequest) -> Dict[str, A
 
 @router.post("/templates/{template_id}/export")
 async def export_report(template_id: int, request: ExportReportRequest):
-    """Export a report to file"""
+    """Export a report to file with AI insights for PDF format"""
     try:
         reports_logger.info(
             f"Exporting report for template: {template_id} as {request.format}"
         )
 
-        # Run the report first
-        run_request = RunReportRequest(parameters=request.parameters)
-        report_result = await run_report(template_id, run_request)
+        # Get template details
+        conn = data_loader.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM report_templates WHERE id = ?", (template_id,))
+        template_row = cursor.fetchone()
 
-        # Generate file based on format
+        if not template_row:
+            raise HTTPException(status_code=404, detail="Template not found")
+
+        # Parse template data
+        template = {
+            "id": template_row[0],
+            "name": template_row[1],
+            "description": template_row[2],
+            "type": template_row[3],
+            "template_data": json.loads(template_row[4]) if template_row[4] else {},
+            "fields_config": json.loads(template_row[5]) if template_row[5] else {},
+            "format": template_row[7],
+            "frequency": template_row[8]
+        }
+
+        # Generate report data
+        report_type = template["type"]
+        parameters = request.parameters or {}
+        report_data = await _generate_report_data(report_type, parameters, cursor)
+
+        conn.close()
+
+        # Handle different export formats
         if request.format.lower() == "csv":
-            return _export_csv(report_result)
+            # Simple CSV export without AI insights
+            return _export_csv({"data": report_data})
+
         elif request.format.lower() == "excel":
-            return _export_excel(report_result)
+            # Excel export (can be enhanced with openpyxl later)
+            return _export_csv({"data": report_data})  # Using CSV for now
+
         elif request.format.lower() == "pdf":
-            return _export_pdf(report_result)
+            # PDF export with AI insights
+            reports_logger.info("Generating AI insights for PDF export")
+
+            # Generate AI insights
+            ai_insights = await report_ai_handler.generate_insights_for_report(
+                report_type=report_type,
+                report_data=report_data,
+                parameters=parameters
+            )
+
+            # Generate PDF with insights
+            pdf_content = pdf_generator.generate_report_pdf(
+                template=template,
+                data=report_data,
+                ai_insights=ai_insights
+            )
+
+            # Return PDF as streaming response
+            filename = f"{template['name'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            return StreamingResponse(
+                io.BytesIO(pdf_content),
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"attachment; filename={filename}"
+                }
+            )
         else:
             raise HTTPException(status_code=400, detail="Unsupported export format")
 
@@ -870,42 +929,43 @@ async def _generate_supplier_report_data(
 
     min_order_threshold = parameters.get("minOrderThreshold", 1)
 
+    # Modified query to include suppliers even without recent orders
     cursor.execute(
         """
-        SELECT 
+        SELECT
             s.name,
-            COUNT(po.po_id) as orders,
-            COUNT(CASE 
-                WHEN po.actual_delivery_date <= po.requested_delivery_date 
-                THEN 1 
-            END) as on_time_orders,
-            AVG(CASE 
-                WHEN po.actual_delivery_date > po.requested_delivery_date 
+            COALESCE(COUNT(po.po_id), 0) as orders,
+            COALESCE(COUNT(CASE
+                WHEN po.actual_delivery_date <= po.requested_delivery_date
+                THEN 1
+            END), 0) as on_time_orders,
+            COALESCE(AVG(CASE
+                WHEN po.actual_delivery_date > po.requested_delivery_date
                 THEN julianday(po.actual_delivery_date) - julianday(po.requested_delivery_date)
-                ELSE 0 
-            END) as avg_delay,
+                ELSE 0
+            END), 0) as avg_delay,
             CASE
                 WHEN COUNT(po.po_id) = 0 THEN 4.0
                 WHEN COUNT(CASE WHEN po.actual_delivery_date <= po.requested_delivery_date THEN 1 END) * 100.0 / COUNT(po.po_id) >= 95 THEN 4.8
                 WHEN COUNT(CASE WHEN po.actual_delivery_date <= po.requested_delivery_date THEN 1 END) * 100.0 / COUNT(po.po_id) >= 90 THEN 4.5
                 WHEN COUNT(CASE WHEN po.actual_delivery_date <= po.requested_delivery_date THEN 1 END) * 100.0 / COUNT(po.po_id) >= 85 THEN 4.2
                 ELSE 4.0
-            END as rating
+            END as rating,
+            s.avg_lead_time
         FROM suppliers s
         LEFT JOIN purchase_orders po ON s.supplier_id = po.supplier_id
-            AND po.created_at >= date('now', '-3 months')
-        GROUP BY s.supplier_id, s.name
-        HAVING COUNT(po.po_id) >= ?
-        ORDER BY orders DESC
-    """,
-        (min_order_threshold,),
+            AND date(po.created_at) >= date('now', '-6 months')
+        WHERE s.status = 'OK' OR s.status IS NULL
+        GROUP BY s.supplier_id, s.name, s.avg_lead_time
+        ORDER BY orders DESC, s.name ASC
+    """
     )
 
     results = cursor.fetchall()
 
     data = []
     for row in results:
-        name, orders, on_time_orders, avg_delay, rating = row
+        name, orders, on_time_orders, avg_delay, rating, avg_lead_time = row
         on_time_percentage = (
             (on_time_orders / max(orders, 1)) * 100 if orders > 0 else 0
         )
@@ -916,6 +976,7 @@ async def _generate_supplier_report_data(
                 "orders": orders,
                 "on_time": round(on_time_percentage, 1),
                 "avg_delay": round(avg_delay or 0, 1),
+                "avg_lead_time": round(avg_lead_time or 0, 1),
                 "rating": round(rating, 1),
             }
         )
@@ -1017,22 +1078,4 @@ def _export_excel(report_result: Dict[str, Any]) -> StreamingResponse:
     return _export_csv(report_result)
 
 
-def _export_pdf(report_result: Dict[str, Any]) -> StreamingResponse:
-    """Export report data as PDF (simplified text for now)"""
-
-    # Create simple text representation
-    content = f"Report Generated: {report_result['generated_at']}\n"
-    content += f"Execution Time: {report_result['execution_time_ms']}ms\n\n"
-    content += "Data:\n"
-
-    for item in report_result["data"][:50]:  # Limit to first 50 items
-        content += str(item) + "\n"
-
-    if len(report_result["data"]) > 50:
-        content += f"\n... and {len(report_result['data']) - 50} more items\n"
-
-    return StreamingResponse(
-        io.BytesIO(content.encode()),
-        media_type="text/plain",
-        headers={"Content-Disposition": "attachment; filename=report.txt"},
-    )
+# PDF generation is now handled by PDFReportGenerator class with AI insights

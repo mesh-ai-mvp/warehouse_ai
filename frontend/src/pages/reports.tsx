@@ -11,12 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Separator } from '@/components/ui/separator'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Dialog,
   DialogContent,
@@ -28,21 +26,11 @@ import {
 import {
   FileText,
   Download,
-  Plus,
-  Eye,
   Edit,
-  Trash2,
   Calendar,
   Mail,
   Settings,
-  BarChart3,
-  PieChart,
-  LineChart,
-  Table,
   Filter,
-  Save,
-  Play,
-  Copy,
 } from 'lucide-react'
 import { format } from 'date-fns'
 // Define our own DateRange type since react-day-picker v9 doesn't export it directly
@@ -62,14 +50,6 @@ interface ReportTemplate {
   recipients: string[]
   parameters: Record<string, any>
   chartTypes: string[]
-}
-
-interface ReportField {
-  id: string
-  name: string
-  type: 'text' | 'number' | 'date' | 'boolean' | 'select'
-  category: 'medication' | 'supplier' | 'order' | 'inventory' | 'financial'
-  required: boolean
 }
 
 const mockReportTemplates: ReportTemplate[] = [
@@ -121,53 +101,12 @@ const mockReportTemplates: ReportTemplate[] = [
   },
 ]
 
-const availableFields: ReportField[] = [
-  { id: 'med_name', name: 'Medication Name', type: 'text', category: 'medication', required: true },
-  { id: 'med_category', name: 'Category', type: 'select', category: 'medication', required: false },
-  {
-    id: 'current_stock',
-    name: 'Current Stock',
-    type: 'number',
-    category: 'inventory',
-    required: false,
-  },
-  {
-    id: 'reorder_point',
-    name: 'Reorder Point',
-    type: 'number',
-    category: 'inventory',
-    required: false,
-  },
-  { id: 'unit_cost', name: 'Unit Cost', type: 'number', category: 'financial', required: false },
-  {
-    id: 'supplier_name',
-    name: 'Supplier Name',
-    type: 'text',
-    category: 'supplier',
-    required: false,
-  },
-  {
-    id: 'last_order_date',
-    name: 'Last Order Date',
-    type: 'date',
-    category: 'order',
-    required: false,
-  },
-  { id: 'expiry_date', name: 'Expiry Date', type: 'date', category: 'medication', required: false },
-]
 
 export function Reports() {
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null)
-  const [isBuilderOpen, setIsBuilderOpen] = useState(false)
-  const [selectedFields, setSelectedFields] = useState<string[]>([])
-  const [reportName, setReportName] = useState('')
-  const [reportDescription, setReportDescription] = useState('')
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
-  const [reportFormat, setReportFormat] = useState<'pdf' | 'excel' | 'csv'>('pdf')
-  const [reportFrequency, setReportFrequency] = useState<'manual' | 'daily' | 'weekly' | 'monthly'>(
-    'manual'
-  )
-  const [chartTypes, setChartTypes] = useState<string[]>(['bar'])
+  const [exportLoading, setExportLoading] = useState(false)
+  const [exportingReportName, setExportingReportName] = useState<string>('')
 
   const { data: reports, isLoading } = useQuery({
     queryKey: ['report-templates'],
@@ -180,9 +119,60 @@ export function Reports() {
     // Implement report generation
   }
 
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+
   const handleExportReport = async (template: ReportTemplate, format: string) => {
-    console.log('Exporting report:', template.name, 'as', format)
-    // Implement export functionality
+    setExportDialogOpen(false)
+    if (!format) return // User cancelled
+
+    setExportLoading(true)
+    setExportingReportName(template.name)
+    try {
+      // Call the export API endpoint
+      const response = await fetch(`/api/reports/templates/${template.id}/export`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          format: format,
+          parameters: template.parameters || {}
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.statusText}`)
+      }
+
+      // Get the blob from response
+      const blob = await response.blob()
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+
+      // Set filename based on format
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+      const filename = `${template.name.replace(/\s+/g, '_')}_${timestamp}.${format}`
+      a.download = filename
+
+      // Trigger download
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+
+      // Clean up
+      window.URL.revokeObjectURL(url)
+
+      console.log(`Successfully exported ${template.name} as ${format}`)
+    } catch (error) {
+      console.error('Error exporting report:', error)
+      alert(`Failed to export report: ${error}`)
+    } finally {
+      setExportLoading(false)
+      setExportingReportName('')
+    }
   }
 
   const handleDeleteReport = (templateId: string) => {
@@ -247,161 +237,6 @@ export function Reports() {
             Generate and manage custom reports for your pharmaceutical operations
           </p>
         </div>
-        <Dialog open={isBuilderOpen} onOpenChange={setIsBuilderOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Report
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Custom Report Builder</DialogTitle>
-              <DialogDescription>
-                Build a custom report with the fields and visualizations you need
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-6">
-              {/* Report Basic Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="report-name">Report Name</Label>
-                  <Input
-                    id="report-name"
-                    value={reportName}
-                    onChange={e => setReportName(e.target.value)}
-                    placeholder="Enter report name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="report-format">Export Format</Label>
-                  <Select
-                    value={reportFormat}
-                    onValueChange={(value: any) => setReportFormat(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pdf">PDF</SelectItem>
-                      <SelectItem value="excel">Excel</SelectItem>
-                      <SelectItem value="csv">CSV</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="report-description">Description</Label>
-                <Input
-                  id="report-description"
-                  value={reportDescription}
-                  onChange={e => setReportDescription(e.target.value)}
-                  placeholder="Enter report description"
-                />
-              </div>
-
-              {/* Date Range */}
-              <div className="space-y-2">
-                <Label>Date Range</Label>
-                <DateRangePicker date={dateRange} onDateChange={setDateRange} />
-              </div>
-
-              {/* Field Selection */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Data Fields</h3>
-                  <Badge variant="secondary">{selectedFields.length} selected</Badge>
-                </div>
-
-                <ScrollArea className="h-48 border rounded p-4">
-                  <div className="space-y-3">
-                    {['medication', 'inventory', 'supplier', 'order', 'financial'].map(category => (
-                      <div key={category}>
-                        <h4 className="font-medium mb-2 capitalize text-muted-foreground">
-                          {category}
-                        </h4>
-                        <div className="space-y-2 pl-4">
-                          {availableFields
-                            .filter(field => field.category === category)
-                            .map(field => (
-                              <div key={field.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={field.id}
-                                  checked={selectedFields.includes(field.id)}
-                                  onCheckedChange={() => toggleField(field.id)}
-                                />
-                                <Label htmlFor={field.id} className="text-sm">
-                                  {field.name}
-                                  {field.required && <span className="text-red-500 ml-1">*</span>}
-                                </Label>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-
-              {/* Chart Types */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Visualizations</h3>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: 'bar', name: 'Bar Chart', icon: BarChart3 },
-                    { id: 'line', name: 'Line Chart', icon: LineChart },
-                    { id: 'pie', name: 'Pie Chart', icon: PieChart },
-                    { id: 'table', name: 'Table', icon: Table },
-                  ].map(chart => (
-                    <Button
-                      key={chart.id}
-                      variant={chartTypes.includes(chart.id) ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => toggleChartType(chart.id)}
-                    >
-                      <chart.icon className="h-4 w-4 mr-2" />
-                      {chart.name}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Schedule */}
-              <div className="space-y-2">
-                <Label>Schedule</Label>
-                <Select
-                  value={reportFrequency}
-                  onValueChange={(value: any) => setReportFrequency(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsBuilderOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveCustomReport}
-                  disabled={!reportName || selectedFields.length === 0}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Report
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Report Templates */}
@@ -417,14 +252,9 @@ export function Reports() {
             {reports?.map(template => (
               <Card key={template.id} className="hover:shadow-md transition-shadow">
                 <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{template.name}</CardTitle>
-                      <CardDescription>{template.description}</CardDescription>
-                    </div>
-                    <Badge variant={template.type === 'custom' ? 'secondary' : 'default'}>
-                      {template.type}
-                    </Badge>
+                  <div>
+                    <CardTitle className="text-lg">{template.name}</CardTitle>
+                    <CardDescription>{template.description}</CardDescription>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -454,40 +284,47 @@ export function Reports() {
 
                   <Separator />
 
-                  <div className="flex gap-2 flex-wrap">
-                    <Button size="sm" onClick={() => handleRunReport(template)}>
-                      <Play className="h-3 w-3 mr-1" />
-                      Run
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setSelectedTemplate(template)}
+                  <div className="flex justify-end">
+                    <Dialog
+                      open={exportDialogOpen && selectedTemplate?.id === template.id}
+                      onOpenChange={(open) => {
+                        setExportDialogOpen(open)
+                        if (open) setSelectedTemplate(template)
+                      }}
                     >
-                      <Eye className="h-3 w-3 mr-1" />
-                      Preview
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleExportReport(template, template.format)}
-                    >
-                      <Download className="h-3 w-3 mr-1" />
-                      Export
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <Copy className="h-3 w-3 mr-1" />
-                      Clone
-                    </Button>
-                    {template.type === 'custom' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDeleteReport(template.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                        >
+                          <Download className="h-3 w-3 mr-1" />
+                          Export
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Select Export Format</DialogTitle>
+                          <DialogDescription>
+                            Choose how you want to export "{template.name}"
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex gap-3 pt-4">
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => handleExportReport(template, 'csv')}
+                          >
+                            CSV (Data Only)
+                          </Button>
+                          <Button
+                            className="flex-1"
+                            onClick={() => handleExportReport(template, 'pdf')}
+                          >
+                            PDF (With AI Insights)
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </CardContent>
               </Card>
@@ -587,6 +424,17 @@ export function Reports() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Loading overlay for exports */}
+      {exportLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-lg font-medium">Exporting {exportingReportName}...</p>
+            <p className="text-sm text-muted-foreground">This may take up to a minute for AI-enhanced PDFs</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

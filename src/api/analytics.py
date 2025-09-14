@@ -2,6 +2,8 @@
 Analytics API endpoints for KPIs, trends, and performance metrics
 """
 
+import csv
+import io
 import json
 import os
 import sys
@@ -9,17 +11,24 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from loguru import logger
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data_loader import DataLoader
+from services.report_ai_handler import ReportAIHandler
+from services.pdf_generator import PDFReportGenerator
 
 # Initialize router
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 # Global data loader instance
 data_loader = DataLoader()
+
+# Initialize AI handler and PDF generator
+report_ai_handler = ReportAIHandler()
+pdf_generator = PDFReportGenerator()
 
 # Logger
 analytics_logger = logger.bind(name="analytics")
@@ -71,12 +80,11 @@ def aggregate_data_by_period(
     return aggregated
 
 
-@router.get("/kpis")
-async def get_analytics_kpis(
-    time_range: str = Query("30d", description="Time range: 7d, 30d, 90d, 1y"),
-    filters: Optional[str] = Query(None, description="JSON encoded filters"),
+def _get_analytics_kpis_internal(
+    time_range: str = "30d",
+    filters: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Get real-time KPI calculations"""
+    """Internal function to calculate KPIs"""
     try:
         analytics_logger.info(f"Calculating KPIs for time_range: {time_range}")
 
@@ -110,8 +118,8 @@ async def get_analytics_kpis(
         cursor.execute(
             """
             SELECT COALESCE(SUM(total_amount), 0) as total_revenue
-            FROM purchase_orders 
-            WHERE created_at >= ? AND created_at <= ?
+            FROM purchase_orders
+            WHERE date(created_at) >= date(?) AND date(created_at) <= date(?)
         """,
             (start_date.isoformat(), end_date.isoformat()),
         )
@@ -121,8 +129,8 @@ async def get_analytics_kpis(
         cursor.execute(
             """
             SELECT COUNT(*) as total_orders
-            FROM purchase_orders 
-            WHERE created_at >= ? AND created_at <= ?
+            FROM purchase_orders
+            WHERE date(created_at) >= date(?) AND date(created_at) <= date(?)
         """,
             (start_date.isoformat(), end_date.isoformat()),
         )
@@ -166,9 +174,9 @@ async def get_analytics_kpis(
                 COUNT(CASE WHEN actual_delivery_date <= requested_delivery_date THEN 1 END) as on_time,
                 COUNT(*) as total
             FROM purchase_orders 
-            WHERE actual_delivery_date IS NOT NULL 
+            WHERE actual_delivery_date IS NOT NULL
             AND requested_delivery_date IS NOT NULL
-            AND created_at >= ? AND created_at <= ?
+            AND date(created_at) >= date(?) AND date(created_at) <= date(?)
         """,
             (start_date.isoformat(), end_date.isoformat()),
         )
@@ -191,7 +199,8 @@ async def get_analytics_kpis(
         turnover_data = cursor.fetchone()
         inventory_turnover = 0
         if turnover_data and turnover_data[1] and turnover_data[1] > 0:
-            inventory_turnover = (turnover_data[0] or 0) / turnover_data[1]
+            # Annualize the turnover rate (multiply by 365 for daily data)
+            inventory_turnover = ((turnover_data[0] or 0) * 365) / turnover_data[1]
 
         # Calculate trends (compare with previous period)
         prev_start_date = start_date - (end_date - start_date)
@@ -200,8 +209,8 @@ async def get_analytics_kpis(
         cursor.execute(
             """
             SELECT COALESCE(SUM(total_amount), 0) as prev_revenue
-            FROM purchase_orders 
-            WHERE created_at >= ? AND created_at < ?
+            FROM purchase_orders
+            WHERE date(created_at) >= date(?) AND date(created_at) < date(?)
         """,
             (prev_start_date.isoformat(), start_date.isoformat()),
         )
@@ -212,8 +221,8 @@ async def get_analytics_kpis(
         cursor.execute(
             """
             SELECT COUNT(*) as prev_orders
-            FROM purchase_orders 
-            WHERE created_at >= ? AND created_at < ?
+            FROM purchase_orders
+            WHERE date(created_at) >= date(?) AND date(created_at) < date(?)
         """,
             (prev_start_date.isoformat(), start_date.isoformat()),
         )
@@ -264,15 +273,26 @@ async def get_analytics_kpis(
 
     except Exception as e:
         analytics_logger.error(f"Error calculating KPIs: {str(e)}")
+        raise
+
+
+@router.get("/kpis")
+async def get_analytics_kpis(
+    time_range: str = Query("30d", description="Time range: 7d, 30d, 90d, 1y"),
+    filters: Optional[str] = Query(None, description="JSON encoded filters"),
+) -> Dict[str, Any]:
+    """Get real-time KPI calculations"""
+    try:
+        return _get_analytics_kpis_internal(time_range, filters)
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calculating KPIs: {str(e)}")
 
 
-@router.get("/consumption-trends")
-async def get_consumption_trends(
-    time_range: str = Query("6m", description="Time range: 3m, 6m, 1y"),
-    medication_id: Optional[str] = Query(None, description="Specific medication ID"),
+def _get_consumption_trends_internal(
+    time_range: str = "6m",
+    medication_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Get consumption trends with forecasting"""
+    """Internal function to get consumption trends"""
     try:
         analytics_logger.info(f"Getting consumption trends for range: {time_range}")
 
@@ -298,35 +318,46 @@ async def get_consumption_trends(
         conn = data_loader.get_connection()
         cursor = conn.cursor()
 
-        # Base query
-        base_query = """
-            SELECT 
+        # Get consumption data
+        consumption_query = """
+            SELECT
                 {group_by} as period,
-                SUM(qty_dispensed) as consumption,
-                COUNT(DISTINCT po.po_id) as orders,
-                0 as forecast
+                SUM(qty_dispensed) as consumption
             FROM consumption_history ch
-            LEFT JOIN medications m ON ch.med_id = m.med_id
-            LEFT JOIN purchase_orders po ON m.supplier_id = po.supplier_id 
-                AND date(po.created_at) = ch.date
             WHERE ch.date >= ? AND ch.date <= ?
         """.format(group_by=group_by)
 
         params = [start_date.isoformat(), end_date.isoformat()]
 
         if medication_id:
-            base_query += " AND ch.med_id = ?"
+            consumption_query += " AND ch.med_id = ?"
             params.append(medication_id)
 
-        base_query += " GROUP BY " + group_by + " ORDER BY period"
+        consumption_query += " GROUP BY " + group_by
 
-        cursor.execute(base_query, params)
-        results = cursor.fetchall()
+        cursor.execute(consumption_query, params)
+        consumption_results = {row[0]: row[1] for row in cursor.fetchall()}
+
+        # Get orders data separately
+        orders_query = """
+            SELECT
+                strftime('%Y-%m', created_at) as period,
+                COUNT(*) as orders
+            FROM purchase_orders
+            WHERE date(created_at) >= date(?) AND date(created_at) <= date(?)
+            GROUP BY strftime('%Y-%m', created_at)
+        """
+        cursor.execute(orders_query, (start_date.isoformat(), end_date.isoformat()))
+        orders_results = {row[0]: row[1] for row in cursor.fetchall()}
+
+        # Combine results
+        all_periods = sorted(set(consumption_results.keys()) | set(orders_results.keys()))
 
         # Process results
         trends = []
-        for row in results:
-            period, consumption, orders, forecast = row
+        for period in all_periods:
+            consumption = consumption_results.get(period, 0)
+            orders = orders_results.get(period, 0)
 
             # Convert period to readable format
             if date_format == "month":
@@ -355,16 +386,27 @@ async def get_consumption_trends(
 
     except Exception as e:
         analytics_logger.error(f"Error getting consumption trends: {str(e)}")
+        raise
+
+
+@router.get("/consumption-trends")
+async def get_consumption_trends(
+    time_range: str = Query("6m", description="Time range: 3m, 6m, 1y"),
+    medication_id: Optional[str] = Query(None, description="Specific medication ID"),
+) -> List[Dict[str, Any]]:
+    """Get consumption trends with forecasting"""
+    try:
+        return _get_consumption_trends_internal(time_range, medication_id)
+    except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error getting consumption trends: {str(e)}"
         )
 
 
-@router.get("/supplier-performance")
-async def get_supplier_performance(
-    time_range: str = Query("3m", description="Time range: 1m, 3m, 6m, 1y"),
+def _get_supplier_performance_internal(
+    time_range: str = "3m",
 ) -> List[Dict[str, Any]]:
-    """Get supplier performance analytics"""
+    """Internal function to get supplier performance analytics"""
     try:
         analytics_logger.info(f"Getting supplier performance for range: {time_range}")
 
@@ -408,7 +450,7 @@ async def get_supplier_performance(
                 END as rating
             FROM suppliers s
             LEFT JOIN purchase_orders po ON s.supplier_id = po.supplier_id
-                AND po.created_at >= ? AND po.created_at <= ?
+                AND date(po.created_at) >= date(?) AND date(po.created_at) <= date(?)
             GROUP BY s.supplier_id, s.name, s.avg_lead_time
             HAVING COUNT(po.po_id) > 0
             ORDER BY orders DESC
@@ -442,14 +484,24 @@ async def get_supplier_performance(
 
     except Exception as e:
         analytics_logger.error(f"Error getting supplier performance: {str(e)}")
+        raise
+
+
+@router.get("/supplier-performance")
+async def get_supplier_performance(
+    time_range: str = Query("3m", description="Time range: 1m, 3m, 6m, 1y"),
+) -> List[Dict[str, Any]]:
+    """Get supplier performance analytics"""
+    try:
+        return _get_supplier_performance_internal(time_range)
+    except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error getting supplier performance: {str(e)}"
         )
 
 
-@router.get("/category-breakdown")
-async def get_category_breakdown() -> List[Dict[str, Any]]:
-    """Get inventory category breakdown"""
+def _get_category_breakdown_internal() -> List[Dict[str, Any]]:
+    """Internal function to get inventory category breakdown"""
     try:
         analytics_logger.info("Getting category breakdown")
 
@@ -503,14 +555,22 @@ async def get_category_breakdown() -> List[Dict[str, Any]]:
 
     except Exception as e:
         analytics_logger.error(f"Error getting category breakdown: {str(e)}")
+        raise
+
+
+@router.get("/category-breakdown")
+async def get_category_breakdown() -> List[Dict[str, Any]]:
+    """Get inventory category breakdown"""
+    try:
+        return _get_category_breakdown_internal()
+    except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error getting category breakdown: {str(e)}"
         )
 
 
-@router.get("/stock-alerts")
-async def get_stock_alerts() -> List[Dict[str, Any]]:
-    """Get critical stock monitoring alerts"""
+def _get_stock_alerts_internal() -> List[Dict[str, Any]]:
+    """Internal function to get critical stock monitoring alerts"""
     try:
         analytics_logger.info("Getting stock alerts")
 
@@ -581,16 +641,24 @@ async def get_stock_alerts() -> List[Dict[str, Any]]:
 
     except Exception as e:
         analytics_logger.error(f"Error getting stock alerts: {str(e)}")
+        raise
+
+
+@router.get("/stock-alerts")
+async def get_stock_alerts() -> List[Dict[str, Any]]:
+    """Get critical stock monitoring alerts"""
+    try:
+        return _get_stock_alerts_internal()
+    except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error getting stock alerts: {str(e)}"
         )
 
 
-@router.get("/revenue-trends")
-async def get_revenue_trends(
-    time_range: str = Query("6m", description="Time range: 3m, 6m, 1y"),
+def _get_revenue_trends_internal(
+    time_range: str = "6m",
 ) -> List[Dict[str, Any]]:
-    """Get revenue trends over time"""
+    """Internal function to get revenue trends over time"""
     try:
         analytics_logger.info(f"Getting revenue trends for range: {time_range}")
 
@@ -616,7 +684,7 @@ async def get_revenue_trends(
                 COUNT(*) as orders,
                 AVG(total_amount) as avg_order_value
             FROM purchase_orders
-            WHERE created_at >= ? AND created_at <= ?
+            WHERE date(created_at) >= date(?) AND date(created_at) <= date(?)
             GROUP BY strftime('%Y-%m', created_at)
             ORDER BY period
         """,
@@ -651,6 +719,17 @@ async def get_revenue_trends(
 
     except Exception as e:
         analytics_logger.error(f"Error getting revenue trends: {str(e)}")
+        raise
+
+
+@router.get("/revenue-trends")
+async def get_revenue_trends(
+    time_range: str = Query("6m", description="Time range: 3m, 6m, 1y"),
+) -> List[Dict[str, Any]]:
+    """Get revenue trends over time"""
+    try:
+        return _get_revenue_trends_internal(time_range)
+    except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error getting revenue trends: {str(e)}"
         )
@@ -1343,3 +1422,168 @@ async def get_delivery_timeline() -> List[Dict[str, Any]]:
         raise HTTPException(
             status_code=500, detail=f"Error getting delivery timeline: {str(e)}"
         )
+
+
+@router.get("/export-analytics")
+async def export_analytics(
+    format: str = Query(..., regex="^(csv|pdf)$", description="Export format"),
+    time_range: str = Query("30d", description="Time range: 7d, 30d, 90d, 1y"),
+    include_ai: bool = Query(True, description="Include AI insights for PDF"),
+):
+    """Export analytics dashboard data with optional AI insights for PDF"""
+    try:
+        analytics_logger.info(f"Exporting analytics as {format} for range: {time_range}")
+
+        # Gather all analytics data using internal functions
+        kpis_data = _get_analytics_kpis_internal(time_range)
+        consumption_data = _get_consumption_trends_internal("6m")
+        supplier_data = _get_supplier_performance_internal("3m")
+        category_data = _get_category_breakdown_internal()
+        stock_alerts_data = _get_stock_alerts_internal()
+        revenue_trends_data = _get_revenue_trends_internal("6m")
+
+        # Combine all data
+        analytics_data = {
+            "kpis": kpis_data,
+            "consumption_trends": consumption_data,
+            "supplier_performance": supplier_data,
+            "category_breakdown": category_data,
+            "stock_alerts": stock_alerts_data,
+            "revenue_trends": revenue_trends_data
+        }
+
+        if format == "csv":
+            # Simple CSV export without AI insights
+            return _export_analytics_csv(analytics_data, time_range)
+
+        elif format == "pdf":
+            # Generate AI insights if requested
+            ai_insights = None
+            if include_ai:
+                analytics_logger.info("Generating AI insights for analytics PDF")
+                ai_insights = await report_ai_handler.generate_insights_for_report(
+                    report_type="analytics_dashboard",
+                    report_data=analytics_data,
+                    parameters={"time_range": time_range}
+                )
+
+            # Generate PDF
+            pdf_content = pdf_generator.generate_analytics_pdf(
+                data=analytics_data,
+                ai_insights=ai_insights,
+                time_range=time_range
+            )
+
+            # Return PDF as streaming response
+            filename = f"Analytics_Dashboard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            return StreamingResponse(
+                io.BytesIO(pdf_content),
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"attachment; filename={filename}"
+                }
+            )
+
+    except Exception as e:
+        analytics_logger.error(f"Error exporting analytics: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error exporting analytics: {str(e)}"
+        )
+
+
+def _export_analytics_csv(analytics_data: Dict[str, Any], time_range: str) -> StreamingResponse:
+    """Export analytics data as CSV"""
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header
+    writer.writerow(["Analytics Dashboard Export", f"Time Range: {time_range}",
+                     f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+    writer.writerow([])
+
+    # Export KPIs
+    if analytics_data.get("kpis"):
+        writer.writerow(["KEY PERFORMANCE INDICATORS"])
+        writer.writerow(["Metric", "Value"])
+        kpis = analytics_data["kpis"].get("kpis", {})
+        for key, value in kpis.items():
+            # Format metric name
+            metric_name = key.replace("_", " ").title()
+            writer.writerow([metric_name, value])
+        writer.writerow([])
+
+        # Export trends
+        writer.writerow(["TRENDS"])
+        writer.writerow(["Metric", "Change %"])
+        trends = analytics_data["kpis"].get("trends", {})
+        for key, value in trends.items():
+            metric_name = key.replace("_", " ").title()
+            writer.writerow([metric_name, f"{value}%"])
+        writer.writerow([])
+
+    # Export consumption trends
+    if analytics_data.get("consumption_trends"):
+        writer.writerow(["CONSUMPTION TRENDS"])
+        writer.writerow(["Month", "Consumption", "Orders", "Forecast"])
+        for item in analytics_data["consumption_trends"]:
+            writer.writerow([
+                item.get("month", ""),
+                item.get("consumption", 0),
+                item.get("orders", 0),
+                item.get("forecast", 0)
+            ])
+        writer.writerow([])
+
+    # Export supplier performance
+    if analytics_data.get("supplier_performance"):
+        writer.writerow(["SUPPLIER PERFORMANCE"])
+        writer.writerow(["Supplier", "Orders", "On-Time %", "Avg Delay", "Lead Time", "Rating"])
+        for supplier in analytics_data["supplier_performance"]:
+            writer.writerow([
+                supplier.get("name", ""),
+                supplier.get("orders", 0),
+                supplier.get("onTime", 0),
+                supplier.get("avgDelay", 0),
+                supplier.get("leadTime", 0),
+                supplier.get("rating", 0)
+            ])
+        writer.writerow([])
+
+    # Export category breakdown
+    if analytics_data.get("category_breakdown"):
+        writer.writerow(["CATEGORY BREAKDOWN"])
+        writer.writerow(["Category", "Percentage", "Count", "Dispensed"])
+        for category in analytics_data["category_breakdown"]:
+            writer.writerow([
+                category.get("name", ""),
+                category.get("value", 0),
+                category.get("count", 0),
+                category.get("dispensed", 0)
+            ])
+        writer.writerow([])
+
+    # Export stock alerts
+    if analytics_data.get("stock_alerts"):
+        writer.writerow(["STOCK ALERTS"])
+        writer.writerow(["Medication", "Current Stock", "Reorder Point", "Days Left", "Priority"])
+        for alert in analytics_data["stock_alerts"]:
+            writer.writerow([
+                alert.get("medication", ""),
+                alert.get("current", 0),
+                alert.get("reorder", 0),
+                alert.get("daysLeft", 0),
+                alert.get("priority", "")
+            ])
+
+    # Get CSV content
+    output.seek(0)
+    csv_content = output.getvalue()
+
+    # Return as streaming response
+    return StreamingResponse(
+        io.BytesIO(csv_content.encode()),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=analytics_{time_range}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        }
+    )

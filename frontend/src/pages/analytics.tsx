@@ -12,6 +12,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import {
   BarChart3,
   TrendingUp,
   TrendingDown,
@@ -108,6 +116,8 @@ const mockAnalyticsData = {
 export function Analytics() {
   const [timeRange, setTimeRange] = useState('30d')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
 
   // Use real API calls instead of mock data
   const { data: kpisData, isLoading: kpisLoading } = useAnalyticsKPIs(timeRange)
@@ -146,9 +156,59 @@ export function Analytics() {
   // Get real supplier performance data
   const { data: supplierPerformanceData } = useSupplierPerformance(timeRange === '30d' ? '1m' : timeRange === '90d' ? '3m' : timeRange)
 
-  const handleExportReport = () => {
-    // Implementation for exporting analytics data
-    console.log('Exporting analytics report...')
+  const handleExportReport = async (format: string) => {
+    setExportDialogOpen(false)
+    if (!format) return // User cancelled
+
+    setExportLoading(true)
+    try {
+      // Build query string for the export endpoint
+      const params = new URLSearchParams({
+        format: format,
+        time_range: timeRange,
+        include_ai: 'true'
+      })
+
+      // Call the export API endpoint with GET method
+      const response = await fetch(`/api/analytics/export-analytics?${params}`, {
+        method: 'GET',
+        headers: {
+          'Accept': format === 'pdf' ? 'application/pdf' : 'text/csv',
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.statusText}`)
+      }
+
+      // Get the blob from response
+      const blob = await response.blob()
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+
+      // Set filename based on format
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+      const filename = `Analytics_Dashboard_${timestamp}.${format}`
+      a.download = filename
+
+      // Trigger download
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+
+      // Clean up
+      window.URL.revokeObjectURL(url)
+
+      console.log(`Successfully exported analytics as ${format}`)
+    } catch (error) {
+      console.error('Error exporting analytics:', error)
+      alert(`Failed to export analytics: ${error}`)
+    } finally {
+      setExportLoading(false)
+    }
   }
 
   if (isLoading) {
@@ -171,7 +231,7 @@ export function Analytics() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -196,10 +256,37 @@ export function Analytics() {
             <RefreshCw className="h-4 w-4 mr-1" />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportReport}>
-            <Download className="h-4 w-4 mr-1" />
-            Export
-          </Button>
+          <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-1" />
+                Export
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Select Export Format</DialogTitle>
+                <DialogDescription>
+                  Choose how you want to export the analytics data
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => handleExportReport('csv')}
+                >
+                  CSV (Data Only)
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => handleExportReport('pdf')}
+                >
+                  PDF (With AI Insights)
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -207,34 +294,26 @@ export function Analytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Revenue"
-          value={`$${analyticsData?.kpis.totalRevenue.toLocaleString()}`}
+          value={`$${(analyticsData?.kpis?.totalRevenue || 0).toLocaleString()}`}
           icon={<DollarSign className="h-8 w-8" />}
-          trend={analyticsData?.trends.revenueChange}
-          description="vs. previous period"
         />
 
         <StatCard
           title="Total Orders"
-          value={analyticsData?.kpis.totalOrders.toLocaleString()}
+          value={(analyticsData?.kpis?.totalOrders || 0).toLocaleString()}
           icon={<FileText className="h-8 w-8" />}
-          trend={analyticsData?.trends.ordersChange}
-          description="purchase orders processed"
         />
 
         <StatCard
           title="Avg Order Value"
-          value={`$${analyticsData?.kpis.avgOrderValue.toLocaleString()}`}
+          value={`$${(analyticsData?.kpis?.avgOrderValue || 0).toLocaleString()}`}
           icon={<BarChart3 className="h-8 w-8" />}
-          trend={analyticsData?.trends.avgOrderChange}
-          description="per order"
         />
 
         <StatCard
           title="Stock Alerts"
-          value={analyticsData?.kpis.lowStockItems}
+          value={analyticsData?.kpis?.lowStockItems || 0}
           icon={<AlertTriangle className="h-8 w-8" />}
-          trend={analyticsData?.trends.stockAlertsChange}
-          description="items need attention"
           variant="warning"
         />
       </div>
@@ -247,7 +326,7 @@ export function Analytics() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Critical Stock</p>
                 <p className="text-2xl font-bold text-destructive">
-                  {analyticsData?.kpis.criticalStockItems}
+                  {analyticsData?.kpis?.criticalStockItems || 0}
                 </p>
               </div>
               <AlertTriangle className="h-8 w-8 text-destructive" />
@@ -260,7 +339,7 @@ export function Analytics() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Active Suppliers</p>
-                <p className="text-2xl font-bold">{analyticsData?.kpis.totalSuppliers}</p>
+                <p className="text-2xl font-bold">{analyticsData?.kpis?.totalSuppliers || 0}</p>
               </div>
               <Users className="h-8 w-8 text-primary" />
             </div>
@@ -273,7 +352,7 @@ export function Analytics() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">On-Time Delivery</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {analyticsData?.kpis.onTimeDeliveries}%
+                  {analyticsData?.kpis?.onTimeDeliveries || 0}%
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-600" />
@@ -286,7 +365,7 @@ export function Analytics() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Inventory Turnover</p>
-                <p className="text-2xl font-bold">{analyticsData?.kpis.inventoryTurnover}x</p>
+                <p className="text-2xl font-bold">{(analyticsData?.kpis?.inventoryTurnover || 0)}x</p>
               </div>
               <Package className="h-8 w-8 text-blue-600" />
             </div>
@@ -359,7 +438,7 @@ export function Analytics() {
                       dataKey="value"
                       label
                     >
-                      {analyticsData?.categoryBreakdown.map((entry, index) => (
+                      {(analyticsData?.categoryBreakdown || []).map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -380,7 +459,7 @@ export function Analytics() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
-                <AreaChart data={analyticsData?.consumptionData}>
+                <AreaChart data={analyticsData?.consumptionData || undefined}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -416,7 +495,7 @@ export function Analytics() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {(supplierPerformanceData || analyticsData?.supplierPerformance).map((supplier, index) => (
+                {(supplierPerformanceData || analyticsData?.supplierPerformance || []).map((supplier, index) => (
                   <div
                     key={index}
                     className="flex items-center justify-between p-4 border rounded-lg"
@@ -458,7 +537,7 @@ export function Analytics() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analyticsData?.categoryBreakdown}>
+                  <BarChart data={analyticsData?.categoryBreakdown || undefined}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
@@ -504,7 +583,7 @@ export function Analytics() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {analyticsData?.stockAlerts.map((alert, index) => (
+                {(analyticsData?.stockAlerts || []).map((alert, index) => (
                   <div
                     key={index}
                     className="flex items-center justify-between p-4 border rounded-lg"
@@ -532,6 +611,17 @@ export function Analytics() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Loading overlay for exports */}
+      {exportLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-lg font-medium">Generating export...</p>
+            <p className="text-sm text-muted-foreground">This may take up to a minute for AI-enhanced reports</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
