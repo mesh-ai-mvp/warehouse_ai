@@ -13,19 +13,10 @@ export function Header() {
 
   return (
     <header className="flex h-16 items-center gap-4 border-b bg-background px-6">
-      <div className="flex items-center gap-3 flex-1">
-        <img
-          src="/@new-logo.png"
-          onError={(e) => { e.currentTarget.src = '/logo.png' }}
-          alt="Suppl.AI"
-          className="h-9 w-auto"
-        />
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">
-            Suppl.AI
-          </h1>
-          <p className="text-xs text-muted-foreground">Intelligent Supply Chain Orchestration</p>
-        </div>
+      <div className="flex-1">
+        <h1 className="text-xl font-semibold text-foreground">
+        Smarter Warehousing for Better Efficiency
+        </h1>
       </div>
 
       <div className="flex items-center gap-4">

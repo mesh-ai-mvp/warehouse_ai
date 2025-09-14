@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from api.analytics import router as analytics_router
+from api.chat import router as chat_router
 from api.reports import router as reports_router
 from api.routes import data_loader
 from api.routes import router as api_router
@@ -87,6 +88,7 @@ app = FastAPI(
 # Mount API routes
 app.include_router(api_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 # Prefer optimized warehouse routes when overlapping paths exist
 app.include_router(warehouse_optimized_router)  # Optimized warehouse routes
