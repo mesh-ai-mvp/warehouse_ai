@@ -1835,7 +1835,9 @@ def generate_batch_info(
                     "supplier_id": med.get("supplier_id"),  # Add supplier_id
                     "receipt_date": received_date.date().isoformat(),
                     "received_date": received_date.date().isoformat(),  # Keep for backward compatibility
-                    "remaining_quantity": quantity if status == "active" else 0,  # Keep for backward compatibility
+                    "remaining_quantity": quantity
+                    if status == "active"
+                    else 0,  # Keep for backward compatibility
                     "status": status,
                 }
             )
@@ -1957,7 +1959,9 @@ def generate_purchase_orders(
         month_year = (order_month_date.year, order_month_date.month)
 
         # Determine if this is the current month
-        is_current_month = (month_year[0] == current_year and month_year[1] == current_month)
+        is_current_month = (
+            month_year[0] == current_year and month_year[1] == current_month
+        )
 
         # Generate 20-50 orders per month (random)
         num_orders = random.randint(20, 50)
@@ -1969,7 +1973,11 @@ def generate_purchase_orders(
             supplier = supplier_lookup.get(med["supplier_id"], {})
 
             # Generate random day within the month
-            days_in_month = 30 if order_month_date.month in [4, 6, 9, 11] else (28 if order_month_date.month == 2 else 31)
+            days_in_month = (
+                30
+                if order_month_date.month in [4, 6, 9, 11]
+                else (28 if order_month_date.month == 2 else 31)
+            )
             day_offset = random.randint(1, days_in_month)
             order_date = order_month_date.replace(day=min(day_offset, days_in_month))
 
@@ -1983,11 +1991,15 @@ def generate_purchase_orders(
                 status_rand = random.random()
                 if status_rand < 0.40:  # 40% completed
                     status = "completed"
-                    actual_delivery = expected_delivery - timedelta(days=random.randint(0, 2))
+                    actual_delivery = expected_delivery - timedelta(
+                        days=random.randint(0, 2)
+                    )
                     notes = "Regular replenishment order - delivered"
                 elif status_rand < 0.55:  # 15% delivered
                     status = "delivered"
-                    actual_delivery = expected_delivery - timedelta(days=random.randint(0, 1))
+                    actual_delivery = expected_delivery - timedelta(
+                        days=random.randint(0, 1)
+                    )
                     notes = "Order delivered - awaiting confirmation"
                 elif status_rand < 0.70:  # 15% in_transit
                     status = "in_transit"
@@ -2004,11 +2016,13 @@ def generate_purchase_orders(
                 else:  # 8% cancelled
                     status = "cancelled"
                     actual_delivery = None
-                    notes = random.choice([
-                        "Cancelled due to supplier shortage",
-                        "Order cancelled - alternative source found",
-                        "Product discontinued by supplier",
-                    ])
+                    notes = random.choice(
+                        [
+                            "Cancelled due to supplier shortage",
+                            "Order cancelled - alternative source found",
+                            "Product discontinued by supplier",
+                        ]
+                    )
             else:
                 # Historical months: mostly completed with few delivered
                 status_rand = random.random()
@@ -2016,17 +2030,23 @@ def generate_purchase_orders(
                     status = "completed"
                     # Add some variance to delivery dates
                     delivery_variance = random.randint(-3, 3)
-                    actual_delivery = expected_delivery + timedelta(days=delivery_variance)
+                    actual_delivery = expected_delivery + timedelta(
+                        days=delivery_variance
+                    )
                     if actual_delivery > now:
                         actual_delivery = expected_delivery  # Don't allow future dates for historical orders
                     notes = "Regular replenishment order - completed"
                 else:  # 8% delivered (but old)
                     status = "delivered"
-                    actual_delivery = expected_delivery - timedelta(days=random.randint(0, 2))
+                    actual_delivery = expected_delivery - timedelta(
+                        days=random.randint(0, 2)
+                    )
                     notes = "Order delivered - completed"
 
             # Get inventory info for quantity
-            inv_info = next((inv for inv in inventory_levels if inv["med_id"] == med_id), {})
+            inv_info = next(
+                (inv for inv in inventory_levels if inv["med_id"] == med_id), {}
+            )
             reorder_point = inv_info.get("reorder_point", 100)
 
             # Vary quantities realistically
@@ -2038,7 +2058,8 @@ def generate_purchase_orders(
             unit_price = 10.0
             if med_id in price_lookup:
                 applicable_prices = [
-                    p for p in price_lookup[med_id]
+                    p
+                    for p in price_lookup[med_id]
                     if pd.to_datetime(p["valid_from"]).date() <= order_date.date()
                 ]
                 if applicable_prices:
@@ -2055,22 +2076,26 @@ def generate_purchase_orders(
             # Payment terms
             payment_terms = random.choice(["NET30", "NET45", "NET60", "COD", "NET15"])
 
-            po_rows.append({
-                "po_id": po_counter,
-                "po_number": po_number,
-                "med_id": med_id,
-                "supplier_id": med["supplier_id"],
-                "quantity_ordered": quantity,
-                "unit_price": unit_price,
-                "total_amount": total_amount,
-                "order_date": order_date.date().isoformat(),
-                "expected_delivery": expected_delivery.date().isoformat(),
-                "actual_delivery": actual_delivery.date().isoformat() if actual_delivery else None,
-                "status": status,
-                "payment_terms": payment_terms,
-                "notes": notes,
-                "created_at": order_date.isoformat(),  # Add for DB insertion
-            })
+            po_rows.append(
+                {
+                    "po_id": po_counter,
+                    "po_number": po_number,
+                    "med_id": med_id,
+                    "supplier_id": med["supplier_id"],
+                    "quantity_ordered": quantity,
+                    "unit_price": unit_price,
+                    "total_amount": total_amount,
+                    "order_date": order_date.date().isoformat(),
+                    "expected_delivery": expected_delivery.date().isoformat(),
+                    "actual_delivery": actual_delivery.date().isoformat()
+                    if actual_delivery
+                    else None,
+                    "status": status,
+                    "payment_terms": payment_terms,
+                    "notes": notes,
+                    "created_at": order_date.isoformat(),  # Add for DB insertion
+                }
+            )
             po_counter += 1
 
     return po_rows
@@ -3170,9 +3195,7 @@ def generate_current_inventory(
             avg_daily = row.get("avg_daily", 10)
             new_stock = int(avg_daily * random.uniform(1, 3))
             row["current_stock"] = max(1, new_stock)
-            row["days_until_stockout"] = max(
-                1, int(new_stock / max(avg_daily, 0.1))
-            )
+            row["days_until_stockout"] = max(1, int(new_stock / max(avg_daily, 0.1)))
             row["stock_status"] = "critical"
 
     for i in range(target_critical, target_critical + target_low):
@@ -3182,9 +3205,7 @@ def generate_current_inventory(
             avg_daily = row.get("avg_daily", 10)
             new_stock = int(avg_daily * random.uniform(3, 7))
             row["current_stock"] = max(1, new_stock)
-            row["days_until_stockout"] = max(
-                3, int(new_stock / max(avg_daily, 0.1))
-            )
+            row["days_until_stockout"] = max(3, int(new_stock / max(avg_daily, 0.1)))
             row["stock_status"] = "low"
 
     # Remove temporary fields before returning
@@ -3629,25 +3650,33 @@ def generate_all(
     if batch_info:
         batch_db_rows = []
         for batch in batch_info:
-            batch_db_rows.append({
-                "batch_id": batch["batch_id"],
-                "med_id": batch["med_id"],
-                "lot_number": batch["lot_number"],
-                "manufacture_date": batch.get("manufacture_date"),
-                "expiry_date": batch["expiry_date"],
-                "quantity_received": batch.get("quantity_received", batch.get("quantity")),
-                "quantity_remaining": batch.get("quantity_remaining", batch.get("remaining_quantity")),
-                "supplier_id": batch.get("supplier_id"),
-                "receipt_date": batch.get("receipt_date", batch.get("received_date")),
-                "status": batch.get("status", "active")
-            })
+            batch_db_rows.append(
+                {
+                    "batch_id": batch["batch_id"],
+                    "med_id": batch["med_id"],
+                    "lot_number": batch["lot_number"],
+                    "manufacture_date": batch.get("manufacture_date"),
+                    "expiry_date": batch["expiry_date"],
+                    "quantity_received": batch.get(
+                        "quantity_received", batch.get("quantity")
+                    ),
+                    "quantity_remaining": batch.get(
+                        "quantity_remaining", batch.get("remaining_quantity")
+                    ),
+                    "supplier_id": batch.get("supplier_id"),
+                    "receipt_date": batch.get(
+                        "receipt_date", batch.get("received_date")
+                    ),
+                    "status": batch.get("status", "active"),
+                }
+            )
 
         cur.executemany(
             """INSERT OR REPLACE INTO batch_info (batch_id, med_id, lot_number, manufacture_date,
                expiry_date, quantity_received, quantity_remaining, supplier_id, receipt_date, status)
                VALUES (:batch_id, :med_id, :lot_number, :manufacture_date,
                :expiry_date, :quantity_received, :quantity_remaining, :supplier_id, :receipt_date, :status)""",
-            batch_db_rows
+            batch_db_rows,
         )
         conn.commit()
         print(f"  ✅ Inserted {len(batch_db_rows)} batch records")
@@ -3678,13 +3707,13 @@ def generate_all(
             # Get supplier name
             supplier_name = next(
                 (s["name"] for s in suppliers if s["supplier_id"] == po["supplier_id"]),
-                "Unknown Supplier"
+                "Unknown Supplier",
             )
 
             # Get medication name
             med_name = next(
                 (m["name"] for m in meds if m["med_id"] == po["med_id"]),
-                "Unknown Medication"
+                "Unknown Medication",
             )
 
             # Use timestamps from the purchase order data
@@ -3692,36 +3721,39 @@ def generate_all(
             updated_at = created_at
 
             # Prepare purchase_orders row
-            po_db_rows.append({
-                "po_id": po_id_text,
-                "po_number": po["po_number"],
-                "supplier_id": po["supplier_id"],
-                "supplier_name": supplier_name,
-                "status": po["status"],
-                "total_amount": po["total_amount"],
-                "created_at": created_at,
-                "updated_at": updated_at,
-                "requested_delivery_date": po.get("expected_delivery"),
-                "actual_delivery_date": po.get("actual_delivery"),
-                "notes": po.get("notes", ""),
-                "created_by": "system",
-                "approved_by": "system" if po["status"] == "completed" else None,
-                "approved_at": created_at if po["status"] == "completed" else None
-            })
+            po_db_rows.append(
+                {
+                    "po_id": po_id_text,
+                    "po_number": po["po_number"],
+                    "supplier_id": po["supplier_id"],
+                    "supplier_name": supplier_name,
+                    "status": po["status"],
+                    "total_amount": po["total_amount"],
+                    "created_at": created_at,
+                    "updated_at": updated_at,
+                    "requested_delivery_date": po.get("expected_delivery"),
+                    "actual_delivery_date": po.get("actual_delivery"),
+                    "notes": po.get("notes", ""),
+                    "created_by": "system",
+                    "approved_by": "system" if po["status"] == "completed" else None,
+                    "approved_at": created_at if po["status"] == "completed" else None,
+                }
+            )
 
             # Prepare purchase_order_items row
-            po_items_db_rows.append({
-                "po_id": po_id_text,
-                "med_id": po["med_id"],
-                "med_name": med_name,
-                "quantity": po["quantity_ordered"],
-                "unit_price": po["unit_price"],
-                "total_price": po["total_amount"],
-                "pack_size": next(
-                    (m["pack_size"] for m in meds if m["med_id"] == po["med_id"]),
-                    1
-                )
-            })
+            po_items_db_rows.append(
+                {
+                    "po_id": po_id_text,
+                    "med_id": po["med_id"],
+                    "med_name": med_name,
+                    "quantity": po["quantity_ordered"],
+                    "unit_price": po["unit_price"],
+                    "total_price": po["total_amount"],
+                    "pack_size": next(
+                        (m["pack_size"] for m in meds if m["med_id"] == po["med_id"]), 1
+                    ),
+                }
+            )
 
         # Insert into purchase_orders table
         cur.executemany(
@@ -3731,7 +3763,7 @@ def generate_all(
                VALUES (:po_id, :po_number, :supplier_id, :supplier_name,
                :status, :total_amount, :created_at, :updated_at, :requested_delivery_date,
                :actual_delivery_date, :notes, :created_by, :approved_by, :approved_at)""",
-            po_db_rows
+            po_db_rows,
         )
 
         # Insert into purchase_order_items table
@@ -3740,11 +3772,13 @@ def generate_all(
                unit_price, total_price, pack_size)
                VALUES (:po_id, :med_id, :med_name, :quantity,
                :unit_price, :total_price, :pack_size)""",
-            po_items_db_rows
+            po_items_db_rows,
         )
 
         conn.commit()
-        print(f"  ✅ Inserted {len(po_db_rows)} purchase orders with {len(po_items_db_rows)} items")
+        print(
+            f"  ✅ Inserted {len(po_db_rows)} purchase orders with {len(po_items_db_rows)} items"
+        )
 
     # Generate pre-aggregated data for fast chart performance
     print("Generating pre-aggregated analytics data …")

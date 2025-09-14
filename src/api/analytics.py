@@ -351,7 +351,9 @@ def _get_consumption_trends_internal(
         orders_results = {row[0]: row[1] for row in cursor.fetchall()}
 
         # Combine results
-        all_periods = sorted(set(consumption_results.keys()) | set(orders_results.keys()))
+        all_periods = sorted(
+            set(consumption_results.keys()) | set(orders_results.keys())
+        )
 
         # Process results
         trends = []
@@ -1432,7 +1434,9 @@ async def export_analytics(
 ):
     """Export analytics dashboard data with optional AI insights for PDF"""
     try:
-        analytics_logger.info(f"Exporting analytics as {format} for range: {time_range}")
+        analytics_logger.info(
+            f"Exporting analytics as {format} for range: {time_range}"
+        )
 
         # Gather all analytics data using internal functions
         kpis_data = _get_analytics_kpis_internal(time_range)
@@ -1449,7 +1453,7 @@ async def export_analytics(
             "supplier_performance": supplier_data,
             "category_breakdown": category_data,
             "stock_alerts": stock_alerts_data,
-            "revenue_trends": revenue_trends_data
+            "revenue_trends": revenue_trends_data,
         }
 
         if format == "csv":
@@ -1464,24 +1468,22 @@ async def export_analytics(
                 ai_insights = await report_ai_handler.generate_insights_for_report(
                     report_type="analytics_dashboard",
                     report_data=analytics_data,
-                    parameters={"time_range": time_range}
+                    parameters={"time_range": time_range},
                 )
 
             # Generate PDF
             pdf_content = pdf_generator.generate_analytics_pdf(
-                data=analytics_data,
-                ai_insights=ai_insights,
-                time_range=time_range
+                data=analytics_data, ai_insights=ai_insights, time_range=time_range
             )
 
             # Return PDF as streaming response
-            filename = f"Analytics_Dashboard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filename = (
+                f"Analytics_Dashboard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            )
             return StreamingResponse(
                 io.BytesIO(pdf_content),
                 media_type="application/pdf",
-                headers={
-                    "Content-Disposition": f"attachment; filename={filename}"
-                }
+                headers={"Content-Disposition": f"attachment; filename={filename}"},
             )
 
     except Exception as e:
@@ -1491,14 +1493,21 @@ async def export_analytics(
         )
 
 
-def _export_analytics_csv(analytics_data: Dict[str, Any], time_range: str) -> StreamingResponse:
+def _export_analytics_csv(
+    analytics_data: Dict[str, Any], time_range: str
+) -> StreamingResponse:
     """Export analytics data as CSV"""
     output = io.StringIO()
     writer = csv.writer(output)
 
     # Write header
-    writer.writerow(["Analytics Dashboard Export", f"Time Range: {time_range}",
-                     f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+    writer.writerow(
+        [
+            "Analytics Dashboard Export",
+            f"Time Range: {time_range}",
+            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        ]
+    )
     writer.writerow([])
 
     # Export KPIs
@@ -1526,27 +1535,33 @@ def _export_analytics_csv(analytics_data: Dict[str, Any], time_range: str) -> St
         writer.writerow(["CONSUMPTION TRENDS"])
         writer.writerow(["Month", "Consumption", "Orders", "Forecast"])
         for item in analytics_data["consumption_trends"]:
-            writer.writerow([
-                item.get("month", ""),
-                item.get("consumption", 0),
-                item.get("orders", 0),
-                item.get("forecast", 0)
-            ])
+            writer.writerow(
+                [
+                    item.get("month", ""),
+                    item.get("consumption", 0),
+                    item.get("orders", 0),
+                    item.get("forecast", 0),
+                ]
+            )
         writer.writerow([])
 
     # Export supplier performance
     if analytics_data.get("supplier_performance"):
         writer.writerow(["SUPPLIER PERFORMANCE"])
-        writer.writerow(["Supplier", "Orders", "On-Time %", "Avg Delay", "Lead Time", "Rating"])
+        writer.writerow(
+            ["Supplier", "Orders", "On-Time %", "Avg Delay", "Lead Time", "Rating"]
+        )
         for supplier in analytics_data["supplier_performance"]:
-            writer.writerow([
-                supplier.get("name", ""),
-                supplier.get("orders", 0),
-                supplier.get("onTime", 0),
-                supplier.get("avgDelay", 0),
-                supplier.get("leadTime", 0),
-                supplier.get("rating", 0)
-            ])
+            writer.writerow(
+                [
+                    supplier.get("name", ""),
+                    supplier.get("orders", 0),
+                    supplier.get("onTime", 0),
+                    supplier.get("avgDelay", 0),
+                    supplier.get("leadTime", 0),
+                    supplier.get("rating", 0),
+                ]
+            )
         writer.writerow([])
 
     # Export category breakdown
@@ -1554,26 +1569,32 @@ def _export_analytics_csv(analytics_data: Dict[str, Any], time_range: str) -> St
         writer.writerow(["CATEGORY BREAKDOWN"])
         writer.writerow(["Category", "Percentage", "Count", "Dispensed"])
         for category in analytics_data["category_breakdown"]:
-            writer.writerow([
-                category.get("name", ""),
-                category.get("value", 0),
-                category.get("count", 0),
-                category.get("dispensed", 0)
-            ])
+            writer.writerow(
+                [
+                    category.get("name", ""),
+                    category.get("value", 0),
+                    category.get("count", 0),
+                    category.get("dispensed", 0),
+                ]
+            )
         writer.writerow([])
 
     # Export stock alerts
     if analytics_data.get("stock_alerts"):
         writer.writerow(["STOCK ALERTS"])
-        writer.writerow(["Medication", "Current Stock", "Reorder Point", "Days Left", "Priority"])
+        writer.writerow(
+            ["Medication", "Current Stock", "Reorder Point", "Days Left", "Priority"]
+        )
         for alert in analytics_data["stock_alerts"]:
-            writer.writerow([
-                alert.get("medication", ""),
-                alert.get("current", 0),
-                alert.get("reorder", 0),
-                alert.get("daysLeft", 0),
-                alert.get("priority", "")
-            ])
+            writer.writerow(
+                [
+                    alert.get("medication", ""),
+                    alert.get("current", 0),
+                    alert.get("reorder", 0),
+                    alert.get("daysLeft", 0),
+                    alert.get("priority", ""),
+                ]
+            )
 
     # Get CSV content
     output.seek(0)
@@ -1585,5 +1606,5 @@ def _export_analytics_csv(analytics_data: Dict[str, Any], time_range: str) -> St
         media_type="text/csv",
         headers={
             "Content-Disposition": f"attachment; filename=analytics_{time_range}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        }
+        },
     )

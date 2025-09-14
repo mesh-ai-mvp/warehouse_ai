@@ -20,6 +20,7 @@ from .report_recommendations_agent import ReportRecommendationsAgent
 
 class ReportInsightState(TypedDict):
     """State for report insight generation workflow"""
+
     # Input parameters
     report_type: str
     report_data: Dict[str, Any]
@@ -58,11 +59,7 @@ class ReportInsightsWorkflow:
     def __init__(self, llm: ChatOpenAI = None):
         """Initialize workflow with LLM and agents"""
         # Use provided LLM or create default
-        self.llm = llm or ChatOpenAI(
-            model="gpt-4",
-            temperature=0.3,
-            max_tokens=2000
-        )
+        self.llm = llm or ChatOpenAI(model="gpt-4", temperature=0.3, max_tokens=2000)
 
         # Initialize agents (same pattern as PO workflow)
         self.insights_agent = ReportInsightsAgent(self.llm)
@@ -114,7 +111,9 @@ class ReportInsightsWorkflow:
             state["anomalies"] = result.get("anomalies", [])
             state["key_metrics"] = result.get("key_metrics", {})
 
-            logger.info(f"Data analysis completed: {len(state['insights'])} insights found")
+            logger.info(
+                f"Data analysis completed: {len(state['insights'])} insights found"
+            )
 
         except Exception as e:
             logger.error(f"Error in data analysis: {str(e)}")
@@ -137,7 +136,9 @@ class ReportInsightsWorkflow:
             state["opportunities"] = result.get("opportunities", [])
             state["trend_analysis"] = result.get("trend_analysis", {})
 
-            logger.info(f"Deep analysis completed: {len(state['predictions'])} predictions generated")
+            logger.info(
+                f"Deep analysis completed: {len(state['predictions'])} predictions generated"
+            )
 
         except Exception as e:
             logger.error(f"Error in deep analysis: {str(e)}")
@@ -145,7 +146,9 @@ class ReportInsightsWorkflow:
 
         return state
 
-    async def _generate_recommendations(self, state: ReportInsightState) -> ReportInsightState:
+    async def _generate_recommendations(
+        self, state: ReportInsightState
+    ) -> ReportInsightState:
         """Generate recommendations step"""
         logger.info("Generating recommendations and executive summary")
         state["processing_stage"] = "generating_recommendations"
@@ -161,7 +164,9 @@ class ReportInsightsWorkflow:
             state["quick_wins"] = result.get("quick_wins", [])
             state["strategic_initiatives"] = result.get("strategic_initiatives", [])
 
-            logger.info(f"Recommendations generated: {len(state['recommendations'])} recommendations")
+            logger.info(
+                f"Recommendations generated: {len(state['recommendations'])} recommendations"
+            )
 
         except Exception as e:
             logger.error(f"Error generating recommendations: {str(e)}")
@@ -181,11 +186,11 @@ class ReportInsightsWorkflow:
         # Log summary
         logger.info(f"""
         Report Insights Generation Complete:
-        - Type: {state['report_type']}
-        - Insights: {len(state['insights'])}
-        - Predictions: {len(state['predictions'])}
-        - Recommendations: {len(state['recommendations'])}
-        - Confidence Score: {state['confidence_score']:.2f}
+        - Type: {state["report_type"]}
+        - Insights: {len(state["insights"])}
+        - Predictions: {len(state["predictions"])}
+        - Recommendations: {len(state["recommendations"])}
+        - Confidence Score: {state["confidence_score"]:.2f}
         """)
 
         return state
@@ -228,7 +233,7 @@ class ReportInsightsWorkflow:
         self,
         report_type: str,
         report_data: Dict[str, Any],
-        parameters: Dict[str, Any] = None
+        parameters: Dict[str, Any] = None,
     ) -> ReportInsightState:
         """
         Main entry point for generating insights
@@ -265,7 +270,7 @@ class ReportInsightsWorkflow:
             processing_stage="initializing",
             error=None,
             timestamp="",
-            processing_time_ms=None
+            processing_time_ms=None,
         )
 
         try:
@@ -274,7 +279,7 @@ class ReportInsightsWorkflow:
             # Run workflow with timeout (same as PO workflow)
             final_state = await asyncio.wait_for(
                 self.workflow.ainvoke(initial_state),
-                timeout=300.0  # 300 second timeout
+                timeout=300.0,  # 300 second timeout
             )
 
             # Calculate processing time

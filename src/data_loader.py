@@ -80,7 +80,9 @@ class DataLoader:
 
         try:
             # Check if templates already exist
-            cursor.execute("SELECT COUNT(*) FROM report_templates WHERE id IN (1, 2, 3, 4)")
+            cursor.execute(
+                "SELECT COUNT(*) FROM report_templates WHERE id IN (1, 2, 3, 4)"
+            )
             count = cursor.fetchone()[0]
 
             if count < 4:
@@ -91,30 +93,61 @@ class DataLoader:
 
                 # Insert default templates
                 templates = [
-                    (1, 'Inventory Stock Report', 'Current stock levels and reorder points',
-                     'inventory', '{"include_expiry": true, "include_location": true}',
-                     '{"columns": ["name", "current_stock", "reorder_point", "category", "expiry_date"]}',
-                     'pdf', 'weekly', 1),
-                    (2, 'Monthly Financial Summary', 'Revenue, expenses, and profitability analysis',
-                     'financial', '{"period": "monthly", "include_trends": true}',
-                     '{"columns": ["revenue", "expenses", "profit", "margin"]}',
-                     'excel', 'monthly', 1),
-                    (3, 'Supplier Performance', 'Supplier delivery times and reliability metrics',
-                     'supplier', '{"include_ratings": true, "period": "quarterly"}',
-                     '{"columns": ["supplier", "on_time_rate", "quality_score", "total_orders"]}',
-                     'pdf', 'monthly', 1),
-                    (4, 'Consumption Trends', 'Medication consumption patterns and forecasts',
-                     'consumption', '{"forecast_days": 30, "include_seasonality": true}',
-                     '{"columns": ["medication", "daily_avg", "trend", "forecast"]}',
-                     'excel', 'monthly', 1)
+                    (
+                        1,
+                        "Inventory Stock Report",
+                        "Current stock levels and reorder points",
+                        "inventory",
+                        '{"include_expiry": true, "include_location": true}',
+                        '{"columns": ["name", "current_stock", "reorder_point", "category", "expiry_date"]}',
+                        "pdf",
+                        "weekly",
+                        1,
+                    ),
+                    (
+                        2,
+                        "Monthly Financial Summary",
+                        "Revenue, expenses, and profitability analysis",
+                        "financial",
+                        '{"period": "monthly", "include_trends": true}',
+                        '{"columns": ["revenue", "expenses", "profit", "margin"]}',
+                        "excel",
+                        "monthly",
+                        1,
+                    ),
+                    (
+                        3,
+                        "Supplier Performance",
+                        "Supplier delivery times and reliability metrics",
+                        "supplier",
+                        '{"include_ratings": true, "period": "quarterly"}',
+                        '{"columns": ["supplier", "on_time_rate", "quality_score", "total_orders"]}',
+                        "pdf",
+                        "monthly",
+                        1,
+                    ),
+                    (
+                        4,
+                        "Consumption Trends",
+                        "Medication consumption patterns and forecasts",
+                        "consumption",
+                        '{"forecast_days": 30, "include_seasonality": true}',
+                        '{"columns": ["medication", "daily_avg", "trend", "forecast"]}',
+                        "excel",
+                        "monthly",
+                        1,
+                    ),
                 ]
 
-                cursor.executemany("""
+                cursor.executemany(
+                    """
                     INSERT INTO report_templates (
                         id, name, description, type, template_data, fields_config,
                         format, frequency, is_active
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, templates)
+                """,
+                    templates,
+                )
 
                 conn.commit()
                 logger.success(f"Initialized {len(templates)} default report templates")

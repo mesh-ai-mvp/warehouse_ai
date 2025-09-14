@@ -56,7 +56,7 @@ class ReportAnalysisAgent:
             # Get AI analysis
             messages = [
                 SystemMessage(content=self.system_prompt),
-                HumanMessage(content=prompt)
+                HumanMessage(content=prompt),
             ]
 
             response = await self._call_llm(messages)
@@ -70,15 +70,12 @@ class ReportAnalysisAgent:
                 "risk_assessment": analysis_data.get("risk_assessment", {}),
                 "opportunities": analysis_data.get("opportunities", []),
                 "trend_analysis": analysis_data.get("trend_analysis", {}),
-                "processing_stage": "analysis_completed"
+                "processing_stage": "analysis_completed",
             }
 
         except Exception as e:
             logger.error(f"Error in ReportAnalysisAgent: {str(e)}")
-            return {
-                "error": str(e),
-                "processing_stage": "analysis_failed"
-            }
+            return {"error": str(e), "processing_stage": "analysis_failed"}
 
     def _build_analysis_context(
         self,
@@ -86,7 +83,7 @@ class ReportAnalysisAgent:
         report_data: Dict,
         insights: List,
         patterns: List,
-        anomalies: List
+        anomalies: List,
     ) -> str:
         """Build context for deep analysis"""
 
@@ -113,7 +110,9 @@ class ReportAnalysisAgent:
                     # Calculate basic stats if numeric data
                     numeric_fields = self._extract_numeric_stats(value)
                     if numeric_fields:
-                        context += f"\n  Statistics: {json.dumps(numeric_fields, indent=2)}"
+                        context += (
+                            f"\n  Statistics: {json.dumps(numeric_fields, indent=2)}"
+                        )
 
         return context
 
@@ -128,13 +127,17 @@ class ReportAnalysisAgent:
         sample = data_list[0]
         for key, value in sample.items():
             if isinstance(value, (int, float)):
-                values = [item.get(key, 0) for item in data_list if isinstance(item.get(key), (int, float))]
+                values = [
+                    item.get(key, 0)
+                    for item in data_list
+                    if isinstance(item.get(key), (int, float))
+                ]
                 if values:
                     stats[key] = {
                         "min": min(values),
                         "max": max(values),
                         "avg": sum(values) / len(values),
-                        "count": len(values)
+                        "count": len(values),
                     }
 
         return stats
@@ -182,10 +185,12 @@ class ReportAnalysisAgent:
                 - Cross-functional optimization opportunities
                 - System-wide risk factors
                 - Strategic improvement areas
-            """
+            """,
         }
 
-        specific_analysis = type_specific_analysis.get(report_type, "Provide comprehensive predictions")
+        specific_analysis = type_specific_analysis.get(
+            report_type, "Provide comprehensive predictions"
+        )
 
         prompt = f"""
         Based on the following analysis context, provide deep predictions and risk assessments.
@@ -274,19 +279,19 @@ class ReportAnalysisAgent:
                     "confidence": "medium",
                     "probability": 0.5,
                     "impact": "To be determined",
-                    "factors": []
+                    "factors": [],
                 }
             ],
             "risk_assessment": {
                 "overall_risk_level": "medium",
                 "risk_factors": [],
-                "risk_score": 5.0
+                "risk_score": 5.0,
             },
             "opportunities": [],
             "trend_analysis": {
                 "short_term": "Stable",
                 "medium_term": "Stable",
                 "long_term": "To be determined",
-                "inflection_points": []
-            }
+                "inflection_points": [],
+            },
         }

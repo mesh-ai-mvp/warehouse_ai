@@ -679,7 +679,7 @@ async def export_report(template_id: int, request: ExportReportRequest):
             "template_data": json.loads(template_row[4]) if template_row[4] else {},
             "fields_config": json.loads(template_row[5]) if template_row[5] else {},
             "format": template_row[7],
-            "frequency": template_row[8]
+            "frequency": template_row[8],
         }
 
         # Generate report data
@@ -704,16 +704,12 @@ async def export_report(template_id: int, request: ExportReportRequest):
 
             # Generate AI insights
             ai_insights = await report_ai_handler.generate_insights_for_report(
-                report_type=report_type,
-                report_data=report_data,
-                parameters=parameters
+                report_type=report_type, report_data=report_data, parameters=parameters
             )
 
             # Generate PDF with insights
             pdf_content = pdf_generator.generate_report_pdf(
-                template=template,
-                data=report_data,
-                ai_insights=ai_insights
+                template=template, data=report_data, ai_insights=ai_insights
             )
 
             # Return PDF as streaming response
@@ -721,9 +717,7 @@ async def export_report(template_id: int, request: ExportReportRequest):
             return StreamingResponse(
                 io.BytesIO(pdf_content),
                 media_type="application/pdf",
-                headers={
-                    "Content-Disposition": f"attachment; filename={filename}"
-                }
+                headers={"Content-Disposition": f"attachment; filename={filename}"},
             )
         else:
             raise HTTPException(status_code=400, detail="Unsupported export format")

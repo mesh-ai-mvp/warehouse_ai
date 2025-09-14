@@ -15,7 +15,10 @@ from langchain_openai import ChatOpenAI
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import workflow
-from ai_agents.report_insights_workflow import ReportInsightsWorkflow, ReportInsightState
+from ai_agents.report_insights_workflow import (
+    ReportInsightsWorkflow,
+    ReportInsightState,
+)
 
 
 class ReportAIHandler:
@@ -26,15 +29,14 @@ class ReportAIHandler:
         # Initialize LLM
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            logger.warning("OPENAI_API_KEY not found, AI insights will use fallback mode")
+            logger.warning(
+                "OPENAI_API_KEY not found, AI insights will use fallback mode"
+            )
             self.workflow = None
         else:
             try:
                 llm = ChatOpenAI(
-                    model="gpt-4",
-                    temperature=0.3,
-                    max_tokens=2000,
-                    api_key=api_key
+                    model="gpt-4", temperature=0.3, max_tokens=2000, api_key=api_key
                 )
                 self.workflow = ReportInsightsWorkflow(llm=llm)
                 logger.info("ReportAIHandler initialized with OpenAI GPT-4")
@@ -53,7 +55,7 @@ class ReportAIHandler:
         report_type: str,
         report_data: Dict[str, Any],
         parameters: Dict[str, Any] = None,
-        use_cache: bool = True
+        use_cache: bool = True,
     ) -> Dict[str, Any]:
         """
         Generate AI insights for a report
@@ -86,9 +88,7 @@ class ReportAIHandler:
         try:
             # Call workflow
             result: ReportInsightState = await self.workflow.generate_insights(
-                report_type=report_type,
-                report_data=report_data,
-                parameters=parameters
+                report_type=report_type, report_data=report_data, parameters=parameters
             )
 
             # Check for errors
@@ -111,18 +111,20 @@ class ReportAIHandler:
                 "strategic_initiatives": result.get("strategic_initiatives", []),
                 "confidence_score": result.get("confidence_score", 0.5),
                 "generated_at": result.get("timestamp", datetime.now().isoformat()),
-                "processing_time_ms": result.get("processing_time_ms", 0)
+                "processing_time_ms": result.get("processing_time_ms", 0),
             }
 
             # Cache the result if caching is enabled
             if use_cache:
                 self._cache[cache_key] = {
                     "data": insights_response,
-                    "expires_at": datetime.now() + self._cache_ttl
+                    "expires_at": datetime.now() + self._cache_ttl,
                 }
                 logger.info(f"Cached insights for {report_type} report")
 
-            logger.info(f"AI insights generated successfully in {insights_response['processing_time_ms']}ms")
+            logger.info(
+                f"AI insights generated successfully in {insights_response['processing_time_ms']}ms"
+            )
             return insights_response
 
         except Exception as e:
@@ -134,7 +136,9 @@ class ReportAIHandler:
         params_str = json.dumps(parameters or {}, sort_keys=True)
         return f"{report_type}:{params_str}"
 
-    def _generate_fallback_insights(self, report_type: str, report_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _generate_fallback_insights(
+        self, report_type: str, report_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Generate fallback insights when AI is not available"""
         logger.info(f"Generating fallback insights for {report_type}")
 
@@ -148,74 +152,80 @@ class ReportAIHandler:
                 "insights": [
                     f"Total inventory items tracked: {stats.get('total_items', 'N/A')}",
                     "Monitor items approaching reorder points for timely replenishment",
-                    "Consider ABC classification for optimized inventory management"
+                    "Consider ABC classification for optimized inventory management",
                 ],
                 "recommendations": [
                     "Review and adjust reorder points based on consumption patterns",
                     "Implement automated alerts for low stock items",
-                    "Optimize safety stock levels to reduce carrying costs"
-                ]
+                    "Optimize safety stock levels to reduce carrying costs",
+                ],
             },
             "financial": {
                 "summary": "Financial report provides revenue and cost analysis for the reporting period.",
                 "insights": [
                     f"Total revenue tracked: ${stats.get('total_revenue', 0):,.2f}",
                     "Review order patterns for revenue optimization opportunities",
-                    "Monitor cost trends for budget management"
+                    "Monitor cost trends for budget management",
                 ],
                 "recommendations": [
                     "Analyze high-value orders for growth opportunities",
                     "Review supplier costs for negotiation possibilities",
-                    "Implement cost control measures for improved margins"
-                ]
+                    "Implement cost control measures for improved margins",
+                ],
             },
             "supplier": {
                 "summary": "Supplier performance metrics indicate delivery and quality standards.",
                 "insights": [
                     f"Total suppliers analyzed: {stats.get('total_suppliers', 'N/A')}",
                     "Track on-time delivery rates for performance management",
-                    "Monitor lead time variations for planning accuracy"
+                    "Monitor lead time variations for planning accuracy",
                 ],
                 "recommendations": [
                     "Establish performance improvement plans for underperforming suppliers",
                     "Consider supplier consolidation for volume discounts",
-                    "Implement supplier scorecards for regular evaluation"
-                ]
+                    "Implement supplier scorecards for regular evaluation",
+                ],
             },
             "consumption": {
                 "summary": "Consumption analysis reveals usage patterns and demand trends.",
                 "insights": [
                     f"Average daily consumption: {stats.get('avg_consumption', 'N/A')} units",
                     "Identify seasonal patterns for improved forecasting",
-                    "Monitor consumption volatility for safety stock adjustments"
+                    "Monitor consumption volatility for safety stock adjustments",
                 ],
                 "recommendations": [
                     "Adjust forecasting models based on recent consumption trends",
                     "Implement demand planning processes for better accuracy",
-                    "Review slow-moving items for inventory optimization"
-                ]
+                    "Review slow-moving items for inventory optimization",
+                ],
             },
             "analytics_dashboard": {
                 "summary": "Dashboard analytics provide comprehensive operational overview.",
                 "insights": [
                     "Key performance indicators show overall system health",
                     "Cross-functional metrics indicate areas for improvement",
-                    "Trend analysis reveals operational patterns"
+                    "Trend analysis reveals operational patterns",
                 ],
                 "recommendations": [
                     "Focus on KPIs showing negative trends",
                     "Implement cross-functional optimization initiatives",
-                    "Establish regular performance review cycles"
-                ]
-            }
+                    "Establish regular performance review cycles",
+                ],
+            },
         }
 
         # Get type-specific content or use default
-        type_content = type_insights.get(report_type, {
-            "summary": f"Analysis complete for {report_type} report.",
-            "insights": ["Data has been analyzed", "Review detailed metrics below"],
-            "recommendations": ["Continue monitoring key metrics", "Implement suggested improvements"]
-        })
+        type_content = type_insights.get(
+            report_type,
+            {
+                "summary": f"Analysis complete for {report_type} report.",
+                "insights": ["Data has been analyzed", "Review detailed metrics below"],
+                "recommendations": [
+                    "Continue monitoring key metrics",
+                    "Implement suggested improvements",
+                ],
+            },
+        )
 
         # Return fallback insights
         return {
@@ -225,7 +235,7 @@ class ReportAIHandler:
                 {
                     "type": "general",
                     "description": "Standard operational patterns observed",
-                    "confidence": "medium"
+                    "confidence": "medium",
                 }
             ],
             "anomalies": [],
@@ -233,17 +243,17 @@ class ReportAIHandler:
                 {
                     "prediction": "Trends expected to continue based on historical data",
                     "timeframe": "30 days",
-                    "confidence": "medium"
+                    "confidence": "medium",
                 }
             ],
             "risk_assessment": {
                 "overall_risk_level": "medium",
                 "risk_factors": [],
-                "risk_score": 5.0
+                "risk_score": 5.0,
             },
             "opportunities": [
                 "Process optimization potential identified",
-                "Cost reduction opportunities available"
+                "Cost reduction opportunities available",
             ],
             "recommendations": type_content["recommendations"],
             "action_items": [
@@ -252,14 +262,14 @@ class ReportAIHandler:
                     "priority": "high",
                     "owner": "Operations Team",
                     "timeline": "1 week",
-                    "expected_outcome": "Action plan developed"
+                    "expected_outcome": "Action plan developed",
                 }
             ],
             "quick_wins": [],
             "strategic_initiatives": [],
             "confidence_score": 0.3,  # Lower confidence for fallback
             "generated_at": datetime.now().isoformat(),
-            "processing_time_ms": 100
+            "processing_time_ms": 100,
         }
 
     def _calculate_basic_stats(self, report_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -278,11 +288,16 @@ class ReportAIHandler:
                         if value and isinstance(value[0], dict):
                             for field_key in value[0].keys():
                                 if isinstance(value[0][field_key], (int, float)):
-                                    values = [item.get(field_key, 0) for item in value
-                                              if isinstance(item.get(field_key), (int, float))]
+                                    values = [
+                                        item.get(field_key, 0)
+                                        for item in value
+                                        if isinstance(item.get(field_key), (int, float))
+                                    ]
                                     if values:
                                         stats[f"total_{field_key}"] = sum(values)
-                                        stats[f"avg_{field_key}"] = sum(values) / len(values)
+                                        stats[f"avg_{field_key}"] = sum(values) / len(
+                                            values
+                                        )
 
             elif isinstance(report_data, list):
                 stats["total_items"] = len(report_data)
@@ -299,11 +314,12 @@ class ReportAIHandler:
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics"""
-        valid_entries = sum(1 for entry in self._cache.values()
-                            if entry["expires_at"] > datetime.now())
+        valid_entries = sum(
+            1 for entry in self._cache.values() if entry["expires_at"] > datetime.now()
+        )
 
         return {
             "total_entries": len(self._cache),
             "valid_entries": valid_entries,
-            "expired_entries": len(self._cache) - valid_entries
+            "expired_entries": len(self._cache) - valid_entries,
         }

@@ -51,7 +51,7 @@ class ReportInsightsAgent:
             # Get AI analysis
             messages = [
                 SystemMessage(content=self.system_prompt),
-                HumanMessage(content=prompt)
+                HumanMessage(content=prompt),
             ]
 
             response = await self._call_llm(messages)
@@ -65,15 +65,12 @@ class ReportInsightsAgent:
                 "patterns": insights_data.get("patterns", []),
                 "anomalies": insights_data.get("anomalies", []),
                 "key_metrics": insights_data.get("key_metrics", {}),
-                "processing_stage": "insights_generated"
+                "processing_stage": "insights_generated",
             }
 
         except Exception as e:
             logger.error(f"Error in ReportInsightsAgent: {str(e)}")
-            return {
-                "error": str(e),
-                "processing_stage": "insights_failed"
-            }
+            return {"error": str(e), "processing_stage": "insights_failed"}
 
     def _prepare_data_summary(self, report_type: str, report_data: Dict) -> str:
         """Prepare a summary of the report data for analysis"""
@@ -86,8 +83,12 @@ class ReportInsightsAgent:
                     summary += f"{key}:\n"
                     summary += f"  - Number of records: {len(value)}\n"
                     if isinstance(value[0], dict):
-                        summary += f"  - Sample record: {json.dumps(value[0], indent=2)}\n"
-                    summary += f"  - First 5 records: {json.dumps(value[:5], indent=2)}\n\n"
+                        summary += (
+                            f"  - Sample record: {json.dumps(value[0], indent=2)}\n"
+                        )
+                    summary += (
+                        f"  - First 5 records: {json.dumps(value[:5], indent=2)}\n\n"
+                    )
                 elif isinstance(value, dict):
                     summary += f"{key}: {json.dumps(value, indent=2)}\n\n"
                 else:
@@ -99,7 +100,9 @@ class ReportInsightsAgent:
 
         return summary
 
-    def _build_analysis_prompt(self, report_type: str, data_summary: str, parameters: Dict) -> str:
+    def _build_analysis_prompt(
+        self, report_type: str, data_summary: str, parameters: Dict
+    ) -> str:
         """Build the analysis prompt based on report type"""
 
         type_specific_instructions = {
@@ -147,10 +150,12 @@ class ReportInsightsAgent:
                 - Operational efficiency
                 - Risk indicators
                 - Opportunity areas
-            """
+            """,
         }
 
-        specific_focus = type_specific_instructions.get(report_type, "Provide comprehensive analysis")
+        specific_focus = type_specific_instructions.get(
+            report_type, "Provide comprehensive analysis"
+        )
 
         prompt = f"""
         Analyze the following {report_type} report data and provide structured insights.
@@ -256,8 +261,10 @@ class ReportInsightsAgent:
                     anomalies.append({"description": content, "severity": "medium"})
 
         return {
-            "insights": insights if insights else ["Analysis complete - review data for details"],
+            "insights": insights
+            if insights
+            else ["Analysis complete - review data for details"],
             "patterns": patterns,
             "anomalies": anomalies,
-            "key_metrics": {}
+            "key_metrics": {},
         }

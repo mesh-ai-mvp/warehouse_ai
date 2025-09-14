@@ -49,8 +49,13 @@ class ReportRecommendationsAgent:
 
             # Build comprehensive context for recommendations
             context = self._build_recommendation_context(
-                report_type, insights, patterns, anomalies,
-                predictions, risk_assessment, opportunities
+                report_type,
+                insights,
+                patterns,
+                anomalies,
+                predictions,
+                risk_assessment,
+                opportunities,
             )
 
             # Generate recommendations prompt
@@ -59,13 +64,15 @@ class ReportRecommendationsAgent:
             # Get AI recommendations
             messages = [
                 SystemMessage(content=self.system_prompt),
-                HumanMessage(content=prompt)
+                HumanMessage(content=prompt),
             ]
 
             response = await self._call_llm(messages)
 
             # Parse recommendations
-            recommendations_data = self._parse_recommendations_response(response.content)
+            recommendations_data = self._parse_recommendations_response(
+                response.content
+            )
 
             # Update state with final recommendations
             return {
@@ -73,16 +80,15 @@ class ReportRecommendationsAgent:
                 "executive_summary": recommendations_data.get("executive_summary", ""),
                 "action_items": recommendations_data.get("action_items", []),
                 "quick_wins": recommendations_data.get("quick_wins", []),
-                "strategic_initiatives": recommendations_data.get("strategic_initiatives", []),
-                "processing_stage": "recommendations_completed"
+                "strategic_initiatives": recommendations_data.get(
+                    "strategic_initiatives", []
+                ),
+                "processing_stage": "recommendations_completed",
             }
 
         except Exception as e:
             logger.error(f"Error in ReportRecommendationsAgent: {str(e)}")
-            return {
-                "error": str(e),
-                "processing_stage": "recommendations_failed"
-            }
+            return {"error": str(e), "processing_stage": "recommendations_failed"}
 
     def _build_recommendation_context(
         self,
@@ -92,7 +98,7 @@ class ReportRecommendationsAgent:
         anomalies: List,
         predictions: List,
         risk_assessment: Dict,
-        opportunities: List
+        opportunities: List,
     ) -> str:
         """Build context for generating recommendations"""
 
@@ -112,10 +118,10 @@ class ReportRecommendationsAgent:
         {self._format_predictions(predictions)}
 
         RISK ASSESSMENT:
-        Overall Risk Level: {risk_assessment.get('overall_risk_level', 'Not assessed')}
-        Risk Score: {risk_assessment.get('risk_score', 'N/A')}
+        Overall Risk Level: {risk_assessment.get("overall_risk_level", "Not assessed")}
+        Risk Score: {risk_assessment.get("risk_score", "N/A")}
         Key Risk Factors:
-        {self._format_risk_factors(risk_assessment.get('risk_factors', []))}
+        {self._format_risk_factors(risk_assessment.get("risk_factors", []))}
 
         OPPORTUNITIES IDENTIFIED:
         {self._format_opportunities(opportunities)}
@@ -137,8 +143,8 @@ class ReportRecommendationsAgent:
         formatted = []
         for pattern in patterns:
             if isinstance(pattern, dict):
-                desc = pattern.get('description', 'Unknown pattern')
-                conf = pattern.get('confidence', 'unknown')
+                desc = pattern.get("description", "Unknown pattern")
+                conf = pattern.get("confidence", "unknown")
                 formatted.append(f"- {desc} (Confidence: {conf})")
             else:
                 formatted.append(f"- {pattern}")
@@ -153,8 +159,8 @@ class ReportRecommendationsAgent:
         formatted = []
         for anomaly in anomalies:
             if isinstance(anomaly, dict):
-                desc = anomaly.get('description', 'Unknown anomaly')
-                sev = anomaly.get('severity', 'unknown')
+                desc = anomaly.get("description", "Unknown anomaly")
+                sev = anomaly.get("severity", "unknown")
                 formatted.append(f"- [{sev.upper()}] {desc}")
             else:
                 formatted.append(f"- {anomaly}")
@@ -169,9 +175,9 @@ class ReportRecommendationsAgent:
         formatted = []
         for pred in predictions:
             if isinstance(pred, dict):
-                desc = pred.get('prediction', 'Unknown prediction')
-                time = pred.get('timeframe', 'unknown')
-                conf = pred.get('confidence', 'unknown')
+                desc = pred.get("prediction", "Unknown prediction")
+                time = pred.get("timeframe", "unknown")
+                conf = pred.get("confidence", "unknown")
                 formatted.append(f"- {desc} (Timeframe: {time}, Confidence: {conf})")
             else:
                 formatted.append(f"- {pred}")
@@ -186,8 +192,8 @@ class ReportRecommendationsAgent:
         formatted = []
         for risk in risk_factors:
             if isinstance(risk, dict):
-                factor = risk.get('factor', 'Unknown risk')
-                severity = risk.get('severity', 'unknown')
+                factor = risk.get("factor", "Unknown risk")
+                severity = risk.get("severity", "unknown")
                 formatted.append(f"- [{severity.upper()}] {factor}")
             else:
                 formatted.append(f"- {risk}")
@@ -202,9 +208,9 @@ class ReportRecommendationsAgent:
         formatted = []
         for opp in opportunities:
             if isinstance(opp, dict):
-                desc = opp.get('opportunity', 'Unknown opportunity')
-                savings = opp.get('potential_savings', 'TBD')
-                effort = opp.get('implementation_effort', 'unknown')
+                desc = opp.get("opportunity", "Unknown opportunity")
+                savings = opp.get("potential_savings", "TBD")
+                effort = opp.get("implementation_effort", "unknown")
                 formatted.append(f"- {desc} (Savings: {savings}, Effort: {effort})")
             else:
                 formatted.append(f"- {opp}")
@@ -259,10 +265,12 @@ class ReportRecommendationsAgent:
                 - Strategic priorities
                 - Operational excellence
                 - Performance management
-            """
+            """,
         }
 
-        specific_focus = type_specific_focus.get(report_type, "Provide comprehensive recommendations")
+        specific_focus = type_specific_focus.get(
+            report_type, "Provide comprehensive recommendations"
+        )
 
         prompt = f"""
         Based on the following analysis context, generate actionable recommendations and an executive summary.
@@ -349,7 +357,7 @@ class ReportRecommendationsAgent:
             "recommendations": [
                 "Review and optimize current operational processes",
                 "Implement continuous monitoring of key metrics",
-                "Establish regular review cycles for performance improvement"
+                "Establish regular review cycles for performance improvement",
             ],
             "action_items": [
                 {
@@ -358,9 +366,9 @@ class ReportRecommendationsAgent:
                     "owner": "Management",
                     "timeline": "1 week",
                     "expected_outcome": "Action plan developed",
-                    "resources_needed": "Team meeting time"
+                    "resources_needed": "Team meeting time",
                 }
             ],
             "quick_wins": [],
-            "strategic_initiatives": []
+            "strategic_initiatives": [],
         }
