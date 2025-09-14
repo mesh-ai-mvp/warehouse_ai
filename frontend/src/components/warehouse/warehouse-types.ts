@@ -16,6 +16,7 @@ export interface Shelf {
   level: number;
   medications: Medication[];
   capacity: number;
+  code?: string;
 }
 
 export interface Aisle {
@@ -25,6 +26,8 @@ export interface Aisle {
   shelves: Shelf[];
   category: string;
   temperature: number;
+  shelfCount?: number;
+  medicationCount?: number;
 }
 
 // Type exports for compatibility

@@ -28,7 +28,9 @@ const transformApiToComponentAisle = (apiAisle: ApiAisle, apiShelves?: ApiShelf[
     },
     category: apiAisle.category,
     temperature: apiAisle.temperature,
-    shelves: apiShelves?.map(shelf => transformApiToComponentShelf(shelf)) || []
+    shelves: apiShelves?.map(shelf => transformApiToComponentShelf(shelf)) || [],
+    shelfCount: (apiAisle as any).shelf_count ?? (apiShelves?.length || 0),
+    medicationCount: (apiAisle as any).total_items ?? (apiAisle as any).medication_count ?? 0
   };
 };
 
@@ -38,7 +40,8 @@ const transformApiToComponentShelf = (apiShelf: ApiShelf): Shelf => {
     position: apiShelf.position,
     level: apiShelf.level,
     capacity: apiShelf.capacity_slots,
-    medications: apiShelf.medications?.map(med => transformApiToComponentMedication(med)) || []
+    medications: apiShelf.medications?.map(med => transformApiToComponentMedication(med)) || [],
+    code: (apiShelf as any).shelf_code
   };
 };
 
@@ -403,9 +406,30 @@ export function WarehouseUI() {
   const selectedAisleWithDetails = useMemo(() => {
     if (!selectedAisle || !aisleDetails) return selectedAisle;
 
+    // Group medications by shelf_id
+    const medicationsByShelf: { [key: string]: any[] } = {};
+    if (aisleDetails.medications) {
+      aisleDetails.medications.forEach((med: any) => {
+        const shelfId = med.shelf_id?.toString();
+        if (shelfId) {
+          if (!medicationsByShelf[shelfId]) {
+            medicationsByShelf[shelfId] = [];
+          }
+          medicationsByShelf[shelfId].push(med);
+        }
+      });
+    }
+
     return {
       ...selectedAisle,
-      shelves: aisleDetails.shelves.map(shelf => transformApiToComponentShelf(shelf))
+      shelves: aisleDetails.shelves.map(shelf => {
+        // Add medications to each shelf
+        const shelfWithMeds = {
+          ...shelf,
+          medications: medicationsByShelf[shelf.shelf_id.toString()] || []
+        };
+        return transformApiToComponentShelf(shelfWithMeds);
+      })
     };
   }, [selectedAisle, aisleDetails]);
 
@@ -484,7 +508,7 @@ export function WarehouseUI() {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-hidden relative">
+    <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative">
       {/* Navigation Bar */}
       <WarehouseNavigation
         currentView={currentView}
@@ -525,7 +549,7 @@ export function WarehouseUI() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-20 right-4 z-20"
+                          className="fixed top-24 right-4 z-20"
           >
             {!searchOpen ? (
               <button
@@ -560,7 +584,7 @@ export function WarehouseUI() {
       </AnimatePresence>
 
       {/* Main Content Area */}
-      <main className="h-full pt-16 relative">
+      <main className="pt-16 relative h-[calc(100vh-4rem)] overflow-y-auto">
         <AnimatePresence mode="wait">
           {currentView === 'warehouse' && (
             <motion.div

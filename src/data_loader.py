@@ -755,11 +755,13 @@ class DataLoader:
                 GROUP BY z.zone_id
             """
             df = pd.read_sql_query(query, conn)
-            return clean_nan_values(df.to_dict('records'))
+            return clean_nan_values(df.to_dict("records"))
         finally:
             conn.close()
 
-    def get_warehouse_aisles(self, zone_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_warehouse_aisles(
+        self, zone_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
         """Get warehouse aisles, optionally filtered by zone"""
         conn = self.get_connection()
         try:
@@ -782,11 +784,13 @@ class DataLoader:
                     GROUP BY a.aisle_id
                 """
                 df = pd.read_sql_query(query, conn)
-            return clean_nan_values(df.to_dict('records'))
+            return clean_nan_values(df.to_dict("records"))
         finally:
             conn.close()
 
-    def get_warehouse_shelves(self, aisle_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_warehouse_shelves(
+        self, aisle_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
         """Get warehouse shelves, optionally filtered by aisle"""
         conn = self.get_connection()
         try:
@@ -817,7 +821,7 @@ class DataLoader:
                     ORDER BY s.aisle_id, s.position, s.level
                 """
                 df = pd.read_sql_query(query, conn)
-            return clean_nan_values(df.to_dict('records'))
+            return clean_nan_values(df.to_dict("records"))
         finally:
             conn.close()
 
@@ -844,7 +848,9 @@ class DataLoader:
         finally:
             conn.close()
 
-    def get_medication_placements(self, med_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_medication_placements(
+        self, med_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
         """Get medication placements across the warehouse"""
         conn = self.get_connection()
         try:
@@ -874,15 +880,17 @@ class DataLoader:
                     WHERE mp.is_active = 1
                 """
                 df = pd.read_sql_query(query, conn)
-            return clean_nan_values(df.to_dict('records'))
+            return clean_nan_values(df.to_dict("records"))
         finally:
             conn.close()
 
-    def get_warehouse_alerts(self, days_ahead: int = 30) -> Dict[str, List[Dict[str, Any]]]:
+    def get_warehouse_alerts(
+        self, days_ahead: int = 30
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """Get warehouse alerts for expiring items, temperature issues, and capacity warnings"""
         conn = self.get_connection()
         try:
-            alerts = {'expiry': [], 'temperature': [], 'capacity': []}
+            alerts = {"expiry": [], "temperature": [], "capacity": []}
 
             # Expiry alerts
             expiry_query = f"""
@@ -900,7 +908,7 @@ class DataLoader:
                 ORDER BY b.expiry_date
             """
             expiry_df = pd.read_sql_query(expiry_query, conn)
-            alerts['expiry'] = clean_nan_values(expiry_df.to_dict('records'))
+            alerts["expiry"] = clean_nan_values(expiry_df.to_dict("records"))
 
             # Temperature alerts (last hour)
             temp_query = """
@@ -911,7 +919,7 @@ class DataLoader:
                     AND t.reading_time >= datetime('now', '-1 hour')
             """
             temp_df = pd.read_sql_query(temp_query, conn)
-            alerts['temperature'] = clean_nan_values(temp_df.to_dict('records'))
+            alerts["temperature"] = clean_nan_values(temp_df.to_dict("records"))
 
             # Capacity alerts
             capacity_query = """
@@ -922,13 +930,15 @@ class DataLoader:
                 WHERE s.utilization_percent > 90
             """
             capacity_df = pd.read_sql_query(capacity_query, conn)
-            alerts['capacity'] = clean_nan_values(capacity_df.to_dict('records'))
+            alerts["capacity"] = clean_nan_values(capacity_df.to_dict("records"))
 
             return alerts
         finally:
             conn.close()
 
-    def get_movement_history(self, days: int = 7, med_id: Optional[int] = None) -> pd.DataFrame:
+    def get_movement_history(
+        self, days: int = 7, med_id: Optional[int] = None
+    ) -> pd.DataFrame:
         """Get movement history for the warehouse"""
         conn = self.get_connection()
         try:

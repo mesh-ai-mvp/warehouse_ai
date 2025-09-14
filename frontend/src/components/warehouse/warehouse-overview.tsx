@@ -15,9 +15,10 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
   const [hoveredAisle, setHoveredAisle] = useState<string | null>(null);
 
   const getAisleStatus = (aisle: Aisle) => {
-    const totalMedications = aisle.shelves.reduce((acc, shelf) => acc + shelf.medications.length, 0);
-    const totalCapacity = aisle.shelves.length;
-    const fillPercentage = totalCapacity > 0 ? (totalMedications / totalCapacity) * 100 : 0;
+    const totalMedications = (aisle as any).medicationCount ?? aisle.shelves.reduce((acc, shelf) => acc + shelf.medications.length, 0);
+    const shelfCount = ((aisle as any).shelfCount ?? aisle.shelves.length) || 8;
+    const maxCapacity = shelfCount * 50; // Assume 50 items per shelf average capacity
+    const fillPercentage = maxCapacity > 0 ? (totalMedications / maxCapacity) * 100 : 0;
 
     if (fillPercentage > 80) return 'high';
     if (fillPercentage > 40) return 'medium';
@@ -72,7 +73,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
   };
 
   return (
-    <div className="h-full relative overflow-hidden">
+    <div className="h-full relative overflow-auto">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-slate-900/90 to-transparent p-6">
         <motion.div
@@ -86,7 +87,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
       </div>
 
       {/* 3D Warehouse Floor */}
-      <div className="h-full flex items-center justify-center perspective-1000 p-8">
+      <div className="h-full flex items-center justify-center perspective-1000 p-10 pt-32 pb-20">
         <motion.div
           initial={{ opacity: 0, rotateX: 45 }}
           animate={{ opacity: 1, rotateX: 20 }}
@@ -94,7 +95,8 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
           className="relative preserve-3d w-full max-w-4xl h-full max-h-[600px]"
           style={{
             transformStyle: 'preserve-3d',
-            transform: 'rotateX(20deg) rotateY(-10deg)'
+            transform: 'rotateX(20deg) rotateY(-10deg)',
+            marginTop: '2rem'
           }}
         >
           {/* Warehouse Building Outline */}
@@ -113,7 +115,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
           </motion.div>
 
           {/* Main Storage Area Grid */}
-          <div className="absolute inset-8 grid grid-cols-3 grid-rows-2 gap-6 p-4">
+          <div className="absolute inset-8 grid grid-cols-3 grid-rows-2 gap-10 p-4">
             {aisles.map((aisle, index) => {
               const status = getAisleStatus(aisle);
               const isHovered = hoveredAisle === aisle.id;
@@ -137,8 +139,11 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                     gridColumn: col + 1,
                     gridRow: row + 1,
                     transform: `translateZ(${isHovered ? '30px' : '0px'})`,
-                    transformStyle: 'preserve-3d'
+                    transformStyle: 'preserve-3d',
+                    zIndex: isHovered ? 50 : 'auto'
                   }}
+                  onMouseEnter={() => setHoveredAisle(aisle.id)}
+                  onMouseLeave={() => setHoveredAisle(null)}
                   onClick={(e) => {
                     e.preventDefault();
                     onAisleClick(aisle);
@@ -154,7 +159,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
 
                   {/* Aisle Container */}
                   <div
-                    className={`relative w-full h-full bg-gradient-to-br ${getStatusColor(status, aisle.category)} rounded-lg shadow-2xl overflow-hidden min-h-[120px]`}
+                    className={`relative w-full h-full bg-gradient-to-br ${getStatusColor(status, aisle.category)} rounded-lg shadow-2xl overflow-hidden min-h-[140px]`}
                     style={{
                       boxShadow: isHovered
                         ? '0 25px 50px rgba(0,0,0,0.6), 0 0 40px rgba(59, 130, 246, 0.4)'
@@ -171,15 +176,18 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                     }`} />
 
                     {/* Shelving Units Visualization */}
-                    <div className="absolute inset-4 grid grid-cols-6 grid-rows-4 gap-1">
+                    <div className="absolute inset-4 grid grid-cols-6 grid-rows-4 gap-2">
                       {Array.from({ length: 24 }).map((_, i) => {
-                        const shelfIndex = Math.floor(i / 3);
-                        const hasStock = shelfIndex < aisle.shelves.length && aisle.shelves[shelfIndex]?.medications.length > 0;
+                        const status = getAisleStatus(aisle);
+                        const fillPercentage = status === 'high' ? 90 :
+                                              status === 'medium' ? 60 :
+                                              status === 'low' ? 30 : 0;
+                        const filledSlots = Math.floor(24 * (fillPercentage / 100));
                         return (
                           <div
                             key={i}
                             className={`rounded-sm transition-all duration-300 ${
-                              hasStock ? 'bg-white/50 shadow-sm' : 'bg-white/15'
+                              i < filledSlots ? 'bg-white/50 shadow-sm' : 'bg-white/15'
                             }`}
                           />
                         );
@@ -210,7 +218,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                         'bg-gray-300'
                       }`} />
                       <span className="text-white/80 text-xs">
-                        {aisle.shelves.reduce((acc, shelf) => acc + shelf.medications.length, 0)} items
+                        {((aisle as any).medicationCount ?? aisle.shelves.reduce((acc, shelf) => acc + shelf.medications.length, 0))} items
                       </span>
                     </div>
 
@@ -232,7 +240,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                       scale: isHovered ? 1 : 0.9
                     }}
                     transition={{ duration: 0.2 }}
-                    className="absolute -top-24 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-xl p-4 shadow-2xl border border-white/20 min-w-[240px] z-20"
+                    className="absolute -top-24 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-xl p-4 shadow-2xl border border-white/20 min-w-[240px] z-[100]"
                     style={{ transformStyle: 'preserve-3d' }}
                   >
                     <div className="flex items-center gap-3 mb-3">
@@ -253,7 +261,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                       </div>
                       <div>
                         <div className="text-slate-500">Shelves</div>
-                        <div className="font-medium">{aisle.shelves.length}</div>
+                        <div className="font-medium">{(aisle as any).shelfCount ?? aisle.shelves.length}</div>
                       </div>
                       <div>
                         <div className="text-slate-500">Status</div>
@@ -292,7 +300,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 1.2 }}
-            className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-2"
+            className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-2 pointer-events-none"
           >
             <div className="bg-slate-700/80 backdrop-blur-sm px-6 py-3 rounded-t-xl border-t border-l border-r border-slate-600/50">
               <div className="text-slate-300 text-sm font-medium mb-1">Main Entrance</div>
@@ -311,7 +319,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 1, delay: 1.4 }}
-            className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-4"
+            className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-4 pointer-events-none"
           >
             <div className="bg-slate-700/60 backdrop-blur-sm px-3 py-2 rounded-l-lg border-l border-t border-b border-slate-600/50">
               <div className="text-slate-300 text-xs font-medium">Admin</div>
@@ -323,7 +331,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 1, delay: 1.6 }}
-            className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-4"
+            className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-4 pointer-events-none"
           >
             <div className="bg-slate-700/60 backdrop-blur-sm px-3 py-2 rounded-r-lg border-r border-t border-b border-slate-600/50">
               <div className="text-slate-300 text-xs font-medium">Quality</div>

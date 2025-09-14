@@ -9,8 +9,7 @@ Provides real-time updates for:
 """
 
 from typing import Dict, List, Set
-from fastapi import WebSocket, WebSocketDisconnect
-import json
+from fastapi import WebSocket
 import asyncio
 import logging
 from datetime import datetime
@@ -21,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class EventType(Enum):
     """Types of real-time events"""
+
     TEMPERATURE_UPDATE = "temperature_update"
     INVENTORY_MOVEMENT = "inventory_movement"
     ALERT_TRIGGERED = "alert_triggered"
@@ -39,11 +39,13 @@ class ConnectionManager:
             "temperature": set(),
             "inventory": set(),
             "alerts": set(),
-            "shelf": set()
+            "shelf": set(),
         }
         self.connection_metadata: Dict[WebSocket, Dict] = {}
 
-    async def connect(self, websocket: WebSocket, client_id: str, subscriptions: List[str] = None):
+    async def connect(
+        self, websocket: WebSocket, client_id: str, subscriptions: List[str] = None
+    ):
         """Accept new WebSocket connection"""
         await websocket.accept()
 
@@ -60,7 +62,7 @@ class ConnectionManager:
         self.connection_metadata[websocket] = {
             "client_id": client_id,
             "connected_at": datetime.now().isoformat(),
-            "subscriptions": subscriptions or ["all"]
+            "subscriptions": subscriptions or ["all"],
         }
 
         logger.info(f"Client {client_id} connected with subscriptions: {subscriptions}")
@@ -72,8 +74,8 @@ class ConnectionManager:
                 "type": "connection_established",
                 "client_id": client_id,
                 "timestamp": datetime.now().isoformat(),
-                "subscriptions": subscriptions or ["all"]
-            }
+                "subscriptions": subscriptions or ["all"],
+            },
         )
 
     def disconnect(self, websocket: WebSocket):
@@ -115,7 +117,9 @@ class ConnectionManager:
         for conn in disconnected:
             self.disconnect(conn)
 
-    async def broadcast_temperature_update(self, aisle_id: int, temperature: float, humidity: float = None):
+    async def broadcast_temperature_update(
+        self, aisle_id: int, temperature: float, humidity: float = None
+    ):
         """Broadcast temperature update"""
         message = {
             "type": EventType.TEMPERATURE_UPDATE.value,
@@ -123,13 +127,15 @@ class ConnectionManager:
                 "aisle_id": aisle_id,
                 "temperature": temperature,
                 "humidity": humidity,
-                "timestamp": datetime.now().isoformat()
-            }
+                "timestamp": datetime.now().isoformat(),
+            },
         }
         await self.broadcast(message, "temperature")
         await self.broadcast(message, "all")
 
-    async def broadcast_inventory_movement(self, med_id: int, from_shelf: int, to_shelf: int, quantity: int):
+    async def broadcast_inventory_movement(
+        self, med_id: int, from_shelf: int, to_shelf: int, quantity: int
+    ):
         """Broadcast inventory movement"""
         message = {
             "type": EventType.INVENTORY_MOVEMENT.value,
@@ -138,13 +144,15 @@ class ConnectionManager:
                 "from_shelf": from_shelf,
                 "to_shelf": to_shelf,
                 "quantity": quantity,
-                "timestamp": datetime.now().isoformat()
-            }
+                "timestamp": datetime.now().isoformat(),
+            },
         }
         await self.broadcast(message, "inventory")
         await self.broadcast(message, "all")
 
-    async def broadcast_alert(self, alert_type: str, severity: str, location: str, message_text: str):
+    async def broadcast_alert(
+        self, alert_type: str, severity: str, location: str, message_text: str
+    ):
         """Broadcast alert notification"""
         message = {
             "type": EventType.ALERT_TRIGGERED.value,
@@ -153,13 +161,15 @@ class ConnectionManager:
                 "severity": severity,
                 "location": location,
                 "message": message_text,
-                "timestamp": datetime.now().isoformat()
-            }
+                "timestamp": datetime.now().isoformat(),
+            },
         }
         await self.broadcast(message, "alerts")
         await self.broadcast(message, "all")
 
-    async def broadcast_shelf_update(self, shelf_id: int, utilization: float, medications_count: int):
+    async def broadcast_shelf_update(
+        self, shelf_id: int, utilization: float, medications_count: int
+    ):
         """Broadcast shelf utilization update"""
         message = {
             "type": EventType.SHELF_UPDATE.value,
@@ -167,8 +177,8 @@ class ConnectionManager:
                 "shelf_id": shelf_id,
                 "utilization_percent": utilization,
                 "medications_count": medications_count,
-                "timestamp": datetime.now().isoformat()
-            }
+                "timestamp": datetime.now().isoformat(),
+            },
         }
         await self.broadcast(message, "shelf")
         await self.broadcast(message, "all")
@@ -185,10 +195,10 @@ class ConnectionManager:
                 {
                     "client_id": meta["client_id"],
                     "connected_at": meta["connected_at"],
-                    "subscriptions": meta["subscriptions"]
+                    "subscriptions": meta["subscriptions"],
                 }
                 for meta in self.connection_metadata.values()
-            ]
+            ],
         }
         return stats
 
@@ -253,7 +263,9 @@ class WarehouseEventSimulator:
         quantity = random.randint(1, 20)
 
         if from_shelf != to_shelf:
-            await self.manager.broadcast_inventory_movement(med_id, from_shelf, to_shelf, quantity)
+            await self.manager.broadcast_inventory_movement(
+                med_id, from_shelf, to_shelf, quantity
+            )
 
     async def _simulate_alert(self):
         """Simulate various alerts"""
@@ -263,7 +275,7 @@ class WarehouseEventSimulator:
             ("temperature", "warning", "Aisle A", "Temperature out of range: 26°C"),
             ("expiry", "critical", "Shelf B3", "Medication expires in 3 days"),
             ("capacity", "info", "Shelf C5", "Shelf at 95% capacity"),
-            ("expiry", "warning", "Shelf A2", "Medication expires in 15 days")
+            ("expiry", "warning", "Shelf A2", "Medication expires in 15 days"),
         ]
 
         alert = random.choice(alert_types)

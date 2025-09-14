@@ -13,12 +13,9 @@ Performance optimizations include:
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
-from datetime import datetime, timedelta
 import pandas as pd
-import numpy as np
 import logging
 import json
-import asyncio
 from functools import wraps
 from src.utils.cache_manager import warehouse_cache
 
@@ -67,13 +64,13 @@ def clean_nan_values(data: Any) -> Any:
 
 def cache_response(ttl_seconds: int = 30):
     """Decorator to cache API responses"""
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             # Generate cache key
             cache_key = warehouse_cache._generate_key(
-                func.__name__,
-                {'args': str(args), 'kwargs': str(kwargs)}
+                func.__name__, {"args": str(args), "kwargs": str(kwargs)}
             )
 
             # Check cache
@@ -88,7 +85,9 @@ def cache_response(ttl_seconds: int = 30):
             warehouse_cache.set(cache_key, result, ttl_seconds)
 
             return result
+
         return wrapper
+
     return decorator
 
 
@@ -105,6 +104,7 @@ async def get_warehouse_layout():
     """
     try:
         from api.routes import data_loader
+
         conn = data_loader.get_connection()
 
         # Optimized single query with all needed data
@@ -133,9 +133,13 @@ async def get_warehouse_layout():
                 a.humidity,
                 a.category,
                 COUNT(DISTINCT s.shelf_id) as shelf_count,
-                AVG(s.utilization_percent) as avg_utilization
+                AVG(s.utilization_percent) as avg_utilization,
+                COUNT(DISTINCT mp.med_id) as medication_count,
+                COALESCE(SUM(mp.quantity), 0) as total_items
             FROM warehouse_aisles a
             LEFT JOIN warehouse_shelves s ON a.aisle_id = s.aisle_id
+            LEFT JOIN shelf_positions sp ON s.shelf_id = sp.shelf_id
+            LEFT JOIN medication_placements mp ON sp.position_id = mp.position_id AND mp.is_active = 1
             GROUP BY a.aisle_id
         ),
         stats_data AS (
@@ -171,7 +175,9 @@ async def get_warehouse_layout():
                 'humidity', humidity,
                 'category', category,
                 'shelf_count', shelf_count,
-                'avg_utilization', avg_utilization
+                'avg_utilization', avg_utilization,
+                'medication_count', medication_count,
+                'total_items', total_items
             )) FROM aisle_data) as aisles,
             (SELECT json_object(
                 'total_medications', total_medications,
@@ -194,12 +200,9 @@ async def get_warehouse_layout():
         aisles = json.loads(result[1]) if result[1] else []
         stats = json.loads(result[2]) if result[2] else {}
 
-        return clean_nan_values({
-            "zones": zones,
-            "aisles": aisles,
-            "stats": stats,
-            "cached": False
-        })
+        return clean_nan_values(
+            {"zones": zones, "aisles": aisles, "stats": stats, "cached": False}
+        )
 
     except Exception as e:
         logger.error(f"Error fetching warehouse layout: {e}")
@@ -214,6 +217,7 @@ async def get_aisle_details(aisle_id: int):
     """
     try:
         from api.routes import data_loader
+
         conn = data_loader.get_connection()
 
         # Use a single optimized query with CTEs
@@ -290,8 +294,8 @@ async def get_aisle_details(aisle_id: int):
                 'capacity_slots', capacity_slots,
                 'utilization_percent', utilization_percent,
                 'medication_count', medication_count,
-                'total_items', total_items,
-                'occupied_positions', occupied_positions
+                'total_items', COALESCE(total_items, 0),
+                'occupied_positions', COALESCE(occupied_positions, 0)
             )) FROM shelf_info) as shelves,
             (SELECT json_group_array(json_object(
                 'med_id', med_id,
@@ -322,14 +326,16 @@ async def get_aisle_details(aisle_id: int):
         medications = json.loads(result[2]) if result[2] else []
         temperature = json.loads(result[3]) if result[3] else None
 
-        return clean_nan_values({
-            "aisle": aisle,
-            "shelves": shelves,
-            "medications": medications,
-            "temperature": temperature,
-            "total_medications": len(medications),
-            "cached": False
-        })
+        return clean_nan_values(
+            {
+                "aisle": aisle,
+                "shelves": shelves,
+                "medications": medications,
+                "temperature": temperature,
+                "total_medications": len(medications),
+                "cached": False,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error fetching aisle details: {e}")
@@ -340,13 +346,16 @@ async def get_aisle_details(aisle_id: int):
 @cache_response(ttl_seconds=30)
 async def get_shelf_inventory_optimized(
     shelf_id: int,
-    include_positions: bool = Query(default=False, description="Include detailed position data")
+    include_positions: bool = Query(
+        default=False, description="Include detailed position data"
+    ),
 ):
     """
     Optimized shelf inventory with optional position loading
     """
     try:
         from api.routes import data_loader
+
         conn = data_loader.get_connection()
 
         # Base query for shelf info
@@ -433,11 +442,11 @@ async def get_shelf_inventory_optimized(
         response = {
             "shelf": shelf_data,
             "utilization": {
-                "percent": shelf_data.get('utilization_percent', 0),
-                "occupied": shelf_data.get('occupied_positions', 0),
-                "total": shelf_data.get('total_positions', 0)
+                "percent": shelf_data.get("utilization_percent", 0),
+                "occupied": shelf_data.get("occupied_positions", 0),
+                "total": shelf_data.get("total_positions", 0),
             },
-            "cached": False
+            "cached": False,
         }
 
         if position_data is not None:
@@ -458,6 +467,7 @@ async def get_alerts_summary():
     """
     try:
         from api.routes import data_loader
+
         conn = data_loader.get_connection()
 
         # Single query for all alert counts
@@ -492,7 +502,7 @@ async def get_alerts_summary():
             "capacity_alerts": result[3] or 0,
             "underutilized_shelves": result[4] or 0,
             "total_alerts": sum(result[:4]),
-            "cached": False
+            "cached": False,
         }
 
     except Exception as e:
@@ -509,11 +519,7 @@ async def invalidate_cache(pattern: Optional[str] = None):
         pattern: Optional pattern to match cache keys
     """
     count = warehouse_cache.invalidate(pattern)
-    return {
-        "success": True,
-        "invalidated_entries": count,
-        "pattern": pattern or "all"
-    }
+    return {"success": True, "invalidated_entries": count, "pattern": pattern or "all"}
 
 
 @router.get("/cache/stats")
@@ -527,7 +533,7 @@ async def get_medications_batch(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     category: Optional[str] = None,
-    velocity: Optional[str] = None
+    velocity: Optional[str] = None,
 ):
     """
     Get medications with pagination and filtering
@@ -539,6 +545,7 @@ async def get_medications_batch(
     """
     try:
         from api.routes import data_loader
+
         conn = data_loader.get_connection()
 
         # Build WHERE clause
@@ -572,7 +579,7 @@ async def get_medications_batch(
         LIMIT {limit} OFFSET {offset}
         """
 
-        medications = pd.read_sql_query(query, conn).to_dict('records')
+        medications = pd.read_sql_query(query, conn).to_dict("records")
 
         # Get total count for pagination
         count_query = f"""
@@ -582,17 +589,19 @@ async def get_medications_batch(
         LEFT JOIN medication_placements mp ON m.med_id = mp.med_id
         WHERE {where_clause}
         """
-        total_count = pd.read_sql_query(count_query, conn).iloc[0]['total']
+        total_count = pd.read_sql_query(count_query, conn).iloc[0]["total"]
 
-        return clean_nan_values({
-            "medications": medications,
-            "pagination": {
-                "offset": offset,
-                "limit": limit,
-                "total": int(total_count),
-                "has_more": offset + limit < total_count
+        return clean_nan_values(
+            {
+                "medications": medications,
+                "pagination": {
+                    "offset": offset,
+                    "limit": limit,
+                    "total": int(total_count),
+                    "has_more": offset + limit < total_count,
+                },
             }
-        })
+        )
 
     except Exception as e:
         logger.error(f"Error fetching medications batch: {e}")
@@ -601,8 +610,7 @@ async def get_medications_batch(
 
 @router.post("/batch/move")
 async def batch_move_medications(
-    moves: List[MoveRequest],
-    background_tasks: BackgroundTasks
+    moves: List[MoveRequest], background_tasks: BackgroundTasks
 ):
     """
     Batch move multiple medications
@@ -613,6 +621,7 @@ async def batch_move_medications(
     """
     try:
         from api.routes import data_loader
+
         conn = data_loader.get_connection()
         cursor = conn.cursor()
 
@@ -638,10 +647,12 @@ async def batch_move_medications(
                     source = cursor.fetchone()
 
                     if not source or source[1] < move.quantity:
-                        failed_moves.append({
-                            "med_id": move.med_id,
-                            "reason": "Invalid source or insufficient quantity"
-                        })
+                        failed_moves.append(
+                            {
+                                "med_id": move.med_id,
+                                "reason": "Invalid source or insufficient quantity",
+                            }
+                        )
                         continue
 
                     # Find target position
@@ -657,52 +668,53 @@ async def batch_move_medications(
                     target = cursor.fetchone()
 
                     if not target:
-                        failed_moves.append({
-                            "med_id": move.med_id,
-                            "reason": "No available position on target shelf"
-                        })
+                        failed_moves.append(
+                            {
+                                "med_id": move.med_id,
+                                "reason": "No available position on target shelf",
+                            }
+                        )
                         continue
 
                     # Execute move
                     if source[1] == move.quantity:
                         cursor.execute(
                             "UPDATE medication_placements SET is_active = 0 WHERE placement_id = ?",
-                            (source[0],)
+                            (source[0],),
                         )
                     else:
                         cursor.execute(
                             "UPDATE medication_placements SET quantity = quantity - ? WHERE placement_id = ?",
-                            (move.quantity, source[0])
+                            (move.quantity, source[0]),
                         )
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO medication_placements
                         (position_id, med_id, quantity, placement_date, placement_reason, is_active)
                         VALUES (?, ?, ?, datetime('now'), ?, 1)
-                    """, (target[0], move.med_id, move.quantity, move.reason))
+                    """,
+                        (target[0], move.med_id, move.quantity, move.reason),
+                    )
 
-                    successful_moves.append({
-                        "med_id": move.med_id,
-                        "quantity": move.quantity,
-                        "from_shelf": move.from_shelf,
-                        "to_shelf": move.to_shelf
-                    })
+                    successful_moves.append(
+                        {
+                            "med_id": move.med_id,
+                            "quantity": move.quantity,
+                            "from_shelf": move.from_shelf,
+                            "to_shelf": move.to_shelf,
+                        }
+                    )
 
                 except Exception as e:
-                    failed_moves.append({
-                        "med_id": move.med_id,
-                        "reason": str(e)
-                    })
+                    failed_moves.append({"med_id": move.med_id, "reason": str(e)})
 
             # Commit transaction
             cursor.execute("COMMIT")
 
             # Record movements in background
             if successful_moves:
-                background_tasks.add_task(
-                    record_batch_movements,
-                    successful_moves
-                )
+                background_tasks.add_task(record_batch_movements, successful_moves)
 
             # Invalidate related cache
             warehouse_cache.invalidate("shelf")
@@ -712,7 +724,9 @@ async def batch_move_medications(
                 "successful_moves": successful_moves,
                 "failed_moves": failed_moves,
                 "total_processed": len(moves),
-                "success_rate": len(successful_moves) / len(moves) * 100 if moves else 0
+                "success_rate": len(successful_moves) / len(moves) * 100
+                if moves
+                else 0,
             }
 
         except Exception as e:
@@ -728,15 +742,19 @@ async def record_batch_movements(moves: List[Dict]):
     """Background task to record movement history"""
     try:
         from api.routes import data_loader
+
         conn = data_loader.get_connection()
         cursor = conn.cursor()
 
         for move in moves:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO movement_history
                 (med_id, movement_type, quantity, movement_date)
                 VALUES (?, 'batch_relocate', ?, datetime('now'))
-            """, (move['med_id'], move['quantity']))
+            """,
+                (move["med_id"], move["quantity"]),
+            )
 
         conn.commit()
         logger.info(f"Recorded {len(moves)} movements in history")
@@ -752,6 +770,7 @@ async def get_performance_report():
     """
     try:
         from api.routes import data_loader
+
         conn = data_loader.get_connection()
 
         # Analyze database performance
@@ -776,9 +795,11 @@ async def get_performance_report():
         suggestions = []
 
         if db_stats[5] and db_stats[5] < 50:
-            suggestions.append("Consider consolidating inventory to improve space utilization")
+            suggestions.append(
+                "Consider consolidating inventory to improve space utilization"
+            )
 
-        if cache_stats['expired_entries'] > cache_stats['valid_entries']:
+        if cache_stats["expired_entries"] > cache_stats["valid_entries"]:
             suggestions.append("Increase cache TTL for frequently accessed data")
 
         if db_stats[2] > 10000:
@@ -791,11 +812,11 @@ async def get_performance_report():
                 "total_movements": db_stats[2],
                 "total_batches": db_stats[3],
                 "total_shelves": db_stats[4],
-                "avg_utilization": round(db_stats[5], 2) if db_stats[5] else 0
+                "avg_utilization": round(db_stats[5], 2) if db_stats[5] else 0,
             },
             "cache_metrics": cache_stats,
             "optimization_suggestions": suggestions,
-            "api_version": "2.0-optimized"
+            "api_version": "2.0-optimized",
         }
 
     except Exception as e:

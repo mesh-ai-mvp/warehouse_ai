@@ -1,0 +1,28 @@
+2025-09-14 05:48:49 | INFO     | ai_agents.api_handler:__init__:17 | Initializing AIPoHandler
+2025-09-14 05:48:49 | INFO     | ai_agents.workflow:__init__:29 | Initializing POGenerationWorkflow
+2025-09-14 05:48:49 | DEBUG    | ai_agents.workflow:_build_workflow:47 | Building LangGraph workflow
+2025-09-14 05:48:49 | INFO     | ai_agents.workflow:__init__:43 | POGenerationWorkflow initialized successfully
+2025-09-14 05:48:49 | WARNING  | ai_agents.api_handler:__init__:27 | Medications not loaded, attempting to load data
+2025-09-14 05:48:49 | INFO     | ai_agents.api_handler:__init__:30 | Successfully loaded 50 medications
+2025-09-14 05:48:49 | INFO     | __main__:<module>:136 | Starting Inventory Management POC
+2025-09-14 05:48:49 | INFO     | __main__:<module>:137 | Server will be available at: http://localhost:8000
+2025-09-14 05:48:49 | INFO     | __main__:<module>:138 | API documentation at: http://localhost:8000/docs
+INFO:     Will watch for changes in these directories: ['/home/sid/dev/hackathon-warehouse-management']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [6387] using WatchFiles
+2025-09-14 05:48:51 | INFO     | ai_agents.api_handler:__init__:17 | Initializing AIPoHandler
+2025-09-14 05:48:51 | INFO     | ai_agents.workflow:__init__:29 | Initializing POGenerationWorkflow
+2025-09-14 05:48:51 | DEBUG    | ai_agents.workflow:_build_workflow:47 | Building LangGraph workflow
+2025-09-14 05:48:51 | INFO     | ai_agents.workflow:__init__:43 | POGenerationWorkflow initialized successfully
+2025-09-14 05:48:51 | WARNING  | ai_agents.api_handler:__init__:27 | Medications not loaded, attempting to load data
+2025-09-14 05:48:51 | INFO     | ai_agents.api_handler:__init__:30 | Successfully loaded 50 medications
+INFO:     Started server process [6449]
+INFO:     Waiting for application startup.
+2025-09-14 05:48:51 | INFO     | main:build_frontend:33 | Building React frontend for development...
+2025-09-14 05:49:32 | SUCCESS  | main:build_frontend:42 | Frontend build completed successfully
+2025-09-14 05:49:32 | SUCCESS  | main:lifespan:59 | Data loaded successfully
+2025-09-14 05:49:32 | INFO     | main:lifespan:60 | Loaded 50 medications
+2025-09-14 05:49:32 | INFO     | main:lifespan:61 | Loaded 10 suppliers
+INFO:     Application startup complete.
+INFO:     127.0.0.1:57706 - "GET /api/warehouse/layout HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33054 - "GET /api/warehouse/aisle/1 HTTP/1.1" 200 OK

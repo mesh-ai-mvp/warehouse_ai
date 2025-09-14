@@ -6,9 +6,15 @@ export class WarehouseService {
 
   // Get complete warehouse layout with zones and aisles
   async getLayout(): Promise<WarehouseLayout> {
-    const response = await fetch(`${this.apiBase}/layout`);
+    // Prefer optimized v2 layout for richer stats (medication_count, total_items, etc.)
+    const response = await fetch(`${this.apiBase}/v2/layout`);
     if (!response.ok) {
-      throw new Error('Failed to fetch warehouse layout');
+      // Fallback to default layout if v2 unavailable
+      const fallback = await fetch(`${this.apiBase}/layout`);
+      if (!fallback.ok) {
+        throw new Error('Failed to fetch warehouse layout');
+      }
+      return fallback.json();
     }
     return response.json();
   }

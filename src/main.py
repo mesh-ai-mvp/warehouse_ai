@@ -85,8 +85,9 @@ app = FastAPI(
 app.include_router(api_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
-app.include_router(warehouse_router)
+# Prefer optimized warehouse routes when overlapping paths exist
 app.include_router(warehouse_optimized_router)  # Optimized warehouse routes
+app.include_router(warehouse_router)
 app.include_router(websocket_router)  # WebSocket routes
 
 # Serve React build files

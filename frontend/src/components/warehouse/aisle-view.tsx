@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Package, Thermometer, Calendar, AlertCircle } from 'lucide-react';
-import { Aisle, Shelf } from './warehouse-types';
+import type { Aisle, Shelf } from './warehouse-types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
@@ -15,7 +15,7 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
   const [hoveredShelf, setHoveredShelf] = useState<string | null>(null);
 
   const getShelfFillLevel = (shelf: Shelf) => {
-    const fillPercentage = (shelf.medications.length / (shelf.capacity / 100)) * 100;
+    const fillPercentage = (shelf.medications.length / Math.max(1, shelf.capacity)) * 100;
     return Math.min(fillPercentage, 100);
   };
 
@@ -43,15 +43,15 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
   const utilizationRate = totalCapacity > 0 ? (totalMedications / totalCapacity) * 100 : 0;
 
   return (
-    <div className="h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-hidden">
+    <div className="h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="p-6 border-b border-slate-700/50 bg-slate-800/50 backdrop-blur-sm"
+        className="p-6 border-b border-slate-700/50 bg-slate-800/50 backdrop-blur-sm z-10 mb-40"
       >
-        <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center gap-4 mb-4 mt-2">
           <Button
             variant="ghost"
             size="sm"
@@ -91,38 +91,40 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
       </motion.div>
 
       {/* 3D Aisle View */}
-      <div className="flex-1 flex items-center justify-center p-8 perspective-1000">
+      <div className="flex-1 flex items-center justify-center p-8 pt-52 pb-16 perspective-1000">
         <motion.div
           initial={{ opacity: 0, rotateX: 60, z: -200 }}
           animate={{ opacity: 1, rotateX: 15, z: 0 }}
           transition={{ duration: 1, ease: [0.23, 1, 0.320, 1] }}
-          className="relative preserve-3d"
+          className="relative preserve-3d w-[900px] h-[600px]"
           style={{
             transformStyle: 'preserve-3d',
             transform: 'rotateX(15deg) rotateY(-5deg)'
           }}
         >
           {/* Left Shelf Unit */}
-          <div className="absolute left-0">
+          <div className="absolute left-16 top-1/2 -translate-y-1/2 z-10">
             <motion.div
               initial={{ x: -100, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
-              className="grid grid-rows-4 gap-4"
+              className="grid grid-rows-4 gap-12"
             >
-              {aisle.shelves.slice(0, 4).map((shelf, index) => (
+              {aisle.shelves.filter((_, i) => i % 2 === 0).map((shelf, index) => (
                 <motion.div
                   key={shelf.id}
                   initial={{ opacity: 0, x: -50 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.6, delay: 0.5 + index * 0.1 }}
                   className="relative cursor-pointer group"
+                  onMouseEnter={() => setHoveredShelf(shelf.id)}
+                  onMouseLeave={() => setHoveredShelf(null)}
                   onClick={() => onShelfClick(shelf)}
                   whileHover={{ scale: 1.02, z: 10 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   <div
-                    className={`w-48 h-16 bg-gradient-to-r ${getShelfStatusColor(shelf)} rounded-lg shadow-lg relative overflow-hidden`}
+                    className={`w-64 h-24 bg-gradient-to-r ${getShelfStatusColor(shelf)} rounded-lg shadow-lg relative overflow-hidden`}
                     style={{
                       boxShadow: hoveredShelf === shelf.id
                         ? '0 15px 30px rgba(0,0,0,0.4), 0 0 20px rgba(59, 130, 246, 0.3)'
@@ -130,7 +132,7 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
                     }}
                   >
                     {/* Shelf Contents Visualization */}
-                    <div className="absolute inset-2 grid grid-cols-8 grid-rows-2 gap-1">
+                    <div className="absolute inset-2 grid grid-cols-8 grid-rows-2 gap-1.5">
                       {Array.from({ length: 16 }).map((_, i) => (
                         <div
                           key={i}
@@ -155,7 +157,7 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
                       onMouseEnter={() => setHoveredShelf(shelf.id)}
                       onMouseLeave={() => setHoveredShelf(null)}
                     >
-                      Shelf {shelf.position + 1}
+                      {shelf.code ? shelf.code : `Shelf ${shelf.position + 1}`}
                     </div>
 
                     {/* Fill Level Indicator */}
@@ -175,7 +177,7 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
                       x: hoveredShelf === shelf.id ? 0 : -20
                     }}
                     transition={{ duration: 0.2 }}
-                    className="absolute left-52 top-0 bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-xl border border-white/20 min-w-[200px] z-10 pointer-events-none"
+                    className="absolute left-[270px] top-0 bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-xl border border-white/20 min-w-[200px] z-50 pointer-events-none"
                   >
                     <div className="text-sm text-slate-800 space-y-1">
                       <div className="flex justify-between">
@@ -208,26 +210,28 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
           </div>
 
           {/* Right Shelf Unit */}
-          <div className="absolute right-0">
+          <div className="absolute right-16 top-1/2 -translate-y-1/2 z-10">
             <motion.div
               initial={{ x: 100, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.4 }}
-              className="grid grid-rows-4 gap-4"
+              className="grid grid-rows-4 gap-12"
             >
-              {aisle.shelves.slice(4, 8).map((shelf, index) => (
+              {aisle.shelves.filter((_, i) => i % 2 === 1).map((shelf, index) => (
                 <motion.div
                   key={shelf.id}
                   initial={{ opacity: 0, x: 50 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.6, delay: 0.6 + index * 0.1 }}
                   className="relative cursor-pointer group"
+                  onMouseEnter={() => setHoveredShelf(shelf.id)}
+                  onMouseLeave={() => setHoveredShelf(null)}
                   onClick={() => onShelfClick(shelf)}
                   whileHover={{ scale: 1.02, z: 10 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   <div
-                    className={`w-48 h-16 bg-gradient-to-r ${getShelfStatusColor(shelf)} rounded-lg shadow-lg relative overflow-hidden`}
+                    className={`w-64 h-24 bg-gradient-to-r ${getShelfStatusColor(shelf)} rounded-lg shadow-lg relative overflow-hidden`}
                     style={{
                       boxShadow: hoveredShelf === shelf.id
                         ? '0 15px 30px rgba(0,0,0,0.4), 0 0 20px rgba(59, 130, 246, 0.3)'
@@ -235,7 +239,7 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
                     }}
                   >
                     {/* Shelf Contents Visualization */}
-                    <div className="absolute inset-2 grid grid-cols-8 grid-rows-2 gap-1">
+                    <div className="absolute inset-2 grid grid-cols-8 grid-rows-2 gap-1.5">
                       {Array.from({ length: 16 }).map((_, i) => (
                         <div
                           key={i}
@@ -260,7 +264,7 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
                       onMouseEnter={() => setHoveredShelf(shelf.id)}
                       onMouseLeave={() => setHoveredShelf(null)}
                     >
-                      Shelf {shelf.position + 1}
+                      {shelf.code ? shelf.code : `Shelf ${shelf.position + 1}`}
                     </div>
 
                     {/* Fill Level Indicator */}
@@ -280,7 +284,7 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
                       x: hoveredShelf === shelf.id ? 0 : 20
                     }}
                     transition={{ duration: 0.2 }}
-                    className="absolute right-52 top-0 bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-xl border border-white/20 min-w-[200px] z-10 pointer-events-none"
+                    className="absolute right-[270px] top-0 bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-xl border border-white/20 min-w-[200px] z-50 pointer-events-none"
                   >
                     <div className="text-sm text-slate-800 space-y-1">
                       <div className="flex justify-between">
@@ -317,7 +321,7 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
             initial={{ opacity: 0, scaleY: 0 }}
             animate={{ opacity: 1, scaleY: 1 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="absolute top-0 left-12 right-12 bottom-0 bg-gradient-to-b from-slate-700/30 to-slate-800/50 rounded-lg border-2 border-slate-600/30"
+            className="absolute top-16 left-32 right-32 bottom-16 bg-gradient-to-b from-slate-700/30 to-slate-800/50 rounded-lg border-2 border-slate-600/30 z-0 overflow-visible"
             style={{ transform: 'rotateX(90deg) translateZ(-20px)' }}
           >
             {/* Aisle markings */}
@@ -335,7 +339,7 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 1 }}
-        className="absolute bottom-6 left-1/2 transform -translate-x-1/2 text-center"
+        className="fixed bottom-6 right-6 text-right z-20"
       >
         <div className="text-slate-400 text-sm bg-slate-800/60 backdrop-blur-sm px-4 py-2 rounded-full">
           Click on any shelf to view detailed medication inventory

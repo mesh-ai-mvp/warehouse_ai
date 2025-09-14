@@ -664,9 +664,7 @@ def create_tables(conn):
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_temperature_readings_aisle ON temperature_readings(aisle_id)"
     )
-    cur.execute(
-        "CREATE INDEX IF NOT EXISTS idx_batch_info_med ON batch_info(med_id)"
-    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_batch_info_med ON batch_info(med_id)")
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_batch_info_expiry ON batch_info(expiry_date)"
     )
@@ -2154,7 +2152,6 @@ def generate_category_daily_aggregates(
     for med_id in price_lookup:
         price_lookup[med_id].sort(key=lambda x: x["valid_from"])
 
-
     category_aggregates = []
 
     # Group by date and category
@@ -2295,6 +2292,7 @@ def generate_hourly_consumption_patterns(
 # Warehouse Management Functions
 # -----------------------
 
+
 def generate_new_warehouse_zones(seed=DEFAULT_SEED):
     """Generate new warehouse zones configuration"""
     zones = [
@@ -2304,7 +2302,7 @@ def generate_new_warehouse_zones(seed=DEFAULT_SEED):
             "zone_type": "restricted",
             "temperature_range": "15-25°C",
             "capacity": 1000,
-            "security_level": "high"
+            "security_level": "high",
         },
         {
             "zone_id": 2,
@@ -2312,7 +2310,7 @@ def generate_new_warehouse_zones(seed=DEFAULT_SEED):
             "zone_type": "cold",
             "temperature_range": "2-8°C",
             "capacity": 800,
-            "security_level": "medium"
+            "security_level": "medium",
         },
         {
             "zone_id": 3,
@@ -2320,7 +2318,7 @@ def generate_new_warehouse_zones(seed=DEFAULT_SEED):
             "zone_type": "ambient",
             "temperature_range": "15-25°C",
             "capacity": 2000,
-            "security_level": "standard"
+            "security_level": "standard",
         },
         {
             "zone_id": 4,
@@ -2328,7 +2326,7 @@ def generate_new_warehouse_zones(seed=DEFAULT_SEED):
             "zone_type": "ambient",
             "temperature_range": "15-25°C",
             "capacity": 1500,
-            "security_level": "standard"
+            "security_level": "standard",
         },
         {
             "zone_id": 5,
@@ -2336,8 +2334,8 @@ def generate_new_warehouse_zones(seed=DEFAULT_SEED):
             "zone_type": "ambient",
             "temperature_range": "15-25°C",
             "capacity": 1500,
-            "security_level": "standard"
-        }
+            "security_level": "standard",
+        },
     ]
     return zones
 
@@ -2351,11 +2349,11 @@ def generate_warehouse_aisles(zones, seed=DEFAULT_SEED):
     aisle_counter = 0
 
     zone_mappings = {
-        1: ('Controlled', 'restricted', 1),  # Zone R1
-        2: ('Refrigerated', 'cold', 2),       # Zone C1
-        3: ('General', 'ambient', 2),         # Zone A1
-        4: ('General', 'ambient', 1),         # Zone A2
-        5: ('General', 'ambient', 0)          # Zone A3 (no aisles for now)
+        1: ("Controlled", "restricted", 1),  # Zone R1
+        2: ("Refrigerated", "cold", 2),  # Zone C1
+        3: ("General", "ambient", 2),  # Zone A1
+        4: ("General", "ambient", 1),  # Zone A2
+        5: ("General", "ambient", 0),  # Zone A3 (no aisles for now)
     }
 
     for zone_id, (category, zone_type, num_aisles) in zone_mappings.items():
@@ -2363,24 +2361,24 @@ def generate_warehouse_aisles(zones, seed=DEFAULT_SEED):
             aisle_counter += 1
 
             # Set temperature based on zone type
-            if zone_type == 'cold':
+            if zone_type == "cold":
                 temperature = np.random.uniform(2, 8)
-            elif zone_type == 'restricted':
+            elif zone_type == "restricted":
                 temperature = np.random.uniform(20, 22)
             else:
                 temperature = np.random.uniform(18, 24)
 
             aisle = {
-                'aisle_id': aisle_counter,
-                'zone_id': zone_id,
-                'aisle_code': chr(64 + aisle_counter),  # A, B, C...
-                'aisle_name': f'{category} Pharmaceuticals {chr(64 + aisle_counter)}',
-                'position_x': (aisle_counter - 1) % 3,
-                'position_z': (aisle_counter - 1) // 3,
-                'temperature': round(temperature, 1),
-                'humidity': np.random.uniform(30, 60),
-                'category': category,
-                'max_shelves': 8
+                "aisle_id": aisle_counter,
+                "zone_id": zone_id,
+                "aisle_code": chr(64 + aisle_counter),  # A, B, C...
+                "aisle_name": f"{category} Pharmaceuticals {chr(64 + aisle_counter)}",
+                "position_x": (aisle_counter - 1) % 3,
+                "position_z": (aisle_counter - 1) // 3,
+                "temperature": round(temperature, 1),
+                "humidity": np.random.uniform(30, 60),
+                "category": category,
+                "max_shelves": 8,
             }
             aisles.append(aisle)
 
@@ -2400,22 +2398,24 @@ def generate_warehouse_shelves(aisles, seed=DEFAULT_SEED):
             for level in range(2):  # 2 levels per position
                 shelf_counter += 1
 
-                # Capacity varies by level (higher shelves have less capacity)
-                base_capacity = np.random.randint(100, 300)
-                if level > 0:
-                    base_capacity = int(base_capacity * 0.8)
+                # Fixed capacity: 10 wide x 3 deep = 30 slots per shelf
+                # This matches the actual grid positions we generate
+                base_capacity = 30
+
+                # Weight capacity varies by level (higher shelves have less capacity)
+                max_weight = 500.0 if level == 0 else 250.0
 
                 shelf = {
-                    'shelf_id': shelf_counter,
-                    'aisle_id': aisle['aisle_id'],
-                    'shelf_code': f"S{position+1}L{level+1}",
-                    'position': position,
-                    'level': level,
-                    'capacity_slots': base_capacity,
-                    'max_weight_kg': 500.0 if level == 0 else 250.0,
-                    'current_weight_kg': 0,
-                    'utilization_percent': 0,
-                    'status': 'active'
+                    "shelf_id": shelf_counter,
+                    "aisle_id": aisle["aisle_id"],
+                    "shelf_code": f"S{position + 1}L{level + 1}",
+                    "position": position,
+                    "level": level,
+                    "capacity_slots": base_capacity,  # Always 30 (10x3 grid)
+                    "max_weight_kg": max_weight,
+                    "current_weight_kg": 0,
+                    "utilization_percent": 0,
+                    "status": "active",
                 }
                 shelves.append(shelf)
 
@@ -2431,7 +2431,7 @@ def generate_shelf_positions(shelves, seed=DEFAULT_SEED):
     position_id = 1
 
     for shelf in shelves:
-        shelf_level = shelf['level']
+        shelf_level = shelf["level"]
 
         # Golden zone is at comfortable picking height (levels 0-1)
         is_golden_level = shelf_level in [0, 1]
@@ -2454,21 +2454,23 @@ def generate_shelf_positions(shelves, seed=DEFAULT_SEED):
                 # Reserve positions for special items
                 reserved = None
                 if is_golden and x <= 5:
-                    reserved = 'fast-movers'
+                    reserved = "fast-movers"
                 elif y == 3:
-                    reserved = 'overstock'
+                    reserved = "overstock"
 
-                positions.append({
-                    'position_id': position_id,
-                    'shelf_id': shelf['shelf_id'],
-                    'grid_x': x,
-                    'grid_y': y,
-                    'is_golden_zone': is_golden,
-                    'accessibility': round(accessibility, 2),
-                    'reserved_for': reserved,
-                    'max_weight': 50.0 if shelf_level <= 1 else 25.0,
-                    'allows_stacking': True
-                })
+                positions.append(
+                    {
+                        "position_id": position_id,
+                        "shelf_id": shelf["shelf_id"],
+                        "grid_x": x,
+                        "grid_y": y,
+                        "is_golden_zone": is_golden,
+                        "accessibility": round(accessibility, 2),
+                        "reserved_for": reserved,
+                        "max_weight": 50.0 if shelf_level <= 1 else 25.0,
+                        "allows_stacking": True,
+                    }
+                )
                 position_id += 1
 
     return positions
@@ -2483,64 +2485,80 @@ def generate_medication_attributes(medications, consumption_history, seed=DEFAUL
 
     # Calculate velocity scores from consumption history
     df_consumption = pd.DataFrame(consumption_history)
-    velocity_by_med = df_consumption.groupby('med_id')['qty_dispensed'].sum().to_dict()
+    velocity_by_med = df_consumption.groupby("med_id")["qty_dispensed"].sum().to_dict()
     max_velocity = max(velocity_by_med.values()) if velocity_by_med else 1
 
     for med in medications:
-        med_id = med['med_id']
+        med_id = med["med_id"]
 
         # Calculate velocity from consumption history
         total_consumption = velocity_by_med.get(med_id, 0)
-        picks_per_day = total_consumption / 365 if total_consumption > 0 else np.random.uniform(0.1, 5)
+        picks_per_day = (
+            total_consumption / 365
+            if total_consumption > 0
+            else np.random.uniform(0.1, 5)
+        )
         velocity_score = min(100, (total_consumption / max_velocity) * 100)
 
         # Determine movement category
         if velocity_score > 70:
-            movement_category = 'Fast'
+            movement_category = "Fast"
         elif velocity_score > 30:
-            movement_category = 'Medium'
+            movement_category = "Medium"
         else:
-            movement_category = 'Slow'
+            movement_category = "Slow"
 
         # Physical attributes
         weight = np.random.uniform(0.1, 25.0)  # kg
         volume = np.random.uniform(100, 5000)  # cm3
 
         # Storage requirements based on medication type
-        med_name_lower = med['name'].lower()
-        requires_refrigeration = 'insulin' in med_name_lower or 'vaccine' in med_name_lower
-        requires_security = 'morphine' in med_name_lower or 'oxy' in med_name_lower or 'codeine' in med_name_lower
+        med_name_lower = med["name"].lower()
+        requires_refrigeration = (
+            "insulin" in med_name_lower or "vaccine" in med_name_lower
+        )
+        requires_security = (
+            "morphine" in med_name_lower
+            or "oxy" in med_name_lower
+            or "codeine" in med_name_lower
+        )
 
         # ABC classification based on value and volume
-        if med['category'] == 'Chronic' and velocity_score > 50:
-            abc_class = 'A'
-        elif med['category'] == 'Intermittent':
-            abc_class = 'B'
+        if med["category"] == "Chronic" and velocity_score > 50:
+            abc_class = "A"
+        elif med["category"] == "Intermittent":
+            abc_class = "B"
         else:
-            abc_class = 'C'
+            abc_class = "C"
 
-        attributes.append({
-            'med_id': med_id,
-            'velocity_score': round(velocity_score, 2),
-            'picks_per_day': round(picks_per_day, 2),
-            'movement_category': movement_category,
-            'weight_kg': round(weight, 2),
-            'volume_cm3': round(volume, 2),
-            'fragility': np.random.choice(['High', 'Medium', 'Low'], p=[0.1, 0.3, 0.6]),
-            'stackable': weight < 10,
-            'requires_refrigeration': requires_refrigeration,
-            'requires_security': requires_security,
-            'light_sensitive': np.random.random() < 0.2,
-            'humidity_sensitive': np.random.random() < 0.15,
-            'abc_classification': abc_class,
-            'reorder_frequency': np.random.uniform(7, 60),
-            'batch_picking_compatible': movement_category != 'Slow'
-        })
+        attributes.append(
+            {
+                "med_id": med_id,
+                "velocity_score": round(velocity_score, 2),
+                "picks_per_day": round(picks_per_day, 2),
+                "movement_category": movement_category,
+                "weight_kg": round(weight, 2),
+                "volume_cm3": round(volume, 2),
+                "fragility": np.random.choice(
+                    ["High", "Medium", "Low"], p=[0.1, 0.3, 0.6]
+                ),
+                "stackable": weight < 10,
+                "requires_refrigeration": requires_refrigeration,
+                "requires_security": requires_security,
+                "light_sensitive": np.random.random() < 0.2,
+                "humidity_sensitive": np.random.random() < 0.15,
+                "abc_classification": abc_class,
+                "reorder_frequency": np.random.uniform(7, 60),
+                "batch_picking_compatible": movement_category != "Slow",
+            }
+        )
 
     return attributes
 
 
-def generate_warehouse_batch_info(medications, suppliers, start_date, days, seed=DEFAULT_SEED):
+def generate_warehouse_batch_info(
+    medications, suppliers, start_date, days, seed=DEFAULT_SEED
+):
     """Generate batch information for medications in warehouse"""
     random.seed(seed)
     np.random.seed(seed)
@@ -2556,32 +2574,46 @@ def generate_warehouse_batch_info(medications, suppliers, start_date, days, seed
             # Manufacture date varies over the past year
             max_days_ago = max(30, days)
             min_days_ago = min(30, days - 1)
-            days_ago = np.random.randint(min_days_ago, max_days_ago) if max_days_ago > min_days_ago else min_days_ago
+            days_ago = (
+                np.random.randint(min_days_ago, max_days_ago)
+                if max_days_ago > min_days_ago
+                else min_days_ago
+            )
             manufacture_date = start_date - timedelta(days=days_ago)
 
             # Expiry date based on shelf life
-            shelf_life_days = med['shelf_life_days']
+            shelf_life_days = med["shelf_life_days"]
             expiry_date = manufacture_date + timedelta(days=shelf_life_days)
 
             # Quantity received
             quantity_received = np.random.randint(100, 1000)
 
             # Remaining quantity (some may have been used)
-            usage_percent = np.random.uniform(0, 0.8) if batch_num < num_batches - 1 else np.random.uniform(0, 0.3)
+            usage_percent = (
+                np.random.uniform(0, 0.8)
+                if batch_num < num_batches - 1
+                else np.random.uniform(0, 0.3)
+            )
             quantity_remaining = int(quantity_received * (1 - usage_percent))
 
-            batches.append({
-                'batch_id': batch_id,
-                'med_id': med['med_id'],
-                'lot_number': f"LOT-{manufacture_date.strftime('%Y%m')}-{med['med_id']:03d}-{batch_num+1:02d}",
-                'manufacture_date': manufacture_date.isoformat(),
-                'expiry_date': expiry_date.isoformat(),
-                'quantity_received': quantity_received,
-                'quantity_remaining': quantity_remaining,
-                'supplier_id': med['supplier_id'],
-                'receipt_date': (manufacture_date + timedelta(days=np.random.randint(7, 30))).isoformat(),
-                'status': 'active' if expiry_date > datetime.now().date() else 'expired'
-            })
+            batches.append(
+                {
+                    "batch_id": batch_id,
+                    "med_id": med["med_id"],
+                    "lot_number": f"LOT-{manufacture_date.strftime('%Y%m')}-{med['med_id']:03d}-{batch_num + 1:02d}",
+                    "manufacture_date": manufacture_date.isoformat(),
+                    "expiry_date": expiry_date.isoformat(),
+                    "quantity_received": quantity_received,
+                    "quantity_remaining": quantity_remaining,
+                    "supplier_id": med["supplier_id"],
+                    "receipt_date": (
+                        manufacture_date + timedelta(days=np.random.randint(7, 30))
+                    ).isoformat(),
+                    "status": "active"
+                    if expiry_date > datetime.now().date()
+                    else "expired",
+                }
+            )
             batch_id += 1
 
     return batches
@@ -2592,48 +2624,60 @@ def calculate_placement_score(medication_attr, position, shelf_category):
     score = 0
 
     # Velocity-based placement (40% weight)
-    if medication_attr['movement_category'] == 'Fast':
-        if position['grid_y'] == 1:  # Front row
+    if medication_attr["movement_category"] == "Fast":
+        if position["grid_y"] == 1:  # Front row
             score += 40
-        if position['is_golden_zone']:
+        if position["is_golden_zone"]:
             score += 20
-    elif medication_attr['movement_category'] == 'Medium':
-        if position['grid_y'] == 2:  # Middle row
+    elif medication_attr["movement_category"] == "Medium":
+        if position["grid_y"] == 2:  # Middle row
             score += 30
     else:  # Slow movers
-        if position['grid_y'] == 3:  # Back row
+        if position["grid_y"] == 3:  # Back row
             score += 30
 
     # Weight-based placement (20% weight)
-    if medication_attr['weight_kg'] < 5:
+    if medication_attr["weight_kg"] < 5:
         score += 20
-    elif medication_attr['weight_kg'] < 15:
+    elif medication_attr["weight_kg"] < 15:
         score += 15
     else:
-        score += 10 if position['max_weight'] >= medication_attr['weight_kg'] else -50
+        score += 10 if position["max_weight"] >= medication_attr["weight_kg"] else -50
 
     # ABC Classification (20% weight)
-    if medication_attr['abc_classification'] == 'A':
-        if position['accessibility'] > 0.8:
+    if medication_attr["abc_classification"] == "A":
+        if position["accessibility"] > 0.8:
             score += 20
-    elif medication_attr['abc_classification'] == 'B':
-        if position['accessibility'] > 0.5:
+    elif medication_attr["abc_classification"] == "B":
+        if position["accessibility"] > 0.5:
             score += 15
     else:
         score += 10
 
     # Special requirements (20% weight)
-    if medication_attr['requires_security'] and shelf_category == 'Controlled':
+    if medication_attr["requires_security"] and shelf_category == "Controlled":
         score += 20
-    elif medication_attr['requires_refrigeration'] and shelf_category == 'Refrigerated':
+    elif medication_attr["requires_refrigeration"] and shelf_category == "Refrigerated":
         score += 20
-    elif not medication_attr['requires_security'] and not medication_attr['requires_refrigeration'] and shelf_category == 'General':
+    elif (
+        not medication_attr["requires_security"]
+        and not medication_attr["requires_refrigeration"]
+        and shelf_category == "General"
+    ):
         score += 15
 
     return score
 
 
-def generate_medication_placements(medications, medication_attributes, batches, positions, shelves, aisles, seed=DEFAULT_SEED):
+def generate_medication_placements(
+    medications,
+    medication_attributes,
+    batches,
+    positions,
+    shelves,
+    aisles,
+    seed=DEFAULT_SEED,
+):
     """Generate intelligent medication placements with FIFO"""
     random.seed(seed)
     np.random.seed(seed)
@@ -2643,33 +2687,35 @@ def generate_medication_placements(medications, medication_attributes, batches, 
     used_positions = set()
 
     # Create lookup dictionaries
-    med_attr_lookup = {attr['med_id']: attr for attr in medication_attributes}
-    position_lookup = {pos['position_id']: pos for pos in positions}
-    shelf_lookup = {shelf['shelf_id']: shelf for shelf in shelves}
-    aisle_lookup = {aisle['aisle_id']: aisle for aisle in aisles}
+    med_attr_lookup = {attr["med_id"]: attr for attr in medication_attributes}
+    position_lookup = {pos["position_id"]: pos for pos in positions}
+    shelf_lookup = {shelf["shelf_id"]: shelf for shelf in shelves}
+    aisle_lookup = {aisle["aisle_id"]: aisle for aisle in aisles}
 
     # Group batches by medication and sort by expiry (FIFO)
     batches_by_med = {}
     for batch in batches:
-        med_id = batch['med_id']
+        med_id = batch["med_id"]
         if med_id not in batches_by_med:
             batches_by_med[med_id] = []
         batches_by_med[med_id].append(batch)
 
     # Sort batches by expiry date for FIFO
     for med_id in batches_by_med:
-        batches_by_med[med_id].sort(key=lambda x: x['expiry_date'])
+        batches_by_med[med_id].sort(key=lambda x: x["expiry_date"])
 
     # Sort medications by priority (velocity, ABC class)
-    sorted_meds = sorted(medications,
-                        key=lambda m: (
-                            med_attr_lookup[m['med_id']]['velocity_score'],
-                            med_attr_lookup[m['med_id']]['abc_classification'] == 'A'
-                        ),
-                        reverse=True)
+    sorted_meds = sorted(
+        medications,
+        key=lambda m: (
+            med_attr_lookup[m["med_id"]]["velocity_score"],
+            med_attr_lookup[m["med_id"]]["abc_classification"] == "A",
+        ),
+        reverse=True,
+    )
 
     for med in sorted_meds:
-        med_id = med['med_id']
+        med_id = med["med_id"]
         med_attr = med_attr_lookup[med_id]
 
         if med_id not in batches_by_med:
@@ -2684,50 +2730,126 @@ def generate_medication_placements(medications, medication_attributes, batches, 
             if pos_id in used_positions:
                 continue
 
-            shelf = shelf_lookup[pos['shelf_id']]
-            aisle = aisle_lookup[shelf['aisle_id']]
+            shelf = shelf_lookup[pos["shelf_id"]]
+            aisle = aisle_lookup[shelf["aisle_id"]]
 
-            score = calculate_placement_score(med_attr, pos, aisle['category'])
+            score = calculate_placement_score(med_attr, pos, aisle["category"])
             best_positions.append((score, pos_id))
 
         # Sort positions by score and take as many as needed for batches
         best_positions.sort(reverse=True)
 
         # Place batches in FIFO order (oldest in front)
-        for i, batch in enumerate(med_batches[:min(len(med_batches), len(best_positions))]):
+        for i, batch in enumerate(
+            med_batches[: min(len(med_batches), len(best_positions))]
+        ):
             if i < len(best_positions):
                 score, pos_id = best_positions[i]
                 position = position_lookup[pos_id]
 
                 # Determine placement reason
-                if med_attr['requires_security']:
-                    reason = 'controlled_substance'
-                elif med_attr['requires_refrigeration']:
-                    reason = 'cold_chain'
+                if med_attr["requires_security"]:
+                    reason = "controlled_substance"
+                elif med_attr["requires_refrigeration"]:
+                    reason = "cold_chain"
                 elif i == 0:
-                    reason = 'oldest_batch_fifo'
+                    reason = "oldest_batch_fifo"
                 elif i == len(med_batches) - 1:
-                    reason = 'newest_batch_fifo'
+                    reason = "newest_batch_fifo"
                 else:
-                    reason = 'intelligent_placement'
+                    reason = "intelligent_placement"
 
-                placements.append({
-                    'placement_id': placement_id,
-                    'position_id': pos_id,
-                    'med_id': med_id,
-                    'batch_id': batch['batch_id'],
-                    'quantity': min(batch['quantity_remaining'], 100),  # Max 100 per position
-                    'placement_date': datetime.now().isoformat(),
-                    'placed_by': 'system',
-                    'placement_reason': reason,
-                    'expiry_date': batch['expiry_date'],
-                    'is_active': True
-                })
+                placements.append(
+                    {
+                        "placement_id": placement_id,
+                        "position_id": pos_id,
+                        "med_id": med_id,
+                        "batch_id": batch["batch_id"],
+                        "quantity": min(
+                            batch["quantity_remaining"], 100
+                        ),  # Max 100 per position
+                        "placement_date": datetime.now().isoformat(),
+                        "placed_by": "system",
+                        "placement_reason": reason,
+                        "expiry_date": batch["expiry_date"],
+                        "is_active": True,
+                    }
+                )
 
                 used_positions.add(pos_id)
                 placement_id += 1
 
     return placements
+
+
+def update_shelf_utilization(
+    conn, placements, positions, shelves, medication_attributes
+):
+    """Update shelf utilization based on actual medication placements"""
+
+    # Create lookups
+    position_to_shelf = {pos["position_id"]: pos["shelf_id"] for pos in positions}
+    med_attr_lookup = {attr["med_id"]: attr for attr in medication_attributes}
+
+    # Calculate occupied positions and weight per shelf
+    shelf_stats = {}
+    for shelf in shelves:
+        shelf_stats[shelf["shelf_id"]] = {
+            "total_positions": 30,  # 10 wide x 3 deep grid
+            "occupied_positions": 0,
+            "total_weight": 0.0,
+            "total_medications": set(),
+        }
+
+    # Count occupied positions and calculate weight
+    for placement in placements:
+        if not placement["is_active"]:
+            continue
+
+        position_id = placement["position_id"]
+        if position_id in position_to_shelf:
+            shelf_id = position_to_shelf[position_id]
+            if shelf_id in shelf_stats:
+                shelf_stats[shelf_id]["occupied_positions"] += 1
+                shelf_stats[shelf_id]["total_medications"].add(placement["med_id"])
+
+                # Add weight based on medication attributes
+                med_id = placement["med_id"]
+                if med_id in med_attr_lookup:
+                    med_attr = med_attr_lookup[med_id]
+                    # Estimate weight: quantity * weight per unit
+                    # Use realistic unit weights (0.01 to 0.5 kg per unit)
+                    base_weight = med_attr.get("weight_kg", 0.5)
+                    # Convert to realistic unit weight (divide by 100 to get per-unit weight)
+                    weight_per_unit = min(0.5, base_weight / 100)  # Cap at 0.5kg per unit
+                    total_weight = placement["quantity"] * weight_per_unit
+                    shelf_stats[shelf_id]["total_weight"] += total_weight
+
+    # Update database
+    cur = conn.cursor()
+    for shelf in shelves:
+        shelf_id = shelf["shelf_id"]
+        stats = shelf_stats[shelf_id]
+
+        # Calculate utilization percentage
+        utilization_percent = 0
+        if stats["total_positions"] > 0:
+            utilization_percent = round(
+                (stats["occupied_positions"] / stats["total_positions"]) * 100, 1
+            )
+
+        # Update the shelf record
+        cur.execute(
+            """
+            UPDATE warehouse_shelves
+            SET utilization_percent = ?,
+                current_weight_kg = ?
+            WHERE shelf_id = ?
+        """,
+            (utilization_percent, round(stats["total_weight"], 2), shelf_id),
+        )
+
+    conn.commit()
 
 
 def generate_temperature_readings(aisles, start_date, days, seed=DEFAULT_SEED):
@@ -2745,7 +2867,7 @@ def generate_temperature_readings(aisles, start_date, days, seed=DEFAULT_SEED):
         for hour in [0, 4, 8, 12, 16, 20]:
             for aisle in aisles:
                 # Base temperature with small variations
-                base_temp = aisle['temperature']
+                base_temp = aisle["temperature"]
 
                 # Add time-of-day variation
                 if hour in [12, 16]:
@@ -2754,29 +2876,37 @@ def generate_temperature_readings(aisles, start_date, days, seed=DEFAULT_SEED):
                     temp_variation = np.random.uniform(-1, 1)
 
                 temperature = base_temp + temp_variation
-                humidity = aisle['humidity'] + np.random.uniform(-5, 5)
+                humidity = aisle["humidity"] + np.random.uniform(-5, 5)
 
                 # Check if alert should be triggered
                 alert_triggered = False
-                if aisle['category'] == 'Refrigerated' and temperature > 8:
+                if aisle["category"] == "Refrigerated" and temperature > 8:
                     alert_triggered = True
-                elif aisle['category'] == 'Controlled' and (temperature < 15 or temperature > 25):
+                elif aisle["category"] == "Controlled" and (
+                    temperature < 15 or temperature > 25
+                ):
                     alert_triggered = True
 
-                readings.append({
-                    'reading_id': reading_id,
-                    'aisle_id': aisle['aisle_id'],
-                    'temperature': round(temperature, 1),
-                    'humidity': round(humidity, 1),
-                    'reading_time': datetime.combine(date, datetime.min.time().replace(hour=hour)).isoformat(),
-                    'alert_triggered': alert_triggered
-                })
+                readings.append(
+                    {
+                        "reading_id": reading_id,
+                        "aisle_id": aisle["aisle_id"],
+                        "temperature": round(temperature, 1),
+                        "humidity": round(humidity, 1),
+                        "reading_time": datetime.combine(
+                            date, datetime.min.time().replace(hour=hour)
+                        ).isoformat(),
+                        "alert_triggered": alert_triggered,
+                    }
+                )
                 reading_id += 1
 
     return readings
 
 
-def generate_current_inventory(medications, batches, consumption_history, seed=DEFAULT_SEED):
+def generate_current_inventory(
+    medications, batches, consumption_history, seed=DEFAULT_SEED
+):
     """Generate current inventory levels with batch tracking"""
     random.seed(seed)
     np.random.seed(seed)
@@ -2787,25 +2917,29 @@ def generate_current_inventory(medications, batches, consumption_history, seed=D
     # Calculate consumption by medication
     df_consumption = pd.DataFrame(consumption_history)
     if not df_consumption.empty:
-        daily_consumption = df_consumption.groupby('med_id')['qty_dispensed'].mean().to_dict()
+        daily_consumption = (
+            df_consumption.groupby("med_id")["qty_dispensed"].mean().to_dict()
+        )
     else:
         daily_consumption = {}
 
     # Group batches by medication
     batches_by_med = {}
     for batch in batches:
-        med_id = batch['med_id']
+        med_id = batch["med_id"]
         if med_id not in batches_by_med:
             batches_by_med[med_id] = []
         batches_by_med[med_id].append(batch)
 
     for med in medications:
-        med_id = med['med_id']
+        med_id = med["med_id"]
 
         # Calculate current stock from batches
         current_stock = 0
         if med_id in batches_by_med:
-            current_stock = sum(batch['quantity_remaining'] for batch in batches_by_med[med_id])
+            current_stock = sum(
+                batch["quantity_remaining"] for batch in batches_by_med[med_id]
+            )
 
         # Calculate reorder point based on consumption
         avg_daily = daily_consumption.get(med_id, np.random.uniform(5, 20))
@@ -2819,34 +2953,38 @@ def generate_current_inventory(medications, batches, consumption_history, seed=D
 
         # Determine stock status
         if current_stock == 0:
-            stock_status = 'stockout'
+            stock_status = "stockout"
         elif current_stock < reorder_point * 0.25:
-            stock_status = 'critical'
+            stock_status = "critical"
         elif current_stock < reorder_point * 0.5:
-            stock_status = 'low'
+            stock_status = "low"
         elif current_stock < reorder_point:
-            stock_status = 'reorder'
+            stock_status = "reorder"
         else:
-            stock_status = 'adequate'
+            stock_status = "adequate"
 
-        inventory.append({
-            'inventory_id': inventory_id,
-            'med_id': med_id,
-            'store_id': 1,  # Default to store 1
-            'current_stock': current_stock,
-            'reserved_stock': 0,
-            'reorder_point': reorder_point,
-            'reorder_quantity': reorder_quantity,
-            'last_updated': datetime.now().isoformat(),
-            'days_until_stockout': days_until_stockout,
-            'stock_status': stock_status
-        })
+        inventory.append(
+            {
+                "inventory_id": inventory_id,
+                "med_id": med_id,
+                "store_id": 1,  # Default to store 1
+                "current_stock": current_stock,
+                "reserved_stock": 0,
+                "reorder_point": reorder_point,
+                "reorder_quantity": reorder_quantity,
+                "last_updated": datetime.now().isoformat(),
+                "days_until_stockout": days_until_stockout,
+                "stock_status": stock_status,
+            }
+        )
         inventory_id += 1
 
     return inventory
 
 
-def generate_movement_history(medication_placements, start_date, days, seed=DEFAULT_SEED):
+def generate_movement_history(
+    medication_placements, start_date, days, seed=DEFAULT_SEED
+):
     """Generate movement history for tracking"""
     random.seed(seed)
     np.random.seed(seed)
@@ -2863,19 +3001,21 @@ def generate_movement_history(medication_placements, start_date, days, seed=DEFA
             days_ago = np.random.randint(0, min(days, 30))
             movement_date = datetime.combine(
                 start_date + timedelta(days=days - days_ago),
-                datetime.min.time().replace(hour=np.random.randint(8, 18))
+                datetime.min.time().replace(hour=np.random.randint(8, 18)),
             )
 
-            movements.append({
-                'movement_id': movement_id,
-                'med_id': placement['med_id'],
-                'position_id': placement['position_id'],
-                'movement_type': 'pick',
-                'quantity': np.random.randint(1, min(10, placement['quantity'])),
-                'movement_date': movement_date.isoformat(),
-                'operator_id': f'OP{np.random.randint(1, 6):03d}',
-                'order_id': np.random.randint(1000, 9999)
-            })
+            movements.append(
+                {
+                    "movement_id": movement_id,
+                    "med_id": placement["med_id"],
+                    "position_id": placement["position_id"],
+                    "movement_type": "pick",
+                    "quantity": np.random.randint(1, min(10, placement["quantity"])),
+                    "movement_date": movement_date.isoformat(),
+                    "operator_id": f"OP{np.random.randint(1, 6):03d}",
+                    "order_id": np.random.randint(1000, 9999),
+                }
+            )
             movement_id += 1
 
     return movements
@@ -3392,8 +3532,8 @@ def generate_all(
 
     # Convert boolean values to integers for SQLite
     for pos in shelf_positions:
-        pos['is_golden_zone'] = 1 if pos['is_golden_zone'] else 0
-        pos['allows_stacking'] = 1 if pos['allows_stacking'] else 0
+        pos["is_golden_zone"] = 1 if pos["is_golden_zone"] else 0
+        pos["allows_stacking"] = 1 if pos["allows_stacking"] else 0
 
     cur.executemany(
         "INSERT OR REPLACE INTO shelf_positions (position_id, shelf_id, grid_x, grid_y, "
@@ -3410,7 +3550,9 @@ def generate_all(
 
     # Generate warehouse batch information
     print("Generating warehouse batch information...")
-    warehouse_batch_info = generate_warehouse_batch_info(meds, suppliers, start_date, days, seed=seed + 104)
+    warehouse_batch_info = generate_warehouse_batch_info(
+        meds, suppliers, start_date, days, seed=seed + 104
+    )
     cur.executemany(
         "INSERT OR REPLACE INTO batch_info (batch_id, med_id, lot_number, manufacture_date, expiry_date, "
         "quantity_received, quantity_remaining, supplier_id, receipt_date, status) "
@@ -3426,16 +3568,18 @@ def generate_all(
 
     # Generate medication attributes
     print("Generating medication attributes based on consumption history...")
-    medication_attributes = generate_medication_attributes(meds, all_history_rows, seed=seed + 105)
+    medication_attributes = generate_medication_attributes(
+        meds, all_history_rows, seed=seed + 105
+    )
 
     # Convert boolean values to integers for SQLite
     for attr in medication_attributes:
-        attr['stackable'] = 1 if attr['stackable'] else 0
-        attr['requires_refrigeration'] = 1 if attr['requires_refrigeration'] else 0
-        attr['requires_security'] = 1 if attr['requires_security'] else 0
-        attr['light_sensitive'] = 1 if attr['light_sensitive'] else 0
-        attr['humidity_sensitive'] = 1 if attr['humidity_sensitive'] else 0
-        attr['batch_picking_compatible'] = 1 if attr['batch_picking_compatible'] else 0
+        attr["stackable"] = 1 if attr["stackable"] else 0
+        attr["requires_refrigeration"] = 1 if attr["requires_refrigeration"] else 0
+        attr["requires_security"] = 1 if attr["requires_security"] else 0
+        attr["light_sensitive"] = 1 if attr["light_sensitive"] else 0
+        attr["humidity_sensitive"] = 1 if attr["humidity_sensitive"] else 0
+        attr["batch_picking_compatible"] = 1 if attr["batch_picking_compatible"] else 0
 
     cur.executemany(
         "INSERT OR REPLACE INTO medication_attributes (med_id, velocity_score, picks_per_day, movement_category, "
@@ -3455,13 +3599,18 @@ def generate_all(
     # Generate medication placements with FIFO
     print("Generating medication placements with FIFO logic...")
     medication_placements = generate_medication_placements(
-        meds, medication_attributes, warehouse_batch_info, shelf_positions,
-        warehouse_shelves, warehouse_aisles, seed=seed + 106
+        meds,
+        medication_attributes,
+        warehouse_batch_info,
+        shelf_positions,
+        warehouse_shelves,
+        warehouse_aisles,
+        seed=seed + 106,
     )
 
     # Convert boolean values to integers for SQLite
     for placement in medication_placements:
-        placement['is_active'] = 1 if placement['is_active'] else 0
+        placement["is_active"] = 1 if placement["is_active"] else 0
 
     cur.executemany(
         "INSERT OR REPLACE INTO medication_placements (placement_id, position_id, med_id, batch_id, "
@@ -3476,16 +3625,31 @@ def generate_all(
     )
     print(f"  ✅ Generated {len(medication_placements)} medication placements")
 
+    # Update shelf utilization based on actual placements
+    print("Updating shelf utilization based on placements...")
+    update_shelf_utilization(
+        conn,
+        medication_placements,
+        shelf_positions,
+        warehouse_shelves,
+        medication_attributes,
+    )
+    print("  ✅ Updated shelf utilization values")
+
     # Generate temperature readings
     print("Generating temperature monitoring data...")
-    temperature_readings = generate_temperature_readings(warehouse_aisles, start_date, days, seed=seed + 107)
+    temperature_readings = generate_temperature_readings(
+        warehouse_aisles, start_date, days, seed=seed + 107
+    )
 
     # Convert boolean values to integers for SQLite
     for reading in temperature_readings:
-        reading['alert_triggered'] = 1 if reading['alert_triggered'] else 0
+        reading["alert_triggered"] = 1 if reading["alert_triggered"] else 0
 
     # Only insert last 30 days of readings to keep DB size manageable
-    recent_readings = temperature_readings[-30*6*len(warehouse_aisles):]  # 30 days * 6 readings/day * num_aisles
+    recent_readings = temperature_readings[
+        -30 * 6 * len(warehouse_aisles) :
+    ]  # 30 days * 6 readings/day * num_aisles
     cur.executemany(
         "INSERT OR REPLACE INTO temperature_readings (reading_id, aisle_id, temperature, humidity, "
         "reading_time, alert_triggered) "
@@ -3500,7 +3664,9 @@ def generate_all(
 
     # Generate current inventory
     print("Generating current inventory levels...")
-    current_inventory = generate_current_inventory(meds, warehouse_batch_info, all_history_rows, seed=seed + 108)
+    current_inventory = generate_current_inventory(
+        meds, warehouse_batch_info, all_history_rows, seed=seed + 108
+    )
     cur.executemany(
         "INSERT OR REPLACE INTO current_inventory (inventory_id, med_id, store_id, current_stock, "
         "reserved_stock, reorder_point, reorder_quantity, last_updated, days_until_stockout, stock_status) "
@@ -3516,7 +3682,9 @@ def generate_all(
 
     # Generate movement history
     print("Generating movement history...")
-    movement_history = generate_movement_history(medication_placements, start_date, days, seed=seed + 109)
+    movement_history = generate_movement_history(
+        medication_placements, start_date, days, seed=seed + 109
+    )
     cur.executemany(
         "INSERT OR REPLACE INTO movement_history (movement_id, med_id, position_id, movement_type, "
         "quantity, movement_date, operator_id, order_id) "

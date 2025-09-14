@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Package, Calendar, Thermometer, AlertTriangle, CheckCircle, Clock, ArrowRight } from 'lucide-react';
-import { Shelf } from './warehouse-types';
+import type { Shelf } from './warehouse-types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,10 +45,11 @@ export function ShelfDetail({ shelf, aisleName, onBack }: ShelfDetailProps) {
   };
 
   const getStockLevel = (quantity: number, maxCapacity: number) => {
-    const percentage = (quantity / maxCapacity) * 100;
-    if (percentage > 80) return { status: 'high', label: 'Well Stocked', color: 'text-green-500' };
-    if (percentage > 50) return { status: 'medium', label: 'Moderate', color: 'text-yellow-500' };
-    if (percentage > 20) return { status: 'low', label: 'Low Stock', color: 'text-orange-500' };
+    const clampedMax = Math.max(1, maxCapacity);
+    const percentage = Math.min(100, Math.max(0, (quantity / clampedMax) * 100));
+    if (percentage >= 80) return { status: 'high', label: 'Well Stocked', color: 'text-green-500' };
+    if (percentage >= 50) return { status: 'medium', label: 'Moderate', color: 'text-yellow-500' };
+    if (percentage >= 20) return { status: 'low', label: 'Low Stock', color: 'text-orange-500' };
     return { status: 'critical', label: 'Critical', color: 'text-red-500' };
   };
 
@@ -59,7 +60,7 @@ export function ShelfDetail({ shelf, aisleName, onBack }: ShelfDetailProps) {
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="p-6 border-b border-slate-700/50 bg-slate-800/50 backdrop-blur-sm sticky top-0 z-10"
+        className="p-6 border-b border-slate-700/50 bg-slate-800/50 backdrop-blur-sm z-10 mb-8"
       >
         <div className="flex items-center gap-4 mb-4">
           <Button
@@ -115,15 +116,16 @@ export function ShelfDetail({ shelf, aisleName, onBack }: ShelfDetailProps) {
               <div className="space-y-2">
                 <div className="text-slate-400 text-sm">Capacity Utilization</div>
                 <div className="text-2xl text-white">
-                  {shelf.medications.length > 0
-                    ? Math.round((shelf.medications.length / (shelf.capacity / 100)) * 100)
-                    : 0}%
+                  {Math.round((shelf.medications.length / Math.max(1, shelf.capacity)) * 100)}%
                 </div>
               </div>
               <div className="space-y-2">
                 <div className="text-slate-400 text-sm">Available Space</div>
                 <div className="text-2xl text-white">
-                  {Math.floor(shelf.capacity / 100) - shelf.medications.length}
+                  {(() => {
+                    const totalSlots = Math.max(1, Math.floor(shelf.capacity / 100));
+                    return Math.max(0, totalSlots - shelf.medications.length);
+                  })()}
                 </div>
               </div>
             </div>
@@ -286,7 +288,7 @@ export function ShelfDetail({ shelf, aisleName, onBack }: ShelfDetailProps) {
               </p>
               <div className="mt-6 text-slate-300">
                 <div className="text-sm">Available Capacity</div>
-                <div className="text-2xl">{Math.floor(shelf.capacity / 100)} slots</div>
+                <div className="text-2xl">{shelf.capacity} slots</div>
               </div>
             </Card>
           </motion.div>

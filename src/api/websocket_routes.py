@@ -4,8 +4,8 @@ WebSocket Routes for Real-time Warehouse Updates
 Provides WebSocket endpoints for real-time communication
 """
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, HTTPException
-from typing import List, Optional
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from typing import Optional
 import json
 import asyncio
 import logging
@@ -20,7 +20,9 @@ router = APIRouter(tags=["websocket"])
 async def websocket_endpoint(
     websocket: WebSocket,
     client_id: str = Query(...),
-    subscriptions: Optional[str] = Query(None, description="Comma-separated list of subscriptions")
+    subscriptions: Optional[str] = Query(
+        None, description="Comma-separated list of subscriptions"
+    ),
 ):
     """
     WebSocket endpoint for real-time warehouse updates
@@ -51,16 +53,12 @@ async def websocket_endpoint(
                 message = json.loads(data)
                 await handle_client_message(websocket, message)
             except json.JSONDecodeError:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": "Invalid JSON format"
-                })
+                await websocket.send_json(
+                    {"type": "error", "message": "Invalid JSON format"}
+                )
             except Exception as e:
                 logger.error(f"Error handling client message: {e}")
-                await websocket.send_json({
-                    "type": "error",
-                    "message": str(e)
-                })
+                await websocket.send_json({"type": "error", "message": str(e)})
 
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
@@ -77,10 +75,9 @@ async def handle_client_message(websocket: WebSocket, message: dict):
 
     if msg_type == "ping":
         # Respond to ping with pong
-        await websocket.send_json({
-            "type": "pong",
-            "timestamp": message.get("timestamp")
-        })
+        await websocket.send_json(
+            {"type": "pong", "timestamp": message.get("timestamp")}
+        )
 
     elif msg_type == "subscribe":
         # Add subscription to existing connection
@@ -89,11 +86,13 @@ async def handle_client_message(websocket: WebSocket, message: dict):
             if channel in ws_manager.active_connections:
                 ws_manager.active_connections[channel].add(websocket)
 
-        await websocket.send_json({
-            "type": "subscription_updated",
-            "channels": channels,
-            "status": "subscribed"
-        })
+        await websocket.send_json(
+            {
+                "type": "subscription_updated",
+                "channels": channels,
+                "status": "subscribed",
+            }
+        )
 
     elif msg_type == "unsubscribe":
         # Remove subscription from connection
@@ -102,28 +101,31 @@ async def handle_client_message(websocket: WebSocket, message: dict):
             if channel in ws_manager.active_connections:
                 ws_manager.active_connections[channel].discard(websocket)
 
-        await websocket.send_json({
-            "type": "subscription_updated",
-            "channels": channels,
-            "status": "unsubscribed"
-        })
+        await websocket.send_json(
+            {
+                "type": "subscription_updated",
+                "channels": channels,
+                "status": "unsubscribed",
+            }
+        )
 
     elif msg_type == "request_status":
         # Send current connection status
         metadata = ws_manager.connection_metadata.get(websocket, {})
-        await websocket.send_json({
-            "type": "status",
-            "client_id": metadata.get("client_id"),
-            "connected_at": metadata.get("connected_at"),
-            "subscriptions": metadata.get("subscriptions", [])
-        })
+        await websocket.send_json(
+            {
+                "type": "status",
+                "client_id": metadata.get("client_id"),
+                "connected_at": metadata.get("connected_at"),
+                "subscriptions": metadata.get("subscriptions", []),
+            }
+        )
 
     else:
         # Unknown message type
-        await websocket.send_json({
-            "type": "error",
-            "message": f"Unknown message type: {msg_type}"
-        })
+        await websocket.send_json(
+            {"type": "error", "message": f"Unknown message type: {msg_type}"}
+        )
 
 
 @router.get("/ws/connections")
@@ -134,9 +136,7 @@ async def get_websocket_connections():
 
 @router.post("/ws/broadcast/temperature")
 async def broadcast_temperature_update(
-    aisle_id: int,
-    temperature: float,
-    humidity: Optional[float] = None
+    aisle_id: int, temperature: float, humidity: Optional[float] = None
 ):
     """
     Manually broadcast a temperature update to all subscribed clients
@@ -150,24 +150,23 @@ async def broadcast_temperature_update(
         "data": {
             "aisle_id": aisle_id,
             "temperature": temperature,
-            "humidity": humidity
-        }
+            "humidity": humidity,
+        },
     }
 
 
 @router.post("/ws/broadcast/movement")
 async def broadcast_movement(
-    med_id: int,
-    from_shelf: int,
-    to_shelf: int,
-    quantity: int
+    med_id: int, from_shelf: int, to_shelf: int, quantity: int
 ):
     """
     Broadcast an inventory movement to all subscribed clients
 
     Automatically called when medications are moved
     """
-    await ws_manager.broadcast_inventory_movement(med_id, from_shelf, to_shelf, quantity)
+    await ws_manager.broadcast_inventory_movement(
+        med_id, from_shelf, to_shelf, quantity
+    )
     return {
         "success": True,
         "message": "Movement broadcasted",
@@ -175,18 +174,13 @@ async def broadcast_movement(
             "med_id": med_id,
             "from_shelf": from_shelf,
             "to_shelf": to_shelf,
-            "quantity": quantity
-        }
+            "quantity": quantity,
+        },
     }
 
 
 @router.post("/ws/broadcast/alert")
-async def broadcast_alert(
-    alert_type: str,
-    severity: str,
-    location: str,
-    message: str
-):
+async def broadcast_alert(alert_type: str, severity: str, location: str, message: str):
     """
     Broadcast an alert to all subscribed clients
 
@@ -201,8 +195,8 @@ async def broadcast_alert(
             "alert_type": alert_type,
             "severity": severity,
             "location": location,
-            "message": message
-        }
+            "message": message,
+        },
     }
 
 
@@ -215,25 +209,16 @@ async def start_event_simulation():
     """
     if not event_simulator.running:
         asyncio.create_task(event_simulator.start_simulation())
-        return {
-            "success": True,
-            "message": "Event simulation started"
-        }
+        return {"success": True, "message": "Event simulation started"}
     else:
-        return {
-            "success": False,
-            "message": "Simulation already running"
-        }
+        return {"success": False, "message": "Simulation already running"}
 
 
 @router.post("/ws/simulation/stop")
 async def stop_event_simulation():
     """Stop the event simulation"""
     await event_simulator.stop_simulation()
-    return {
-        "success": True,
-        "message": "Event simulation stopped"
-    }
+    return {"success": True, "message": "Event simulation stopped"}
 
 
 @router.get("/ws/simulation/status")
@@ -241,5 +226,5 @@ async def get_simulation_status():
     """Get the status of event simulation"""
     return {
         "running": event_simulator.running,
-        "connections": ws_manager.get_connection_stats()
+        "connections": ws_manager.get_connection_stats(),
     }

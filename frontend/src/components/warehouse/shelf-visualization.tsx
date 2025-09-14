@@ -247,7 +247,7 @@ export function ShelfVisualization({
                 <div className="absolute -left-16 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">
                   Back
                 </div>
-                <div className="grid grid-cols-10 gap-2">
+                <div className="grid grid-cols-10 gap-3">
                   {shelfData.rows.back.map((position) => (
                     <ShelfPositionComponent
                       key={position.position_id}
@@ -270,7 +270,7 @@ export function ShelfVisualization({
                 <div className="absolute -left-16 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">
                   Middle
                 </div>
-                <div className="grid grid-cols-10 gap-2">
+                <div className="grid grid-cols-10 gap-3">
                   {shelfData.rows.middle.map((position) => (
                     <ShelfPositionComponent
                       key={position.position_id}
@@ -293,7 +293,7 @@ export function ShelfVisualization({
                 <div className="absolute -left-16 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">
                   Front
                 </div>
-                <div className="grid grid-cols-10 gap-2">
+                <div className="grid grid-cols-10 gap-3">
                   {shelfData.rows.front.map((position) => (
                     <ShelfPositionComponent
                       key={position.position_id}
