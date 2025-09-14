@@ -32,7 +32,9 @@ const transformApiToComponentAisle = (apiAisle: ApiAisle, apiShelves?: ApiShelf[
     temperature: apiAisle.temperature,
     shelves: apiShelves?.map(shelf => transformApiToComponentShelf(shelf)) || [],
     shelfCount: (apiAisle as any).shelf_count ?? (apiShelves?.length || 0),
-    medicationCount: (apiAisle as any).total_items ?? (apiAisle as any).medication_count ?? 0
+    medicationCount: (apiAisle as any).total_items ?? (apiAisle as any).medication_count ?? 0,
+    total_items: (apiAisle as any).total_items || 0,
+    total_capacity: (apiAisle as any).total_capacity || 0
   };
 };
 

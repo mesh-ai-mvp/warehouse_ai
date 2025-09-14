@@ -58,9 +58,14 @@ export function FloatingPanel({
   };
 
   const getAisleUtilization = (aisle: Aisle) => {
-    const totalMeds = aisle.shelves.reduce((acc, shelf) => acc + shelf.medications.length, 0);
-    const totalCapacity = aisle.shelves.length;
-    return totalCapacity > 0 ? (totalMeds / totalCapacity) * 100 : 0;
+    // Calculate based on actual quantities, not just medication count
+    const totalQuantity = aisle.shelves.reduce((acc, shelf) =>
+      acc + shelf.medications.reduce((sum, med) => sum + (med.quantity || 0), 0), 0);
+    const totalCapacity = aisle.shelves.reduce((acc, shelf) => acc + (shelf.capacity || 0), 0);
+    // Estimate 100 items per position for quantity-based utilization
+    const estimatedMaxQuantity = totalCapacity * 100;
+    return estimatedMaxQuantity > 0 ?
+      Math.min(100, (totalQuantity / estimatedMaxQuantity) * 100) : 0;
   };
 
   const getCriticalAlerts = () => {

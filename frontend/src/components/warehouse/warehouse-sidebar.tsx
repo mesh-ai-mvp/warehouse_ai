@@ -70,9 +70,14 @@ export function WarehouseSidebar({
   };
 
   const getAisleUtilization = (aisle: Aisle) => {
-    const totalMeds = aisle.shelves.reduce((acc, shelf) => acc + shelf.medications.length, 0);
-    const totalCapacity = aisle.shelves.length;
-    return totalCapacity > 0 ? (totalMeds / totalCapacity) * 100 : 0;
+    // Calculate based on actual quantities, not just medication count
+    const totalQuantity = aisle.shelves.reduce((acc, shelf) =>
+      acc + shelf.medications.reduce((sum, med) => sum + (med.quantity || 0), 0), 0);
+    const totalCapacity = aisle.shelves.reduce((acc, shelf) => acc + (shelf.capacity || 0), 0);
+    // Estimate 100 items per position for quantity-based utilization
+    const estimatedMaxQuantity = totalCapacity * 100;
+    return estimatedMaxQuantity > 0 ?
+      Math.min(100, (totalQuantity / estimatedMaxQuantity) * 100) : 0;
   };
 
   const totalMedications = getTotalMedications();
@@ -89,36 +94,41 @@ export function WarehouseSidebar({
       transition={{ duration: 0.6, ease: [0.23, 1, 0.320, 1] }}
       className="bg-slate-900/95 backdrop-blur-sm border-r border-slate-700/50 flex flex-col h-full relative"
     >
-      {/* Collapse Toggle */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onToggleCollapse}
-        className="absolute -right-3 top-4 z-50 w-6 h-6 p-0 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-full"
-      >
-        {collapsed ? (
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-        ) : (
-          <ChevronLeft className="w-3 h-3 text-slate-300" />
-        )}
-      </Button>
       {/* Header */}
       <div className="p-6 border-b border-slate-700/50">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Package className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <img
+              src="/@new-logo.png"
+              onError={(e) => { e.currentTarget.src = '/logo.png' }}
+              alt="Suppl.AI"
+              className="h-10 w-auto flex-shrink-0"
+            />
+            {!collapsed && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, delay: 0.1 }}
+              >
+                <h1 className="text-white font-medium">Suppl.AI</h1>
+                <p className="text-slate-400 text-sm">Warehouse Management</p>
+              </motion.div>
+            )}
           </div>
-          {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2, delay: 0.1 }}
-            >
-              <h1 className="text-white font-medium">MediCore</h1>
-              <p className="text-slate-400 text-sm">Warehouse Management</p>
-            </motion.div>
-          )}
+          {/* Collapse Toggle */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggleCollapse}
+            className="w-6 h-6 p-0 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-full flex-shrink-0"
+          >
+            {collapsed ? (
+              <ChevronRight className="w-3 h-3 text-slate-300" />
+            ) : (
+              <ChevronLeft className="w-3 h-3 text-slate-300" />
+            )}
+          </Button>
         </div>
 
         {/* Search */}

@@ -720,8 +720,12 @@ def create_tables(conn):
     """)
 
     # Create indexes for source of truth tables
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_optimal_batch_med ON optimal_batch_placement(med_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_chaos_metrics_name ON warehouse_chaos_metrics(metric_name)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_optimal_batch_med ON optimal_batch_placement(med_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_chaos_metrics_name ON warehouse_chaos_metrics(metric_name)"
+    )
 
     conn.commit()
 
@@ -2390,15 +2394,51 @@ def generate_warehouse_aisles(zones, seed=DEFAULT_SEED):
     # Define aisle configuration matching frontend expectations
     aisle_configs = [
         # Aisle A & B - General storage
-        {"aisle_id": 1, "zone_id": 3, "aisle_code": "A", "category": "General", "zone_type": "ambient"},
-        {"aisle_id": 2, "zone_id": 3, "aisle_code": "B", "category": "General", "zone_type": "ambient"},
+        {
+            "aisle_id": 1,
+            "zone_id": 3,
+            "aisle_code": "A",
+            "category": "General",
+            "zone_type": "ambient",
+        },
+        {
+            "aisle_id": 2,
+            "zone_id": 3,
+            "aisle_code": "B",
+            "category": "General",
+            "zone_type": "ambient",
+        },
         # Aisle C & D - Refrigerated storage
-        {"aisle_id": 3, "zone_id": 2, "aisle_code": "C", "category": "Refrigerated", "zone_type": "cold"},
-        {"aisle_id": 4, "zone_id": 2, "aisle_code": "D", "category": "Refrigerated", "zone_type": "cold"},
+        {
+            "aisle_id": 3,
+            "zone_id": 2,
+            "aisle_code": "C",
+            "category": "Refrigerated",
+            "zone_type": "cold",
+        },
+        {
+            "aisle_id": 4,
+            "zone_id": 2,
+            "aisle_code": "D",
+            "category": "Refrigerated",
+            "zone_type": "cold",
+        },
         # Aisle E - Controlled substances
-        {"aisle_id": 5, "zone_id": 1, "aisle_code": "E", "category": "Controlled", "zone_type": "restricted"},
+        {
+            "aisle_id": 5,
+            "zone_id": 1,
+            "aisle_code": "E",
+            "category": "Controlled",
+            "zone_type": "restricted",
+        },
         # Aisle F - Quarantine area
-        {"aisle_id": 6, "zone_id": 4, "aisle_code": "F", "category": "Quarantine", "zone_type": "ambient"},
+        {
+            "aisle_id": 6,
+            "zone_id": 4,
+            "aisle_code": "F",
+            "category": "Quarantine",
+            "zone_type": "ambient",
+        },
     ]
 
     for config in aisle_configs:
@@ -2769,8 +2809,14 @@ def generate_medication_placements(
         if random.random() < 0.40 and len(med_batches) > 0:
             # Fragment first batch across multiple locations
             batch_to_fragment = med_batches[0]
-            available_positions = [p for p in position_lookup.keys() if p not in used_positions]
-            num_fragments = random.randint(3, min(5, len(available_positions))) if available_positions else 0
+            available_positions = [
+                p for p in position_lookup.keys() if p not in used_positions
+            ]
+            num_fragments = (
+                random.randint(3, min(5, len(available_positions)))
+                if available_positions
+                else 0
+            )
 
             if num_fragments > 1:
                 fragment_qty = batch_to_fragment["quantity_remaining"] // num_fragments
@@ -2778,7 +2824,9 @@ def generate_medication_placements(
 
                 for frag_idx in range(num_fragments):
                     # Find random available position
-                    available_pos = [p for p in position_lookup.keys() if p not in used_positions]
+                    available_pos = [
+                        p for p in position_lookup.keys() if p not in used_positions
+                    ]
                     if not available_pos:
                         break
 
@@ -2786,18 +2834,20 @@ def generate_medication_placements(
                     qty_to_place = min(fragment_qty, remaining_qty)
 
                     if qty_to_place > 0:
-                        placements.append({
-                            "placement_id": placement_id,
-                            "position_id": random_pos_id,
-                            "med_id": med_id,
-                            "batch_id": batch_to_fragment["batch_id"],
-                            "quantity": qty_to_place,
-                            "placement_date": datetime.now().isoformat(),
-                            "placed_by": "system",
-                            "placement_reason": "batch_fragmentation_chaos",
-                            "expiry_date": batch_to_fragment["expiry_date"],
-                            "is_active": True,
-                        })
+                        placements.append(
+                            {
+                                "placement_id": placement_id,
+                                "position_id": random_pos_id,
+                                "med_id": med_id,
+                                "batch_id": batch_to_fragment["batch_id"],
+                                "quantity": qty_to_place,
+                                "placement_date": datetime.now().isoformat(),
+                                "placed_by": "system",
+                                "placement_reason": "batch_fragmentation_chaos",
+                                "expiry_date": batch_to_fragment["expiry_date"],
+                                "is_active": True,
+                            }
+                        )
                         used_positions.add(random_pos_id)
                         placement_id += 1
                         remaining_qty -= qty_to_place
@@ -2822,7 +2872,9 @@ def generate_medication_placements(
                     chaos_score = 100  # Put fast movers in back
                 elif med_attr["movement_category"] == "Slow" and pos["grid_y"] == 1:
                     chaos_score = 100  # Put slow movers in front
-                elif med_attr["movement_category"] == "Medium" and pos["is_golden_zone"]:
+                elif (
+                    med_attr["movement_category"] == "Medium" and pos["is_golden_zone"]
+                ):
                     chaos_score = 50  # Waste golden zone on medium movers
 
                 if chaos_score > 0:
@@ -3819,10 +3871,13 @@ def generate_all(
     print("\nPopulating source of truth tables for optimization...")
 
     # Populate optimal batch placement rules
-    cur.executemany("""
+    cur.executemany(
+        """
         INSERT OR REPLACE INTO optimal_batch_placement (med_id, optimal_locations, consolidation_strategy)
         SELECT med_id, 1, 'single_location' FROM medications
-    """, [])
+    """,
+        [],
+    )
 
     # Populate velocity zone mapping
     cur.execute("""

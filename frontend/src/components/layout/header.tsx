@@ -7,21 +7,28 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { SidebarTrigger } from '@/components/ui/sidebar'
 
 export function Header() {
   const { setTheme } = useTheme()
 
   return (
     <header className="flex h-16 items-center gap-4 border-b bg-background px-6">
-      <div className="flex-1">
-        <h1 className="text-xl font-semibold text-foreground">
-          Pharmaceutical Warehouse Management
-        </h1>
+      <div className="flex items-center gap-3 flex-1">
+        <img
+          src="/@new-logo.png"
+          onError={(e) => { e.currentTarget.src = '/logo.png' }}
+          alt="Suppl.AI"
+          className="h-9 w-auto"
+        />
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">
+            Suppl.AI
+          </h1>
+          <p className="text-xs text-muted-foreground">Intelligent Supply Chain Orchestration</p>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
-        <SidebarTrigger className="h-8 w-8" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon">

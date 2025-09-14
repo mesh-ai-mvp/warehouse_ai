@@ -17,12 +17,19 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
   const [hoveredAisle, setHoveredAisle] = useState<string | null>(null);
 
   const getAisleStatus = (aisle: Aisle) => {
-    // Calculate based on actual quantities from medications
-    const totalQuantity = aisle.shelves.reduce((acc, shelf) =>
-      acc + shelf.medications.reduce((sum, med) => sum + (med.quantity || 0), 0), 0);
-    // Use actual capacity from shelves
-    const maxCapacity = aisle.shelves.reduce((acc, shelf) => acc + (shelf.capacity || 0), 0);
-    const fillPercentage = maxCapacity > 0 ? (totalQuantity / maxCapacity) * 100 : 0;
+    // Use API-provided aggregated data if available
+    const totalItems = (aisle as any).total_items ||
+      aisle.shelves.reduce((acc, shelf) =>
+        acc + shelf.medications.reduce((sum, med) => sum + (med.quantity || 0), 0), 0);
+
+    // Use total_capacity from API, or calculate from shelves
+    const totalCapacity = (aisle as any).total_capacity ||
+      aisle.shelves.reduce((acc, shelf) => acc + (shelf.capacity || 0), 0);
+
+    // Calculate fill percentage based on estimated item capacity per position (100 items per slot)
+    const estimatedMaxItems = totalCapacity * 100; // Rough estimate: 100 items per position
+    const fillPercentage = estimatedMaxItems > 0 ?
+      Math.min(100, (totalItems / estimatedMaxItems) * 100) : 0;
 
     if (fillPercentage > 80) return 'high';
     if (fillPercentage > 40) return 'medium';
@@ -182,11 +189,13 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                     {/* Shelving Units Visualization */}
                     <div className="absolute inset-4 grid grid-cols-6 grid-rows-4 gap-2">
                       {Array.from({ length: 24 }).map((_, i) => {
-                        const status = getAisleStatus(aisle);
-                        const fillPercentage = status === 'high' ? 90 :
-                                              status === 'medium' ? 60 :
-                                              status === 'low' ? 30 : 0;
-                        const filledSlots = Math.floor(24 * (fillPercentage / 100));
+                        // Calculate actual fill percentage from data
+                        const totalItems = (aisle as any).total_items || 0;
+                        const totalCapacity = (aisle as any).total_capacity || 30;
+                        const estimatedMaxItems = totalCapacity * 100; // 100 items per position estimate
+                        const actualFillPercentage = estimatedMaxItems > 0 ?
+                          Math.min(100, (totalItems / estimatedMaxItems) * 100) : 0;
+                        const filledSlots = Math.floor(24 * (actualFillPercentage / 100));
                         return (
                           <div
                             key={i}
@@ -222,7 +231,7 @@ export function WarehouseOverview({ aisles, onAisleClick, legendCollapsed, onTog
                         'bg-gray-300'
                       }`} />
                       <span className="text-white/80 text-xs">
-                        {((aisle as any).medicationCount ?? aisle.shelves.reduce((acc, shelf) => acc + shelf.medications.length, 0))} items
+                        {((aisle as any).total_items ?? (aisle as any).medicationCount ?? aisle.shelves.reduce((acc, shelf) => acc + shelf.medications.length, 0))} items
                       </span>
                     </div>
 

@@ -44,7 +44,10 @@ export function AisleView({ aisle, onShelfClick, onBack }: AisleViewProps) {
   const totalQuantity = aisle.shelves.reduce((acc, shelf) =>
     acc + shelf.medications.reduce((sum, med) => sum + (med.quantity || 0), 0), 0);
   const totalCapacity = aisle.shelves.reduce((acc, shelf) => acc + shelf.capacity, 0);
-  const utilizationRate = totalCapacity > 0 ? (totalQuantity / totalCapacity) * 100 : 0;
+  // Estimate 100 items per position for quantity-based utilization
+  const estimatedMaxQuantity = totalCapacity * 100;
+  const utilizationRate = estimatedMaxQuantity > 0 ?
+    Math.min(100, (totalQuantity / estimatedMaxQuantity) * 100) : 0;
 
   return (
     <div className="overflow-auto">

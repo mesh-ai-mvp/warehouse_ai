@@ -116,7 +116,7 @@ export function ShelfDetail({ shelf, aisleName, onBack }: ShelfDetailProps) {
               <div className="space-y-2">
                 <div className="text-muted-foreground text-sm">Capacity Utilization</div>
                 <div className="text-2xl font-bold">
-                  {Math.round((shelf.medications.length / Math.max(1, shelf.capacity)) * 100)}%
+                  {Math.min(100, Math.round((shelf.medications.length / Math.max(1, shelf.capacity)) * 100))}%
                 </div>
               </div>
               <div className="space-y-2">

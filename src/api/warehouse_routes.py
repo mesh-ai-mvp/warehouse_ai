@@ -82,12 +82,25 @@ async def get_warehouse_layout():
         """
         zones = pd.read_sql_query(zones_query, conn).to_dict("records")
 
-        # Get aisles with shelf count and utilization
+        # Get aisles with shelf count, utilization, and aggregated medication data
         aisles_query = """
-            SELECT a.*, COUNT(s.shelf_id) as shelf_count,
-                   AVG(s.utilization_percent) as avg_utilization
+            SELECT a.*,
+                   COUNT(DISTINCT s.shelf_id) as shelf_count,
+                   AVG(s.utilization_percent) as avg_utilization,
+                   COALESCE(SUM(s.capacity_slots), 0) as total_capacity,
+                   COALESCE(SUM(shelf_stats.total_items), 0) as total_items,
+                   COALESCE(SUM(shelf_stats.medication_count), 0) as medication_count
             FROM warehouse_aisles a
             LEFT JOIN warehouse_shelves s ON a.aisle_id = s.aisle_id
+            LEFT JOIN (
+                SELECT sp.shelf_id,
+                       COUNT(DISTINCT mp.med_id) as medication_count,
+                       SUM(mp.quantity) as total_items
+                FROM shelf_positions sp
+                LEFT JOIN medication_placements mp ON sp.position_id = mp.position_id
+                    AND mp.is_active = 1
+                GROUP BY sp.shelf_id
+            ) shelf_stats ON s.shelf_id = shelf_stats.shelf_id
             GROUP BY a.aisle_id
         """
         aisles = pd.read_sql_query(aisles_query, conn).to_dict("records")
@@ -1037,18 +1050,26 @@ async def get_chaos_metrics():
             FROM warehouse_chaos_metrics
             ORDER BY improvement_potential DESC
         """
-        metrics = pd.read_sql_query(metrics_query, conn).to_dict('records')
+        metrics = pd.read_sql_query(metrics_query, conn).to_dict("records")
 
         # Calculate overall chaos score
         overall_chaos = 0
         if metrics:
-            overall_chaos = sum(m['current_chaos_score'] for m in metrics if m['current_chaos_score']) / len(metrics)
+            overall_chaos = sum(
+                m["current_chaos_score"] for m in metrics if m["current_chaos_score"]
+            ) / len(metrics)
 
-        return clean_nan_values({
-            "chaos_metrics": metrics,
-            "overall_chaos_score": round(overall_chaos, 2),
-            "total_improvement_potential": sum(m['improvement_potential'] for m in metrics if m['improvement_potential'])
-        })
+        return clean_nan_values(
+            {
+                "chaos_metrics": metrics,
+                "overall_chaos_score": round(overall_chaos, 2),
+                "total_improvement_potential": sum(
+                    m["improvement_potential"]
+                    for m in metrics
+                    if m["improvement_potential"]
+                ),
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error fetching chaos metrics: {e}")
@@ -1089,21 +1110,29 @@ async def get_batch_fragmentation():
             ORDER BY num_locations DESC, b.expiry_date
         """
 
-        fragmented_batches = pd.read_sql_query(fragmentation_query, conn).to_dict('records')
+        fragmented_batches = pd.read_sql_query(fragmentation_query, conn).to_dict(
+            "records"
+        )
 
         # Calculate fragmentation statistics
         total_batches_query = "SELECT COUNT(DISTINCT batch_id) as total FROM batch_info"
-        total_batches = pd.read_sql_query(total_batches_query, conn).iloc[0]['total']
+        total_batches = pd.read_sql_query(total_batches_query, conn).iloc[0]["total"]
 
-        fragmentation_rate = (len(fragmented_batches) / total_batches * 100) if total_batches > 0 else 0
+        fragmentation_rate = (
+            (len(fragmented_batches) / total_batches * 100) if total_batches > 0 else 0
+        )
 
-        return clean_nan_values({
-            "fragmented_batches": fragmented_batches[:20],  # Top 20 most fragmented
-            "total_fragmented": len(fragmented_batches),
-            "total_batches": int(total_batches),  # Convert numpy int64 to regular int
-            "fragmentation_rate": round(fragmentation_rate, 2),
-            "consolidation_opportunity": f"{len(fragmented_batches)} batches could be consolidated"
-        })
+        return clean_nan_values(
+            {
+                "fragmented_batches": fragmented_batches[:20],  # Top 20 most fragmented
+                "total_fragmented": len(fragmented_batches),
+                "total_batches": int(
+                    total_batches
+                ),  # Convert numpy int64 to regular int
+                "fragmentation_rate": round(fragmentation_rate, 2),
+                "consolidation_opportunity": f"{len(fragmented_batches)} batches could be consolidated",
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error fetching batch fragmentation: {e}")
@@ -1156,21 +1185,23 @@ async def get_velocity_mismatches():
             ORDER BY ma.velocity_score DESC
         """
 
-        mismatches = pd.read_sql_query(mismatch_query, conn).to_dict('records')
+        mismatches = pd.read_sql_query(mismatch_query, conn).to_dict("records")
 
         # Get optimal placement reference
         optimal_query = """
             SELECT * FROM velocity_zone_mapping
             ORDER BY velocity_category
         """
-        optimal_mapping = pd.read_sql_query(optimal_query, conn).to_dict('records')
+        optimal_mapping = pd.read_sql_query(optimal_query, conn).to_dict("records")
 
-        return clean_nan_values({
-            "velocity_mismatches": mismatches[:30],  # Top 30 mismatches
-            "total_mismatches": len(mismatches),
-            "optimal_mapping": optimal_mapping,
-            "relocation_opportunity": f"{len(mismatches)} items could be relocated for better efficiency"
-        })
+        return clean_nan_values(
+            {
+                "velocity_mismatches": mismatches[:30],  # Top 30 mismatches
+                "total_mismatches": len(mismatches),
+                "optimal_mapping": optimal_mapping,
+                "relocation_opportunity": f"{len(mismatches)} items could be relocated for better efficiency",
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error fetching velocity mismatches: {e}")
