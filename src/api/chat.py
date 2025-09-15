@@ -462,7 +462,15 @@ Guidelines:
 
     def create_enhanced_text_representation(self, table_name, row):
         """Create enhanced text representation for database records"""
-        text_parts = [f"table {table_name}"]
+        # Emphasize table name for better matching
+        text_parts = [
+            f"table {table_name}",
+            f"table_{table_name}",
+            table_name,
+            table_name.replace("_", " "),
+            f"from {table_name} table",
+            f"database table {table_name}"
+        ]
 
         # Add all field information
         for col, val in row.items():
@@ -533,9 +541,44 @@ Guidelines:
 
         return " ".join(text_parts)
 
+    def detect_direct_table_query(self, query: str) -> Optional[List[str]]:
+        """Detect if user is asking about specific database tables"""
+        query_lower = query.lower()
+
+        # Known table names from the database
+        available_tables = list(self.db_data.keys())
+        mentioned_tables = []
+
+        # Check for direct table name mentions
+        for table in available_tables:
+            # Check various forms of the table name
+            table_variations = [
+                table,
+                table.replace("_", " "),
+                table.replace("_", ""),
+                table.rstrip("s"),  # Remove plural
+                table + "s"  # Add plural
+            ]
+
+            for variation in table_variations:
+                if variation in query_lower:
+                    mentioned_tables.append(table)
+                    break
+
+        # Check for general table queries
+        if any(phrase in query_lower for phrase in ["what tables", "show tables", "list tables", "database schema"]):
+            return available_tables
+
+        return mentioned_tables if mentioned_tables else None
+
     def detect_query_intent(self, query: str) -> Dict[str, Any]:
         """Enhanced query intent detection for supply chain queries"""
         query_lower = query.lower().strip()
+
+        # First check for direct table queries
+        direct_tables = self.detect_direct_table_query(query)
+        if direct_tables:
+            logger.info(f"Direct table query detected: {direct_tables}")
 
         # Supply chain specific intent patterns
         intent_patterns = {
@@ -626,13 +669,53 @@ Guidelines:
             "query_lower": query_lower,
             "use_langchain": use_langchain,
             "chain_type": chain_type,
+            "direct_tables": direct_tables,
         }
 
         logger.debug(f"Intent detection result: {result}")
         return result
 
-    def retrieve_knowledge(self, query: str, top_k: int = 15) -> List[Dict[str, Any]]:
+    def retrieve_direct_table_data(self, table_names: List[str], limit: int = 20) -> List[Dict[str, Any]]:
+        """Retrieve data directly from specified tables"""
+        results = []
+
+        for table_name in table_names:
+            if table_name in self.db_data:
+                df = self.db_data[table_name]
+
+                # Get sample rows from the table
+                sample_df = df.head(limit) if len(df) > limit else df
+
+                for idx, row in sample_df.iterrows():
+                    result = {
+                        "metadata": {
+                            "table": table_name,
+                            "row_index": idx,
+                            "data": row.to_dict(),
+                            "searchable_fields": self.extract_searchable_fields(row),
+                        },
+                        "similarity": 1.0,  # Perfect match for direct queries
+                        "content": self.get_structured_content({
+                            "table": table_name,
+                            "data": row.to_dict(),
+                            "searchable_fields": self.extract_searchable_fields(row),
+                        })
+                    }
+                    results.append(result)
+
+                logger.info(f"Retrieved {len(sample_df)} records from table '{table_name}'")
+            else:
+                logger.warning(f"Table '{table_name}' not found in database")
+
+        return results
+
+    def retrieve_knowledge(self, query: str, top_k: int = 15, intent: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """Enhanced knowledge retrieval with database data"""
+        # Check for direct table queries first
+        if intent and intent.get("direct_tables"):
+            logger.info(f"Using direct table retrieval for tables: {intent['direct_tables']}")
+            return self.retrieve_direct_table_data(intent["direct_tables"], limit=top_k)
+
         if not hasattr(self, "knowledge_vectors") or self.knowledge_vectors is None:
             logger.error("Knowledge vectors not available for retrieval")
             return []
@@ -648,8 +731,8 @@ Guidelines:
                 query_vector, self.knowledge_vectors
             ).flatten()
 
-            # Use threshold for filtering
-            threshold = float(os.getenv("KNOWLEDGE_SIMILARITY_THRESHOLD", "0.01"))
+            # Use lower threshold for better matching
+            threshold = float(os.getenv("KNOWLEDGE_SIMILARITY_THRESHOLD", "0.001"))
             valid_indices = np.where(similarities > threshold)[0]
 
             logger.debug(
@@ -723,12 +806,21 @@ Guidelines:
                 "supply",
                 "inventory item",
                 "stock item",
+                "medications",
+                "medicine",
             ],
             "find": ["search", "show", "list", "get", "locate", "identify", "display"],
             "total": ["count", "number", "sum", "amount", "quantity"],
             "price": ["cost", "pricing", "rate", "expense", "value", "amount"],
-            "supplier": ["vendor", "provider", "distributor", "manufacturer"],
+            "supplier": ["vendor", "provider", "distributor", "manufacturer", "suppliers"],
+            "order": ["purchase order", "po", "procurement", "purchase_orders"],
+            "inventory": ["stock", "warehouse", "storage", "consumption_history"],
         }
+
+        # Add table name variations
+        for table_name in self.db_data.keys():
+            table_clean = table_name.replace("_", " ")
+            enhanced_terms.extend([table_name, table_clean, f"table {table_name}"])
 
         for term, syns in synonyms.items():
             if term in query_lower:
@@ -1198,7 +1290,7 @@ Please check your API configuration and try again."""
             }
 
             if intent["is_knowledge_query"]:
-                knowledge = self.retrieve_knowledge(message, top_k=20)
+                knowledge = self.retrieve_knowledge(message, top_k=20, intent=intent)
                 debug_info["knowledge_retrieved"] = len(knowledge)
                 logger.info(f"Retrieved {len(knowledge)} knowledge items")
 
