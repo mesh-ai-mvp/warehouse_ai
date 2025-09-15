@@ -308,7 +308,7 @@ DEFAULT_TEMPLATES = [
     {
         "name": "Warehouse Chaos Dashboard",
         "description": "AI-powered analysis of warehouse inefficiencies and optimization opportunities",
-        "type": "warehouse_optimization",
+        "type": "custom",
         "template_data": {
             "title": "Warehouse Chaos Analysis Dashboard",
             "sections": ["chaos_metrics", "problem_areas", "quick_wins", "recommendations"],
@@ -354,7 +354,7 @@ DEFAULT_TEMPLATES = [
     {
         "name": "Placement Efficiency Report",
         "description": "Product placement optimization and consolidation opportunities",
-        "type": "warehouse_optimization",
+        "type": "custom",
         "template_data": {
             "title": "Placement Efficiency Analysis",
             "sections": ["velocity_analysis", "fragmentation", "consolidation_plan", "relocation_strategy"],
@@ -393,7 +393,7 @@ DEFAULT_TEMPLATES = [
     {
         "name": "FIFO Compliance Report",
         "description": "Expiry management and FIFO compliance monitoring",
-        "type": "warehouse_optimization",
+        "type": "custom",
         "template_data": {
             "title": "FIFO Compliance & Expiry Management",
             "sections": ["compliance_score", "violations", "expiry_alerts", "corrective_actions"],
@@ -432,7 +432,7 @@ DEFAULT_TEMPLATES = [
     {
         "name": "Movement Optimization Report",
         "description": "Picking path and movement pattern optimization analysis",
-        "type": "warehouse_optimization",
+        "type": "custom",
         "template_data": {
             "title": "Movement Pattern Optimization",
             "sections": ["movement_stats", "path_analysis", "congestion_points", "layout_recommendations"],
@@ -470,7 +470,7 @@ DEFAULT_TEMPLATES = [
     {
         "name": "Comprehensive Warehouse Optimization",
         "description": "Complete AI-driven warehouse optimization analysis with ROI",
-        "type": "warehouse_optimization",
+        "type": "custom",
         "template_data": {
             "title": "Comprehensive Warehouse Optimization Report",
             "sections": [
@@ -1024,6 +1024,13 @@ async def _generate_report_data(
         return await _generate_consumption_report_data(parameters, cursor)
     elif report_type == "warehouse_optimization":
         return await _generate_warehouse_optimization_report_data(parameters, cursor)
+    elif report_type == "custom":
+        # Check if this is a warehouse optimization custom report
+        if parameters.get("analysis_type") or parameters.get("focus") or parameters.get("include_ai_insights"):
+            return await _generate_warehouse_optimization_report_data(parameters, cursor)
+        else:
+            # Generic custom report - return empty data for now
+            return [{"message": "Custom report data generation not implemented"}]
     else:
         raise HTTPException(
             status_code=400, detail=f"Unsupported report type: {report_type}"
