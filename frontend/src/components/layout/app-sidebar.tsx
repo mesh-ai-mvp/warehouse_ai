@@ -1,6 +1,5 @@
 import { BarChart3, Package, ShoppingCart, FileText, Home, Settings, Warehouse } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import logoImage from '@/assets/logo2.png'
 
 import {
   Sidebar,
@@ -64,15 +63,11 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="h-20 w-full bg-gray-50 relative">
-          <img
-            src={logoImage}
-            alt="Company Logo"
-            className="h-full w-full object-fill"
-          />
-          <div className="absolute top-2 right-2">
-            <SidebarTrigger className="h-6 w-6 bg-white/80 hover:bg-white rounded shadow-sm" />
+        <div className="h-16 w-full flex items-center justify-between px-3">
+          <div className="brand-font text-2xl font-semibold tracking-wide text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+            Suppl.AI
           </div>
+          <SidebarTrigger className="h-6 w-6 bg-white/80 hover:bg-white rounded shadow-sm dark:bg-black/30 dark:hover:bg-black/40" />
         </div>
       </SidebarHeader>
       <SidebarContent>

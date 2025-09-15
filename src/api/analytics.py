@@ -1487,7 +1487,9 @@ async def export_analytics(
             )
 
     except Exception as e:
+        import traceback
         analytics_logger.error(f"Error exporting analytics: {str(e)}")
+        analytics_logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500, detail=f"Error exporting analytics: {str(e)}"
         )

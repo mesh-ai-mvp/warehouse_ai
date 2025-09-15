@@ -197,6 +197,10 @@ class PDFReportGenerator:
         Returns:
             PDF content as bytes
         """
+        # Sanitize AI insights if provided
+        if ai_insights:
+            ai_insights = self._sanitize_ai_insights(ai_insights)
+
         buffer = io.BytesIO()
 
         # Create document
@@ -247,13 +251,13 @@ class PDFReportGenerator:
         elements.append(Spacer(1, 2 * inch))
 
         # Title
-        title = template.get("name", "Report")
+        title = str(template.get("name", "Report"))
         elements.append(Paragraph(title, self.styles["CustomTitle"]))
 
         # Description
         if template.get("description"):
             elements.append(Spacer(1, 0.5 * inch))
-            elements.append(Paragraph(template["description"], self.styles["BodyText"]))
+            elements.append(Paragraph(str(template["description"]), self.styles["BodyText"]))
 
         # Report metadata
         elements.append(Spacer(1, 1 * inch))
@@ -278,10 +282,10 @@ class PDFReportGenerator:
         )
 
         metadata = [
-            [Paragraph("Report Type:", meta_label_style), Paragraph(template.get("type", "General").title(), meta_value_style)],
+            [Paragraph("Report Type:", meta_label_style), Paragraph(str(template.get("type", "General")).title(), meta_value_style)],
             [Paragraph("Generated:", meta_label_style), Paragraph(datetime.now().strftime("%B %d, %Y at %I:%M %p"), meta_value_style)],
             [Paragraph("Format:", meta_label_style), Paragraph("PDF with AI Insights", meta_value_style)],
-            [Paragraph("Frequency:", meta_label_style), Paragraph(template.get("frequency", "On-demand").title(), meta_value_style)],
+            [Paragraph("Frequency:", meta_label_style), Paragraph(str(template.get("frequency", "On-demand")).title(), meta_value_style)],
         ]
 
         metadata_table = Table(metadata, colWidths=[2 * inch, 3 * inch])
@@ -312,9 +316,10 @@ class PDFReportGenerator:
             # Split into paragraphs if needed
             paragraphs = summary.split("\n\n") if "\n\n" in summary else [summary]
             for para in paragraphs:
-                if para.strip():
+                para_str = str(para)
+                if para_str.strip():
                     elements.append(
-                        Paragraph(para.strip(), self.styles["ExecutiveSummary"])
+                        Paragraph(para_str.strip(), self.styles["ExecutiveSummary"])
                     )
                     elements.append(Spacer(1, 6))
 
@@ -377,9 +382,50 @@ class PDFReportGenerator:
 
         return elements
 
+    def _sanitize_ai_insights(self, ai_insights: Dict[str, Any]) -> Dict[str, Any]:
+        """Sanitize AI insights to ensure all string fields are properly typed"""
+        if not ai_insights:
+            return ai_insights
+
+        sanitized = ai_insights.copy()
+
+        # Sanitize anomalies
+        if isinstance(sanitized.get("anomalies"), list):
+            for i, anomaly in enumerate(sanitized["anomalies"]):
+                if isinstance(anomaly, dict):
+                    if "severity" in anomaly:
+                        anomaly["severity"] = str(anomaly["severity"])
+
+        # Sanitize risk assessment
+        if isinstance(sanitized.get("risk_assessment"), dict):
+            risk = sanitized["risk_assessment"]
+            if "overall_risk_level" in risk:
+                risk["overall_risk_level"] = str(risk["overall_risk_level"])
+            if isinstance(risk.get("risk_factors"), list):
+                for factor in risk["risk_factors"]:
+                    if isinstance(factor, dict) and "severity" in factor:
+                        factor["severity"] = str(factor["severity"])
+
+        # Sanitize action items
+        if isinstance(sanitized.get("action_items"), list):
+            for item in sanitized["action_items"]:
+                if isinstance(item, dict) and "priority" in item:
+                    item["priority"] = str(item["priority"])
+
+        # Sanitize patterns
+        if isinstance(sanitized.get("patterns"), list):
+            for pattern in sanitized["patterns"]:
+                if isinstance(pattern, dict) and "confidence" in pattern:
+                    pattern["confidence"] = str(pattern["confidence"])
+
+        return sanitized
+
     def _create_ai_insights_section(self, ai_insights: Dict[str, Any]) -> List:
         """Create AI insights section"""
         elements = []
+
+        # Sanitize insights before processing
+        ai_insights = self._sanitize_ai_insights(ai_insights)
 
         elements.append(
             Paragraph("AI Insights & Analysis", self.styles["CustomHeading1"])
@@ -390,7 +436,7 @@ class PDFReportGenerator:
         if ai_insights.get("insights"):
             elements.append(Paragraph("Key Insights", self.styles["CustomHeading2"]))
             for insight in ai_insights["insights"][:10]:  # Limit to 10 insights
-                elements.append(Paragraph(f"• {insight}", self.styles["Insight"]))
+                elements.append(Paragraph(f"• {str(insight)}", self.styles["Insight"]))
             elements.append(Spacer(1, 12))
 
         # Patterns & Trends
@@ -400,8 +446,8 @@ class PDFReportGenerator:
             )
             for pattern in ai_insights["patterns"][:8]:
                 if isinstance(pattern, dict):
-                    desc = pattern.get("description", "Pattern identified")
-                    conf = pattern.get("confidence", "medium")
+                    desc = str(pattern.get("description", "Pattern identified"))
+                    conf = str(pattern.get("confidence", "medium"))
                     elements.append(
                         Paragraph(
                             f"• {desc} <i>(Confidence: {conf})</i>",
@@ -409,7 +455,7 @@ class PDFReportGenerator:
                         )
                     )
                 else:
-                    elements.append(Paragraph(f"• {pattern}", self.styles["Insight"]))
+                    elements.append(Paragraph(f"• {str(pattern)}", self.styles["Insight"]))
             elements.append(Spacer(1, 12))
 
         # Anomalies
@@ -419,8 +465,8 @@ class PDFReportGenerator:
             )
             for anomaly in ai_insights["anomalies"][:5]:
                 if isinstance(anomaly, dict):
-                    desc = anomaly.get("description", "Anomaly detected")
-                    severity = anomaly.get("severity", "medium")
+                    desc = str(anomaly.get("description", "Anomaly detected"))
+                    severity = str(anomaly.get("severity", "medium"))
                     color = "#e74c3c" if severity in ["critical", "high"] else "#f39c12"
                     elements.append(
                         Paragraph(
@@ -429,7 +475,7 @@ class PDFReportGenerator:
                         )
                     )
                 else:
-                    elements.append(Paragraph(f"⚠ {anomaly}", self.styles["Warning"]))
+                    elements.append(Paragraph(f"⚠ {str(anomaly)}", self.styles["Warning"]))
             elements.append(Spacer(1, 12))
 
         # Predictions
@@ -439,9 +485,9 @@ class PDFReportGenerator:
             )
             for pred in ai_insights["predictions"][:6]:
                 if isinstance(pred, dict):
-                    desc = pred.get("prediction", "Prediction")
-                    timeframe = pred.get("timeframe", "Future")
-                    confidence = pred.get("confidence", "medium")
+                    desc = str(pred.get("prediction", "Prediction"))
+                    timeframe = str(pred.get("timeframe", "Future"))
+                    confidence = str(pred.get("confidence", "medium"))
                     elements.append(
                         Paragraph(
                             f"📈 {desc} <i>({timeframe}, Confidence: {confidence})</i>",
@@ -449,7 +495,7 @@ class PDFReportGenerator:
                         )
                     )
                 else:
-                    elements.append(Paragraph(f"📈 {pred}", self.styles["Insight"]))
+                    elements.append(Paragraph(f"📈 {str(pred)}", self.styles["Insight"]))
             elements.append(Spacer(1, 12))
 
         # Risk Assessment
@@ -477,8 +523,8 @@ class PDFReportGenerator:
                 elements.append(Spacer(1, 6))
                 for factor in risk["risk_factors"][:5]:
                     if isinstance(factor, dict):
-                        desc = factor.get("factor", "Risk factor")
-                        severity = factor.get("severity", "medium")
+                        desc = str(factor.get("factor", "Risk factor"))
+                        severity = str(factor.get("severity", "medium"))
                         elements.append(
                             Paragraph(
                                 f"• {desc} (Severity: {severity})",
@@ -491,7 +537,7 @@ class PDFReportGenerator:
         if ai_insights.get("recommendations"):
             elements.append(Paragraph("Recommendations", self.styles["CustomHeading2"]))
             for i, rec in enumerate(ai_insights["recommendations"][:10], 1):
-                elements.append(Paragraph(f"{i}. {rec}", self.styles["Recommendation"]))
+                elements.append(Paragraph(f"{i}. {str(rec)}", self.styles["Recommendation"]))
             elements.append(Spacer(1, 12))
 
         # Action Items
@@ -504,8 +550,6 @@ class PDFReportGenerator:
                 parent=self.styles["Normal"],
                 fontSize=9,
                 leading=11,
-                wordWrap=1,
-                splitLongWords=1,
             )
 
             # Headers wrapped in Paragraphs
@@ -521,10 +565,10 @@ class PDFReportGenerator:
                     # Wrap all cells in Paragraphs for proper text wrapping
                     action_data.append(
                         [
-                            Paragraph(item.get("priority", "Medium").upper(), action_wrap_style),
-                            Paragraph(item.get("action", "Action required"), action_wrap_style),
-                            Paragraph(item.get("owner", "TBD"), action_wrap_style),
-                            Paragraph(item.get("timeline", "TBD"), action_wrap_style),
+                            Paragraph(str(item.get("priority", "Medium")).upper(), action_wrap_style),
+                            Paragraph(str(item.get("action", "Action required")), action_wrap_style),
+                            Paragraph(str(item.get("owner", "TBD")), action_wrap_style),
+                            Paragraph(str(item.get("timeline", "TBD")), action_wrap_style),
                         ]
                     )
 
@@ -565,8 +609,6 @@ class PDFReportGenerator:
             parent=self.styles["Normal"],
             fontSize=9,
             leading=11,
-            wordWrap=1,  # Enable word wrapping
-            splitLongWords=1,  # Split long words if necessary
         )
 
         # Create header style with bold and proper wrapping
@@ -731,6 +773,10 @@ class PDFReportGenerator:
         time_range: str = "30d",
     ) -> bytes:
         """Generate PDF for analytics dashboard export"""
+
+        # Sanitize AI insights if provided
+        if ai_insights:
+            ai_insights = self._sanitize_ai_insights(ai_insights)
 
         # Create a template for analytics
         template = {

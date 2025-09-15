@@ -16,7 +16,7 @@ class AIConfig(BaseModel):
 
     # OpenAI settings
     openai_api_key: str = Field(default="")
-    model_name: str = Field(default="gpt-5-mini")
+    model_name: str = Field(default="gpt-4o-minii")
     temperature: float = Field(default=0.7)
     max_tokens: int = Field(default=2000)
     request_timeout: int = Field(default=30)
@@ -75,7 +75,7 @@ class ConfigLoader:
             # AI agent settings
             if "ai_agents" in parser:
                 ai_section = parser["ai_agents"]
-                config_data["model_name"] = ai_section.get("model_name", "gpt-5-mini")
+                config_data["model_name"] = ai_section.get("model_name", "gpt-4o-mini")
                 config_data["temperature"] = float(ai_section.get("temperature", 0.7))
                 config_data["max_tokens"] = int(ai_section.get("max_tokens", 2000))
                 config_data["request_timeout"] = int(

@@ -220,53 +220,52 @@ class DataLoader:
             )
             self.drug_prices = prices_df.set_index("med_id").to_dict("index")
 
-            # Load new enhanced data files (with error handling for missing files)
-            try:
-                # Load current inventory
-                current_inventory_df = pd.read_csv(
-                    os.path.join(self.data_dir, "current_inventory.csv")
-                )
-                self.current_inventory = current_inventory_df.set_index(
-                    "med_id"
-                ).to_dict("index")
-            except FileNotFoundError:
-                logger.warning("current_inventory.csv not found, using fallback data")
+            # Load current inventory from database
+            inventory_df = pd.read_sql_query("SELECT * FROM current_inventory", conn)
+            if not inventory_df.empty:
+                self.current_inventory = inventory_df.set_index("med_id").to_dict("index")
+            else:
+                logger.info("No current inventory data in database")
                 self.current_inventory = {}
 
-            try:
-                # Load batch information
-                batch_df = pd.read_csv(os.path.join(self.data_dir, "batch_info.csv"))
+            # Load batch information from database
+            batch_df = pd.read_sql_query("SELECT * FROM batch_info", conn)
+            if not batch_df.empty:
                 # Group batches by medication ID (drop med_id column from results to avoid warning)
                 self.batch_info = {}
                 for med_id, group in batch_df.groupby("med_id"):
                     self.batch_info[med_id] = group.drop(columns=["med_id"]).to_dict(
                         "records"
                     )
-            except FileNotFoundError:
-                logger.warning("batch_info.csv not found, using fallback data")
+            else:
+                logger.info("No batch info data in database")
                 self.batch_info = {}
 
-            try:
-                # Load warehouse zones
-                zones_df = pd.read_csv(
-                    os.path.join(self.data_dir, "warehouse_zones.csv")
-                )
+            # Load warehouse zones from database
+            zones_df = pd.read_sql_query("SELECT * FROM warehouse_zones", conn)
+            if not zones_df.empty:
                 self.warehouse_zones = zones_df.to_dict("records")
-            except FileNotFoundError:
-                logger.debug("warehouse_zones.csv not found, using fallback data")
+            else:
+                logger.info("No warehouse zones data in database")
                 self.warehouse_zones = []
 
-            try:
-                # Load purchase orders
-                po_df = pd.read_csv(os.path.join(self.data_dir, "purchase_orders.csv"))
-                # Group POs by medication ID (drop med_id column from results to avoid warning)
+            # Load purchase orders from database
+            # Note: Using purchase_order_items table to group by med_id
+            po_items_df = pd.read_sql_query(
+                """SELECT poi.*, po.po_number, po.status, po.created_at
+                   FROM purchase_order_items poi
+                   JOIN purchase_orders po ON poi.po_id = po.po_id""",
+                conn
+            )
+            if not po_items_df.empty:
+                # Group POs by medication ID
                 self.purchase_orders = {}
-                for med_id, group in po_df.groupby("med_id"):
+                for med_id, group in po_items_df.groupby("med_id"):
                     self.purchase_orders[med_id] = group.drop(
                         columns=["med_id"]
                     ).to_dict("records")
-            except FileNotFoundError:
-                logger.warning("purchase_orders.csv not found, using fallback data")
+            else:
+                logger.info("No purchase orders data in database")
                 self.purchase_orders = {}
 
             # Load supplier-specific prices from database
@@ -520,14 +519,20 @@ class DataLoader:
     ) -> Dict[str, Any]:
         """Get historical consumption data and forecast for a specific medication"""
         try:
-            # Load full consumption history for this medication
-            consumption_df = pd.read_csv(
-                os.path.join(self.data_dir, "consumption_history.csv")
+            # Load full consumption history from database
+            conn = self.get_connection()
+            consumption_df = pd.read_sql_query(
+                """SELECT * FROM consumption_history
+                   WHERE med_id = ?
+                   ORDER BY date DESC""",
+                conn,
+                params=(med_id,)
             )
             consumption_df["date"] = pd.to_datetime(consumption_df["date"])
+            conn.close()
 
-            # Filter for specific medication
-            med_data = consumption_df[consumption_df["med_id"] == med_id].copy()
+            # Filter for specific medication (already filtered in query)
+            med_data = consumption_df.copy()
 
             if med_data.empty:
                 return {"error": "No consumption data found for this medication"}

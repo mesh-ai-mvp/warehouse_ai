@@ -10,7 +10,7 @@ services:
         UV_NO_CACHE: 1
     container_name: warehouse-management
     ports:
-      - "8000:8000"
+      - "27893:8000"
     environment:
       - PORT=8000
       - HOST=0.0.0.0
@@ -29,8 +29,8 @@ services:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/filters', timeout=5)"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 120s
     networks:
       - warehouse-network
     deploy:

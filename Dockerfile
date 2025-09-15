@@ -26,6 +26,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 # Install build dependencies for Alpine
 RUN apk add --no-cache --virtual .build-deps \
     gcc \
+    g++ \
     musl-dev \
     libffi-dev \
     openssl-dev \
@@ -58,6 +59,8 @@ RUN apk add --no-cache \
     libffi \
     openssl \
     ca-certificates \
+    libgomp \
+    libstdc++ \
     && rm -rf /var/cache/apk/*
 
 # Set labels for metadata

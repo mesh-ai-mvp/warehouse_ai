@@ -95,6 +95,7 @@ class KAGOpenAILangChainAgent:
     def find_database_file(self):
         """Find the SQLite database file in possible locations"""
         possible_db_paths = [
+            Path("/app/poc_supplychain.db"),  # Docker container path
             Path("poc_supplychain.db"),
             Path("data/poc_supplychain.db"),
             Path("../data/poc_supplychain.db"),

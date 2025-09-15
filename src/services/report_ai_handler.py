@@ -36,13 +36,13 @@ class ReportAIHandler:
         else:
             try:
                 llm = ChatOpenAI(
-                    model="gpt-5-mini",
+                    model="gpt-4o-mini",
                     temperature=0.3,
                     max_tokens=2000,
                     api_key=api_key,
                 )
                 self.workflow = ReportInsightsWorkflow(llm=llm)
-                logger.info("ReportAIHandler initialized with OpenAI GPT-5-mini")
+                logger.info("ReportAIHandler initialized with OpenAI gpt-4o-mini")
             except Exception as e:
                 logger.error(f"Failed to initialize AI workflow: {str(e)}")
                 self.workflow = None

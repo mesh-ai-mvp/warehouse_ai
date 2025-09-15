@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  warehouse-app:
+    image: sidhez/warehouse-management:latest
+    container_name: warehouse-management-prod
+    ports:
+      - "${PORT:-27893}:8000"
+    environment:
+      - PORT=${PORT:-8000}
+      - HOST=0.0.0.0
+      - WORKERS=${WORKERS:-2}
+      - PYTHONPATH=/app/src:/app
+      - APP_ENV=production
+      - DEBUG=false
+      # AI Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Database (uses internal SQLite)
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///app/poc_supplychain.db}
+      # Email Configuration
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - EMAIL_FROM_NAME=${EMAIL_FROM_NAME:-Warehouse Team}
+      - EMAIL_BCC=${EMAIL_BCC}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      # Frontend Settings
+      - VITE_ENABLE_MOCK_FALLBACKS=${VITE_ENABLE_MOCK_FALLBACKS:-false}
+      - VITE_API_URL=${VITE_API_URL:-/api}
+      - VITE_ENABLE_AI_GENERATION=${VITE_ENABLE_AI_GENERATION:-true}
+    volumes:
+      # Mount logs directory for persistence
+      - warehouse-logs:/app/logs
+      # Optional: Mount data directory if you need to update data without rebuilding
+      # - ./data:/app/data:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/filters', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - warehouse-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Nginx reverse proxy with SSL termination
+  nginx:
+    image: nginx:alpine
+    container_name: warehouse-nginx
+    profiles:
+      - with-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - warehouse-app
+    networks:
+      - warehouse-network
+    restart: unless-stopped
+
+networks:
+  warehouse-network:
+    driver: bridge
+
+volumes:
+  warehouse-logs:
+    driver: local
