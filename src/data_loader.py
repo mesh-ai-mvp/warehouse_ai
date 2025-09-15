@@ -5,6 +5,7 @@ Now uses SQLite database instead of CSV files
 
 import os
 import sqlite3
+import json
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
@@ -75,84 +76,50 @@ class DataLoader:
 
     def initialize_report_templates(self):
         """Initialize default report templates in the database"""
+        # Import DEFAULT_TEMPLATES from reports module
+        try:
+            from api.reports import DEFAULT_TEMPLATES
+        except ImportError:
+            logger.warning("Could not import DEFAULT_TEMPLATES from api.reports")
+            return
+
         conn = self.get_connection()
         cursor = conn.cursor()
 
         try:
-            # Check if templates already exist
-            cursor.execute(
-                "SELECT COUNT(*) FROM report_templates WHERE id IN (1, 2, 3, 4)"
-            )
-            count = cursor.fetchone()[0]
+            # Always clear and re-initialize to ensure consistency
+            logger.info("Re-initializing report templates from DEFAULT_TEMPLATES...")
 
-            if count < 4:
-                logger.info("Initializing default report templates...")
+            # Clear existing templates
+            cursor.execute("DELETE FROM report_templates")
 
-                # Delete existing templates with IDs 1-4 to ensure clean state
-                cursor.execute("DELETE FROM report_templates WHERE id IN (1, 2, 3, 4)")
-
-                # Insert default templates
-                templates = [
-                    (
-                        1,
-                        "Inventory Stock Report",
-                        "Current stock levels and reorder points",
-                        "inventory",
-                        '{"include_expiry": true, "include_location": true}',
-                        '{"columns": ["name", "current_stock", "reorder_point", "category", "expiry_date"]}',
-                        "pdf",
-                        "weekly",
-                        1,
-                    ),
-                    (
-                        2,
-                        "Monthly Financial Summary",
-                        "Revenue, expenses, and profitability analysis",
-                        "financial",
-                        '{"period": "monthly", "include_trends": true}',
-                        '{"columns": ["revenue", "expenses", "profit", "margin"]}',
-                        "excel",
-                        "monthly",
-                        1,
-                    ),
-                    (
-                        3,
-                        "Supplier Performance",
-                        "Supplier delivery times and reliability metrics",
-                        "supplier",
-                        '{"include_ratings": true, "period": "quarterly"}',
-                        '{"columns": ["supplier", "on_time_rate", "quality_score", "total_orders"]}',
-                        "pdf",
-                        "monthly",
-                        1,
-                    ),
-                    (
-                        4,
-                        "Consumption Trends",
-                        "Medication consumption patterns and forecasts",
-                        "consumption",
-                        '{"forecast_days": 30, "include_seasonality": true}',
-                        '{"columns": ["medication", "daily_avg", "trend", "forecast"]}',
-                        "excel",
-                        "monthly",
-                        1,
-                    ),
-                ]
-
-                cursor.executemany(
+            # Insert all templates from DEFAULT_TEMPLATES
+            for idx, template in enumerate(DEFAULT_TEMPLATES, start=1):
+                cursor.execute(
                     """
                     INSERT INTO report_templates (
                         id, name, description, type, template_data, fields_config,
-                        format, frequency, is_active
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                    templates,
+                        chart_config, format, frequency, recipients, parameters,
+                        created_by, is_active
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'system', 1)
+                    """,
+                    (
+                        idx,
+                        template["name"],
+                        template.get("description", ""),
+                        template["type"],
+                        json.dumps(template.get("template_data", {})),
+                        json.dumps(template.get("fields_config", {})),
+                        json.dumps(template.get("chart_config", {})),
+                        template.get("format", "pdf"),
+                        template.get("frequency", "manual"),
+                        json.dumps(template.get("recipients", [])),
+                        json.dumps(template.get("parameters", {}))
+                    )
                 )
 
-                conn.commit()
-                logger.success(f"Initialized {len(templates)} default report templates")
-            else:
-                logger.info("Report templates already initialized")
+            conn.commit()
+            logger.success(f"Initialized {len(DEFAULT_TEMPLATES)} report templates from DEFAULT_TEMPLATES")
 
         except Exception as e:
             logger.error(f"Error initializing report templates: {e}")

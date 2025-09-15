@@ -43,7 +43,7 @@ interface ReportTemplate {
   id: string
   name: string
   description: string
-  type: 'inventory' | 'financial' | 'supplier' | 'consumption' | 'custom'
+  type: 'inventory' | 'financial' | 'supplier' | 'consumption' | 'warehouse_optimization' | 'custom'
   lastRun?: string
   frequency: 'manual' | 'daily' | 'weekly' | 'monthly'
   format: 'pdf' | 'excel' | 'csv'
@@ -99,6 +99,68 @@ const mockReportTemplates: ReportTemplate[] = [
     parameters: { timeRange: '90d', includeForecasts: true },
     chartTypes: ['line', 'area'],
   },
+  {
+    id: '5',
+    name: 'Warehouse Chaos Dashboard',
+    description: 'AI-powered analysis of warehouse inefficiencies',
+    type: 'warehouse_optimization',
+    lastRun: '2024-01-10T09:00:00Z',
+    frequency: 'daily',
+    format: 'pdf',
+    recipients: ['warehouse@company.com', 'operations@company.com'],
+    parameters: { analysis_type: 'full', include_ai_insights: true },
+    chartTypes: ['gauge', 'heatmap', 'bar'],
+  },
+  {
+    id: '6',
+    name: 'Placement Efficiency Report',
+    description: 'Product placement optimization and consolidation',
+    type: 'warehouse_optimization',
+    frequency: 'weekly',
+    format: 'excel',
+    recipients: ['warehouse@company.com'],
+    parameters: { focus: 'placement', include_simulation: true },
+    chartTypes: ['scatter', 'sankey'],
+  },
+  {
+    id: '7',
+    name: 'FIFO Compliance Report',
+    description: 'Expiry management and FIFO compliance monitoring',
+    type: 'warehouse_optimization',
+    lastRun: '2024-01-10T08:00:00Z',
+    frequency: 'daily',
+    format: 'pdf',
+    recipients: ['compliance@company.com', 'quality@company.com'],
+    parameters: { focus: 'compliance', alert_threshold_days: 30 },
+    chartTypes: ['timeline', 'pie'],
+  },
+  {
+    id: '8',
+    name: 'Movement Optimization Report',
+    description: 'Picking path and movement pattern optimization',
+    type: 'warehouse_optimization',
+    frequency: 'weekly',
+    format: 'pdf',
+    recipients: ['operations@company.com'],
+    parameters: { focus: 'movement', include_layout_changes: true },
+    chartTypes: ['flow', 'line'],
+  },
+  {
+    id: '9',
+    name: 'Comprehensive Warehouse Optimization',
+    description: 'Complete AI-driven warehouse optimization with ROI',
+    type: 'warehouse_optimization',
+    frequency: 'monthly',
+    format: 'pdf',
+    recipients: ['management@company.com', 'operations@company.com'],
+    parameters: {
+      analysis_type: 'full',
+      include_simulation: true,
+      include_ai_insights: true,
+      generate_action_plan: true
+    },
+    chartTypes: ['dashboard', 'waterfall', 'gantt'],
+  },
 ]
 
 
@@ -110,7 +172,26 @@ export function Reports() {
 
   const { data: reports, isLoading } = useQuery({
     queryKey: ['report-templates'],
-    queryFn: () => Promise.resolve(mockReportTemplates),
+    queryFn: async () => {
+      const response = await fetch('/api/reports/templates')
+      if (!response.ok) {
+        throw new Error('Failed to fetch report templates')
+      }
+      const data = await response.json()
+      // Transform backend data to match frontend interface
+      return data.map((template: any) => ({
+        id: template.id.toString(),
+        name: template.name,
+        description: template.description,
+        type: template.type,
+        lastRun: template.last_run,
+        frequency: template.frequency,
+        format: template.format,
+        recipients: template.recipients || [],
+        parameters: template.parameters || {},
+        chartTypes: template.chart_config?.charts?.map((c: any) => c.type) || []
+      }))
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 

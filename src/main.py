@@ -19,6 +19,7 @@ from api.routes import data_loader
 from api.routes import router as api_router
 from api.warehouse_routes import router as warehouse_router
 from api.warehouse_routes_optimized import router as warehouse_optimized_router
+from api.warehouse_optimization_routes import router as warehouse_optimization_router
 from api.websocket_routes import router as websocket_router
 
 
@@ -93,6 +94,7 @@ app.include_router(reports_router, prefix="/api")
 # Prefer optimized warehouse routes when overlapping paths exist
 app.include_router(warehouse_optimized_router)  # Optimized warehouse routes
 app.include_router(warehouse_router)
+app.include_router(warehouse_optimization_router, prefix="/api")  # Warehouse optimization AI routes
 app.include_router(websocket_router)  # WebSocket routes
 
 # Serve React build files

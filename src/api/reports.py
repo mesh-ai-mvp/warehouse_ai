@@ -305,6 +305,225 @@ DEFAULT_TEMPLATES = [
         "recipients": ["analytics@company.com"],
         "parameters": {"includeForecasts": True, "timeRange": "6m"},
     },
+    {
+        "name": "Warehouse Chaos Dashboard",
+        "description": "AI-powered analysis of warehouse inefficiencies and optimization opportunities",
+        "type": "warehouse_optimization",
+        "template_data": {
+            "title": "Warehouse Chaos Analysis Dashboard",
+            "sections": ["chaos_metrics", "problem_areas", "quick_wins", "recommendations"],
+            "analysis_type": "full",
+        },
+        "fields_config": {
+            "fields": [
+                {"name": "metric_name", "label": "Metric", "type": "text", "required": True},
+                {"name": "current_score", "label": "Current Score", "type": "number", "required": True},
+                {"name": "target_score", "label": "Target", "type": "number", "required": True},
+                {"name": "improvement_potential", "label": "Improvement %", "type": "number", "required": True},
+                {"name": "priority", "label": "Priority", "type": "text", "required": True},
+            ]
+        },
+        "chart_config": {
+            "charts": [
+                {
+                    "type": "gauge",
+                    "title": "Overall Efficiency Score",
+                    "value": "efficiency_score",
+                    "min": 0,
+                    "max": 100,
+                    "target": 85,
+                },
+                {
+                    "type": "heatmap",
+                    "title": "Warehouse Problem Zones",
+                    "data": "heat_map_data",
+                },
+                {
+                    "type": "bar",
+                    "title": "Optimization Opportunities",
+                    "x": "category",
+                    "y": "impact_score",
+                },
+            ]
+        },
+        "format": "pdf",
+        "frequency": "daily",
+        "recipients": ["warehouse@company.com", "operations@company.com"],
+        "parameters": {"analysis_type": "full", "include_ai_insights": True},
+    },
+    {
+        "name": "Placement Efficiency Report",
+        "description": "Product placement optimization and consolidation opportunities",
+        "type": "warehouse_optimization",
+        "template_data": {
+            "title": "Placement Efficiency Analysis",
+            "sections": ["velocity_analysis", "fragmentation", "consolidation_plan", "relocation_strategy"],
+            "focus": "placement",
+        },
+        "fields_config": {
+            "fields": [
+                {"name": "item_name", "label": "Item", "type": "text", "required": True},
+                {"name": "current_location", "label": "Current Location", "type": "text", "required": True},
+                {"name": "optimal_location", "label": "Optimal Location", "type": "text", "required": True},
+                {"name": "velocity_category", "label": "Velocity", "type": "text", "required": True},
+                {"name": "time_savings", "label": "Time Savings (min/day)", "type": "number", "required": False},
+            ]
+        },
+        "chart_config": {
+            "charts": [
+                {
+                    "type": "scatter",
+                    "title": "Velocity vs Location Analysis",
+                    "x": "velocity_score",
+                    "y": "grid_position",
+                },
+                {
+                    "type": "sankey",
+                    "title": "Relocation Flow",
+                    "source": "current_zones",
+                    "target": "optimal_zones",
+                },
+            ]
+        },
+        "format": "excel",
+        "frequency": "weekly",
+        "recipients": ["warehouse@company.com"],
+        "parameters": {"focus": "placement", "include_simulation": True},
+    },
+    {
+        "name": "FIFO Compliance Report",
+        "description": "Expiry management and FIFO compliance monitoring",
+        "type": "warehouse_optimization",
+        "template_data": {
+            "title": "FIFO Compliance & Expiry Management",
+            "sections": ["compliance_score", "violations", "expiry_alerts", "corrective_actions"],
+            "focus": "compliance",
+        },
+        "fields_config": {
+            "fields": [
+                {"name": "batch_number", "label": "Batch", "type": "text", "required": True},
+                {"name": "item_name", "label": "Item", "type": "text", "required": True},
+                {"name": "expiry_date", "label": "Expiry Date", "type": "date", "required": True},
+                {"name": "days_remaining", "label": "Days Until Expiry", "type": "number", "required": True},
+                {"name": "violation_type", "label": "Violation", "type": "text", "required": False},
+                {"name": "action_required", "label": "Action", "type": "text", "required": True},
+            ]
+        },
+        "chart_config": {
+            "charts": [
+                {
+                    "type": "timeline",
+                    "title": "Expiry Timeline",
+                    "data": "expiry_schedule",
+                },
+                {
+                    "type": "pie",
+                    "title": "Compliance Status Distribution",
+                    "value": "count",
+                    "label": "status",
+                },
+            ]
+        },
+        "format": "pdf",
+        "frequency": "daily",
+        "recipients": ["compliance@company.com", "quality@company.com"],
+        "parameters": {"focus": "compliance", "alert_threshold_days": 30},
+    },
+    {
+        "name": "Movement Optimization Report",
+        "description": "Picking path and movement pattern optimization analysis",
+        "type": "warehouse_optimization",
+        "template_data": {
+            "title": "Movement Pattern Optimization",
+            "sections": ["movement_stats", "path_analysis", "congestion_points", "layout_recommendations"],
+            "focus": "movement",
+        },
+        "fields_config": {
+            "fields": [
+                {"name": "route", "label": "Route", "type": "text", "required": True},
+                {"name": "frequency", "label": "Frequency", "type": "number", "required": True},
+                {"name": "avg_time", "label": "Avg Time (sec)", "type": "number", "required": True},
+                {"name": "distance", "label": "Distance (m)", "type": "number", "required": True},
+                {"name": "optimization", "label": "Optimization", "type": "text", "required": False},
+            ]
+        },
+        "chart_config": {
+            "charts": [
+                {
+                    "type": "flow",
+                    "title": "Movement Heat Flow",
+                    "data": "flow_map",
+                },
+                {
+                    "type": "line",
+                    "title": "Hourly Movement Patterns",
+                    "x": "hour",
+                    "y": "movements",
+                },
+            ]
+        },
+        "format": "pdf",
+        "frequency": "weekly",
+        "recipients": ["operations@company.com"],
+        "parameters": {"focus": "movement", "include_layout_changes": True},
+    },
+    {
+        "name": "Comprehensive Warehouse Optimization",
+        "description": "Complete AI-driven warehouse optimization analysis with ROI",
+        "type": "warehouse_optimization",
+        "template_data": {
+            "title": "Comprehensive Warehouse Optimization Report",
+            "sections": [
+                "executive_summary",
+                "chaos_analysis",
+                "placement_optimization",
+                "compliance_audit",
+                "movement_analysis",
+                "recommendations",
+                "roi_analysis",
+                "implementation_roadmap"
+            ],
+            "analysis_type": "full",
+        },
+        "fields_config": {
+            "fields": [
+                {"name": "recommendation", "label": "Recommendation", "type": "text", "required": True},
+                {"name": "priority", "label": "Priority", "type": "text", "required": True},
+                {"name": "effort", "label": "Effort", "type": "text", "required": True},
+                {"name": "impact", "label": "Impact", "type": "text", "required": True},
+                {"name": "timeline", "label": "Timeline", "type": "text", "required": True},
+                {"name": "roi", "label": "ROI", "type": "currency", "required": False},
+            ]
+        },
+        "chart_config": {
+            "charts": [
+                {
+                    "type": "dashboard",
+                    "title": "Optimization Scorecard",
+                    "metrics": ["efficiency", "compliance", "utilization", "accuracy"],
+                },
+                {
+                    "type": "waterfall",
+                    "title": "ROI Breakdown",
+                    "categories": ["savings", "costs", "net_benefit"],
+                },
+                {
+                    "type": "gantt",
+                    "title": "Implementation Timeline",
+                    "tasks": "roadmap_tasks",
+                },
+            ]
+        },
+        "format": "pdf",
+        "frequency": "monthly",
+        "recipients": ["management@company.com", "operations@company.com"],
+        "parameters": {
+            "analysis_type": "full",
+            "include_simulation": True,
+            "include_ai_insights": True,
+            "generate_action_plan": True
+        },
+    },
 ]
 
 
@@ -803,6 +1022,8 @@ async def _generate_report_data(
         return await _generate_supplier_report_data(parameters, cursor)
     elif report_type == "consumption":
         return await _generate_consumption_report_data(parameters, cursor)
+    elif report_type == "warehouse_optimization":
+        return await _generate_warehouse_optimization_report_data(parameters, cursor)
     else:
         raise HTTPException(
             status_code=400, detail=f"Unsupported report type: {report_type}"
@@ -1039,6 +1260,189 @@ async def _generate_consumption_report_data(
         )
 
     return data
+
+
+async def _generate_warehouse_optimization_report_data(
+    parameters: Dict[str, Any], cursor
+) -> List[Dict[str, Any]]:
+    """Generate warehouse optimization report data"""
+
+    analysis_type = parameters.get("analysis_type", "full")
+    focus = parameters.get("focus", "general")
+
+    # Get chaos metrics
+    cursor.execute("""
+        SELECT
+            metric_name,
+            current_chaos_score,
+            optimal_score,
+            improvement_potential
+        FROM warehouse_chaos_metrics
+        ORDER BY improvement_potential DESC
+    """)
+
+    metrics = cursor.fetchall()
+
+    # Get fragmentation data
+    cursor.execute("""
+        SELECT
+            COUNT(DISTINCT b.batch_id) as fragmented_batches,
+            COUNT(DISTINCT mp.position_id) as total_positions,
+            SUM(mp.quantity) as total_quantity
+        FROM medication_placements mp
+        JOIN batch_info b ON mp.batch_id = b.batch_id
+        WHERE mp.is_active = 1
+        GROUP BY b.batch_id
+        HAVING COUNT(DISTINCT mp.position_id) > 1
+    """)
+
+    fragmentation = cursor.fetchone()
+
+    # Get velocity mismatches
+    cursor.execute("""
+        SELECT COUNT(*) as mismatches
+        FROM medication_placements mp
+        JOIN medications m ON mp.med_id = m.med_id
+        JOIN medication_attributes ma ON m.med_id = ma.med_id
+        JOIN shelf_positions sp ON mp.position_id = sp.position_id
+        WHERE mp.is_active = 1
+        AND ((ma.movement_category = 'Fast' AND sp.grid_y = 3)
+            OR (ma.movement_category = 'Slow' AND sp.grid_y = 1))
+    """)
+
+    velocity_mismatches = cursor.fetchone()
+
+    # Build report data based on focus
+    data = []
+
+    if focus == "compliance":
+        # Focus on compliance metrics
+        cursor.execute("""
+            SELECT
+                m.name as item_name,
+                b.lot_number as batch_number,
+                b.expiry_date,
+                julianday(b.expiry_date) - julianday('now') as days_remaining,
+                CASE
+                    WHEN julianday(b.expiry_date) - julianday('now') <= 0 THEN 'Expired'
+                    WHEN julianday(b.expiry_date) - julianday('now') <= 7 THEN 'Critical'
+                    WHEN julianday(b.expiry_date) - julianday('now') <= 30 THEN 'Warning'
+                    ELSE 'OK'
+                END as status,
+                'Immediate rotation required' as action_required
+            FROM medication_placements mp
+            JOIN batch_info b ON mp.batch_id = b.batch_id
+            JOIN medications m ON mp.med_id = m.med_id
+            WHERE mp.is_active = 1
+            AND julianday(b.expiry_date) - julianday('now') <= 30
+            ORDER BY days_remaining
+            LIMIT 50
+        """)
+
+        for row in cursor.fetchall():
+            data.append({
+                "item_name": row[0],
+                "batch_number": row[1],
+                "expiry_date": row[2],
+                "days_remaining": int(row[3]) if row[3] else 0,
+                "violation_type": row[4],
+                "action_required": row[5]
+            })
+
+    elif focus == "placement":
+        # Focus on placement optimization
+        cursor.execute("""
+            SELECT
+                m.name as item_name,
+                a.aisle_code || '-' || s.shelf_code || '-' || sp.grid_label as current_location,
+                CASE ma.movement_category
+                    WHEN 'Fast' THEN 'A1-S1-P1'
+                    WHEN 'Medium' THEN 'B1-S1-P5'
+                    ELSE 'C1-S2-P8'
+                END as optimal_location,
+                ma.movement_category as velocity_category,
+                ma.velocity_score * 2.5 as time_savings
+            FROM medication_placements mp
+            JOIN medications m ON mp.med_id = m.med_id
+            JOIN medication_attributes ma ON m.med_id = ma.med_id
+            JOIN shelf_positions sp ON mp.position_id = sp.position_id
+            JOIN warehouse_shelves s ON sp.shelf_id = s.shelf_id
+            JOIN warehouse_aisles a ON s.aisle_id = a.aisle_id
+            WHERE mp.is_active = 1
+            AND ((ma.movement_category = 'Fast' AND sp.grid_y = 3)
+                OR (ma.movement_category = 'Slow' AND sp.grid_y = 1))
+            LIMIT 50
+        """)
+
+        for row in cursor.fetchall():
+            data.append({
+                "item_name": row[0],
+                "current_location": row[1],
+                "optimal_location": row[2],
+                "velocity_category": row[3],
+                "time_savings": round(row[4], 1) if row[4] else 0
+            })
+
+    elif focus == "movement":
+        # Focus on movement patterns
+        cursor.execute("""
+            SELECT
+                movement_type || ' - ' || COALESCE(a.aisle_code || '-' || s.shelf_code, 'Unknown') as route,
+                COUNT(*) as frequency,
+                ROUND(AVG(sp.grid_x * 3 + sp.grid_y * 2), 1) as distance,
+                COUNT(*) * 15 as avg_time,
+                'Optimize path' as optimization
+            FROM movement_history mh
+            LEFT JOIN shelf_positions sp ON mh.position_id = sp.position_id
+            LEFT JOIN warehouse_shelves s ON sp.shelf_id = s.shelf_id
+            LEFT JOIN warehouse_aisles a ON s.aisle_id = a.aisle_id
+            WHERE mh.movement_date >= datetime('now', '-30 days')
+            GROUP BY movement_type, a.aisle_code, s.shelf_code
+            HAVING COUNT(*) > 5
+            ORDER BY frequency DESC
+            LIMIT 50
+        """)
+
+        for row in cursor.fetchall():
+            data.append({
+                "route": row[0],
+                "frequency": row[1],
+                "distance": round(row[2], 1) if row[2] else 0,
+                "avg_time": round(row[3], 1) if row[3] else 0,
+                "optimization": row[4]
+            })
+
+    else:
+        # General optimization metrics
+        for metric in metrics:
+            data.append({
+                "metric_name": metric[0],
+                "current_score": round(metric[1], 2) if metric[1] else 0,
+                "target_score": metric[2] if metric[2] else 0,
+                "improvement_potential": round(metric[3], 2) if metric[3] else 0,
+                "priority": "High" if metric[3] and metric[3] > 10 else "Medium"
+            })
+
+        # Add summary metrics
+        if fragmentation:
+            data.append({
+                "metric_name": "Batch Fragmentation",
+                "current_score": fragmentation[0] if fragmentation[0] else 0,
+                "target_score": 0,
+                "improvement_potential": fragmentation[0] * 5 if fragmentation[0] else 0,
+                "priority": "High"
+            })
+
+        if velocity_mismatches:
+            data.append({
+                "metric_name": "Velocity Mismatches",
+                "current_score": velocity_mismatches[0] if velocity_mismatches[0] else 0,
+                "target_score": 0,
+                "improvement_potential": velocity_mismatches[0] * 3 if velocity_mismatches[0] else 0,
+                "priority": "High"
+            })
+
+    return data if data else [{"message": "No optimization data available"}]
 
 
 def _export_csv(report_result: Dict[str, Any]) -> StreamingResponse:
